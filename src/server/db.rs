@@ -72,6 +72,7 @@ impl Db {
             [],
         );
         let _ = conn.execute("ALTER TABLE things ADD COLUMN kind TEXT", []);
+        let _ = conn.execute("ALTER TABLE players ADD COLUMN key_hash TEXT", []);
         Ok(Db { conn })
     }
 
@@ -317,6 +318,32 @@ impl Db {
     }
 
     /// Where a returning player was, and how far through first steps.
+    /// The hash of the key that owns a name, if it's been claimed.
+    pub fn name_key(&self, name: &str) -> Option<String> {
+        self.conn
+            .query_row("SELECT key_hash FROM players WHERE name = ?1", [name], |r| r.get(0))
+            .ok()
+            .flatten()
+    }
+
+    pub fn claim_name(&self, name: &str, key_hash: &str, x: i64, y: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO players (name, x, y, tutorial, key_hash) VALUES (?1, ?2, ?3, 0, ?4)
+             ON CONFLICT(name) DO UPDATE SET key_hash = excluded.key_hash",
+            params![name, x, y, key_hash],
+        )?;
+        Ok(())
+    }
+
+    /// Free a name so the next device to use it claims it. True if it was claimed.
+    pub fn release_name(&self, name: &str) -> anyhow::Result<bool> {
+        let n = self.conn.execute(
+            "UPDATE players SET key_hash = NULL WHERE name = ?1 COLLATE NOCASE AND key_hash IS NOT NULL",
+            [name],
+        )?;
+        Ok(n > 0)
+    }
+
     pub fn player(&self, name: &str) -> Option<(i64, i64, u8)> {
         self.conn
             .query_row("SELECT x, y, tutorial FROM players WHERE name = ?1", [name], |r| {

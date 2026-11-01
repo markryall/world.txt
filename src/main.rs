@@ -1,6 +1,7 @@
 mod agent;
 mod bridge;
 mod client;
+mod identity;
 mod protocol;
 mod server;
 
@@ -72,6 +73,12 @@ enum Cmd {
         #[arg(long, default_value = "tmp/bridge")]
         dir: std::path::PathBuf,
     },
+    /// Free a name so a new device can claim it (e.g. a kid on a new iPad).
+    Release {
+        name: String,
+        #[arg(long, default_value = "world.db")]
+        db: String,
+    },
     /// Send one command through a running bridge and print what comes back.
     Send {
         name: String,
@@ -94,5 +101,6 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Bridge { name, server, password, dir } => bridge::run(name, &server, password, dir).await,
         Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
+        Cmd::Release { name, db } => server::release(&db, &name),
     }
 }

@@ -137,6 +137,9 @@ pub enum ToServer {
         /// True for AI residents, so the world can tell them from people.
         #[serde(default)]
         bot: bool,
+        /// This device's secret: the first device to use a name claims it.
+        #[serde(default)]
+        key: Option<String>,
     },
     Cmd { text: String },
 }

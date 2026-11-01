@@ -3,6 +3,7 @@
 
 mod db;
 mod game;
+pub mod names;
 mod nature;
 mod rng;
 mod terrain;
@@ -20,7 +21,7 @@ use tokio_tungstenite::tungstenite::Message;
 pub type ClientTx = UnboundedSender<ToClient>;
 
 pub enum Event {
-    Join { id: u64, name: String, bot: bool, tx: ClientTx },
+    Join { id: u64, name: String, bot: bool, key: Option<String>, tx: ClientTx },
     Cmd { id: u64, text: String },
     Leave { id: u64 },
 }
@@ -101,9 +102,9 @@ async fn connection(
                 });
                 break;
             }
-            ToServer::Hello { name, bot, .. } if !joined => {
+            ToServer::Hello { name, bot, key, .. } if !joined => {
                 joined = true;
-                events.send(Event::Join { id, name, bot, tx: tx.clone() })?;
+                events.send(Event::Join { id, name, bot, key, tx: tx.clone() })?;
             }
             ToServer::Cmd { text } if joined => {
                 events.send(Event::Cmd { id, text })?;
@@ -162,5 +163,16 @@ async fn serve_page(mut stream: TcpStream) -> anyhow::Result<()> {
     );
     stream.write_all(resp.as_bytes()).await?;
     stream.shutdown().await?;
+    Ok(())
+}
+
+/// `world.txt release <Name>`: let a new device claim a name.
+pub fn release(db_path: &str, name: &str) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    if db.release_name(name)? {
+        println!("🔓 {name} is free: the next device to use that name will claim it.");
+    } else {
+        println!("Nobody had claimed {name} (in {db_path}), so there was nothing to release.");
+    }
     Ok(())
 }

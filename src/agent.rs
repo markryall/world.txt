@@ -89,7 +89,7 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
 
     let ws = crate::bridge::connect_retry(&opts.server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = ToServer::Hello { name: opts.name.clone(), password: opts.password.clone(), bot: true };
+    let hello = ToServer::Hello { name: opts.name.clone(), password: opts.password.clone(), bot: true, key: crate::identity::device_key() };
     sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
     log(&opts.name, &format!("🐾 joined {} (budget ${:.2}/day, {MODEL})", opts.server, opts.daily_usd));
 

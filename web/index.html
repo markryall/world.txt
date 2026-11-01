@@ -209,10 +209,23 @@ function status(m) {
   updateRain();
 }
 
+// This device's secret. The first device to use a name claims it, so
+// nobody else can turn up as Poppy. getRandomValues works on plain http too.
+function deviceKey() {
+  try {
+    let k = localStorage.getItem('world.key');
+    if (!k) {
+      k = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem('world.key', k);
+    }
+    return k;
+  } catch { return null; }
+}
+
 function connect(name, password) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/`);
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', name, password }));
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', name, password, key: deviceKey() }));
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.type === 'lines') addLines(m.lines);
@@ -225,6 +238,10 @@ function connect(name, password) {
         try { localStorage.removeItem('world.pw'); } catch {}
         history.replaceState(null, '', location.pathname);
         setTimeout(() => location.reload(), 2000);
+      } else if (m.reason.includes('belongs to') || m.reason.includes('already here')) {
+        // Back to the name screen to pick another.
+        try { localStorage.removeItem('world.name'); } catch {}
+        setTimeout(() => location.reload(), 3500);
       }
     }
   };

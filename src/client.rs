@@ -44,7 +44,7 @@ pub async fn run(name: Option<String>, server: &str, password: Option<String>) -
 
     let (ws, _) = tokio_tungstenite::connect_async(server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = serde_json::to_string(&ToServer::Hello { name, password, bot: false })?;
+    let hello = serde_json::to_string(&ToServer::Hello { name, password, bot: false, key: crate::identity::device_key() })?;
     sink.send(Message::Text(hello.into())).await?;
 
     let mut terminal = ratatui::init();

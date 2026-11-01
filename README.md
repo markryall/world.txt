@@ -13,6 +13,13 @@ open http://localhost:4040         # browser client (works on iPads, plays sound
 Cargo won't put a `.` in a binary name, so `cargo build` makes `target/release/world`
 and `make install` copies it into place as `world.txt`. `cargo run -- serve` works too.
 
+**Names belong to the device that first uses them.** Each browser keeps a secret
+key (and this machine's terminal client, residents and bridges share one in
+`~/.config/world.txt/key`); the world stores only a hash. Anyone else trying that
+name is turned away. When a kid moves to a new device, free their name with
+`world.txt release Poppy` (it works while the server is running), and the next
+device to use it claims it.
+
 One port serves both doors: websocket upgrades go to the game, and plain HTTP
 gets the browser page (`web/index.html`, compiled into the binary).
 

@@ -38,7 +38,7 @@ pub async fn run(name: String, server: &str, password: Option<String>, dir: Path
 
     let ws = connect_retry(server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = ToServer::Hello { name: name.clone(), password, bot: true };
+    let hello = ToServer::Hello { name: name.clone(), password, bot: true, key: crate::identity::device_key() };
     sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
 
     let listener = UnixListener::bind(&sock_path)?;

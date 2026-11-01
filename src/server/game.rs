@@ -70,7 +70,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>) {
 impl Game {
     fn handle(&mut self, ev: Event) {
         match ev {
-            Event::Join { id, name, bot, tx } => self.join(id, name, bot, tx),
+            Event::Join { id, name, bot, key, tx } => self.join(id, name, bot, key, tx),
             Event::Leave { id } => self.leave(id),
             Event::Cmd { id, text } => {
                 let before = self.snapshot(id);
@@ -154,7 +154,7 @@ impl Game {
 
     // ---- arriving and leaving -----------------------------------------
 
-    fn join(&mut self, id: u64, raw: String, bot: bool, tx: ClientTx) {
+    fn join(&mut self, id: u64, raw: String, bot: bool, key: Option<String>, tx: ClientTx) {
         let name = clean_name(&raw);
         if name.is_empty() {
             let _ = tx.send(ToClient::Bye { reason: "Names need a letter or two, darling.".into() });
@@ -164,6 +164,19 @@ impl Game {
             let _ = tx.send(ToClient::Bye { reason: format!("Someone called {name} is already here.") });
             return;
         }
+        let claim = match super::names::check(self.world.db.name_key(&name).as_deref(), key.as_deref()) {
+            super::names::NameCheck::Taken => {
+                let _ = tx.send(ToClient::Bye {
+                    reason: format!(
+                        "🔐 The name {name} belongs to someone else's device. Try a different name! \
+                         (If it's really yours, ask the island's keeper to release it.)"
+                    ),
+                });
+                return;
+            }
+            super::names::NameCheck::Claim(hash) => Some(hash),
+            super::names::NameCheck::Welcome => None,
+        };
         let saved = self.world.db.player(&name);
         let first_time = saved.is_none() && !bot;
         let tutorial = if bot { tutorial::DONE } else { saved.map_or(0, |s| s.2) };
@@ -172,6 +185,11 @@ impl Game {
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
+        if let Some(hash) = claim {
+            if let Err(e) = self.world.db.claim_name(&name, &hash, x, y) {
+                eprintln!("claiming {name}: {e}");
+            }
+        }
         self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None });
 
         self.send(
