@@ -1,0 +1,7 @@
+name = "Keepers can help kids back into their names"
+status = "todo"
+description = "Browsers keep the name key per web address, so a new quick-tunnel link, switching between the home address and the Cloudflare one, or iPad Safari clearing old site data gives a kid a fresh key, and they're told their own name belongs to someone else. Today the only fix is 'world.txt release <name>' on the server's machine. Let island keepers fix it from inside the world: an in-game 'release Poppy' for keepers, and a gentle path for the kid (e.g. the refusal says to ask a keeper, or the keeper approves the new device). Maybe also a 'link' code so a kid can move their name to a new device themselves. Docs should recommend one stable address (named tunnel or the same home address)."
+created_at = "2026-11-01T14:43:47.449350Z"
+updated_at = "2026-11-01T14:43:47.449350Z"
+tags = ["safety"]
+priority = "high"
