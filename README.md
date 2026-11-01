@@ -4,11 +4,23 @@ A small shared island made of text. You can wander, chat, dig ponds, plant trees
 name places and make things. There are no battles, just vibes.
 
 ```
-make install                       # builds and installs ~/.local/bin/world.txt
-world.txt serve                    # opens the world on :4040, saves to world.db
-world.txt play Mark                # terminal client
-open http://localhost:4040         # browser client (works on iPads, plays sound)
+make install                         # builds and installs ~/.local/bin/world.txt
+world.txt serve                      # opens the world on :4040, saves to world.db
+world.txt invite Mark --keeper       # your account, and its magic link: open it!
+world.txt play --invite <link>       # or the terminal client (just `world.txt play` after)
 ```
+
+**The world is invite-only.** Every account is made by a keeper (or on the
+server's machine with `world.txt invite`), which prints a **magic link**. Opening
+it signs that device in for good: the link is used up, and the browser (or
+terminal) keeps a device token instead, so next time it just opens. Links work
+once and expire after 7 days. For someone's new device, a keeper makes a fresh
+link (`link Poppy` in the world, or `world.txt link Poppy`); their other devices
+keep working. In the world, keepers type `invite Poppy` to make an account for
+someone new. Pass `--url https://your.address` (or `WORLD_URL`) to `serve` and
+`invite` so links come out whole; otherwise the browser fills in its own address.
+Browsers keep the device token per web address, so stick to one address (a named
+tunnel, or the same home address).
 
 Cargo won't put a `.` in a binary name, so `cargo build` makes `target/release/world`
 and `make install` copies it into place as `world.txt`. `cargo run -- serve` works too.
@@ -166,8 +178,8 @@ Clouds drift across the island on the wind, and a whole day passes in 24 minutes
 anyone else's or to where newcomers arrive). It shows as `⌂` on the map and is
 called "Poppy's Home" (with "Poppy's Garden" around it) unless you `name` it.
 `home` takes you straight back from anywhere. Anyone can visit, but only you,
-the friends you `invite`, and keepers can make, place, dig, plant or name things
-there (`uninvite`, `guests`). Claiming somewhere else moves your home.
+the friends you `share` it with, and keepers can make, place, dig, plant or name
+things there (`unshare`, `guests`). Claiming somewhere else moves your home.
 
 ### Gathering
 
@@ -226,7 +238,9 @@ Residents are AI characters who join like any other player and call Claude
 
 ```
 export ANTHROPIC_API_KEY=...
-world.txt agent Moss                     # uses personas/moss.md
+world.txt invite Moss                    # once: Moss's account and invite
+world.txt agent Moss --invite <link>     # the first time
+world.txt agent Moss                     # after that (uses personas/moss.md)
 world.txt agent Moss --dry-run           # prints what it would ask Claude, calls nothing
 ```
 
@@ -250,6 +264,7 @@ For a special guest with a bigger brain, a Claude Code session can be the
 resident instead. It runs on your Claude plan, with no API key needed.
 
 ```
+world.txt bridge Claudia --invite <link>  # the first time (world.txt invite Claudia makes one)
 world.txt bridge Claudia                  # stays connected, logs to tmp/bridge/claudia.log
 world.txt send Claudia say hello darlings! # acts, and prints what the world said back
 ```

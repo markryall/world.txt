@@ -34,6 +34,10 @@ a play you're performing in.
 1. Read `personas/<name>.md`. That's who you are. If there's no file, ask the
    human for a one-line character and keep it gentle and kid-friendly.
 2. Start the bridge with Bash `run_in_background`: `world.txt bridge <Name>`.
+   The world is invite-only: the first time, the bridge needs
+   `--invite <magic link>`. If it says it needs an invite, ask the human to run
+   `world.txt invite <Name>` on the server machine (or a keeper to type
+   `invite <Name>`) and give you the link.
    It keeps you connected and writes everything you see to
    `tmp/bridge/<name>.log`.
 3. Wait for `tmp/bridge/<name>.sock` to exist (`until [ -S ... ]; do sleep 0.3; done`).
