@@ -349,6 +349,8 @@ impl Game {
             self.say1(id, line.clone());
             self.tell_here(nx, ny, id, line);
         }
+        // Save where they are with every step, so a crash or power cut loses nothing.
+        self.save_progress(id);
         self.status_all();
         Ok(())
     }
@@ -466,8 +468,8 @@ impl Game {
         }
     }
 
-    /// Remember progress straight away, so a returning visitor never has to
-    /// repeat first steps, even if the world restarts before they leave.
+    /// Save a player's position and first-steps progress straight away, so
+    /// nothing is lost even if the world stops before they leave.
     fn save_progress(&self, id: u64) {
         let Some(p) = self.players.get(&id) else { return };
         if !p.bot {
