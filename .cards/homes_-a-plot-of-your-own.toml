@@ -1,7 +1,7 @@
 name = "Homes: a plot of your own"
-status = "todo"
+status = "done"
 description = "Claim a little plot, decorate it with placed things, invite friends in, and 'home' takes you back there. A place that's yours."
 created_at = "2026-11-01T14:36:29.465740Z"
-updated_at = "2026-11-01T14:36:29.465740Z"
+updated_at = "2026-11-01T14:56:48.147610Z"
 tags = ["belonging"]
 priority = "medium"

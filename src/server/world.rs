@@ -64,10 +64,30 @@ impl Thing {
     }
 }
 
+pub struct Home {
+    pub owner: String,
+    pub x: i64,
+    pub y: i64,
+    pub guests: Vec<String>,
+}
+
+/// A home is the 3x3 patch around where it was claimed.
+pub const HOME_RADIUS: i64 = 1;
+
+impl Home {
+    pub fn covers(&self, x: i64, y: i64) -> bool {
+        (x - self.x).abs() <= HOME_RADIUS && (y - self.y).abs() <= HOME_RADIUS
+    }
+    pub fn welcomes(&self, name: &str) -> bool {
+        self.owner.eq_ignore_ascii_case(name) || self.guests.iter().any(|g| g.eq_ignore_ascii_case(name))
+    }
+}
+
 pub struct World {
     pub seed: u64,
     tiles: Vec<Tile>,
     pub things: Vec<Thing>,
+    pub homes: Vec<Home>,
     pub weather: Weather,
     pub db: Db,
 }
@@ -118,7 +138,12 @@ impl World {
                 kind: r.kind,
             })
             .collect();
-        Ok(World { seed, tiles, things, weather: Weather::new(SIZE, seed), db })
+        let homes = db
+            .homes()?
+            .into_iter()
+            .map(|(owner, x, y, guests)| Home { owner, x, y, guests })
+            .collect();
+        Ok(World { seed, tiles, things, homes, weather: Weather::new(SIZE, seed), db })
     }
 
     pub fn tile(&self, x: i64, y: i64) -> Option<&Tile> {
@@ -151,9 +176,18 @@ impl World {
         self.db.save_tiles(&[row])
     }
 
+    pub fn home_at(&self, x: i64, y: i64) -> Option<&Home> {
+        self.homes.iter().find(|h| h.covers(x, y))
+    }
+
     pub fn place_title(&self, x: i64, y: i64) -> String {
         match self.tile(x, y) {
             Some(Tile { name: Some(n), .. }) => n.clone(),
+            Some(_) if self.home_at(x, y).is_some() => {
+                let h = self.home_at(x, y).unwrap();
+                let what = if (h.x, h.y) == (x, y) { "Home" } else { "Garden" };
+                format!("{}'s {what}", h.owner)
+            }
             Some(t) => t.terrain.place_name().to_string(),
             None => "The Edge of the World".into(),
         }
@@ -317,6 +351,8 @@ impl World {
                     line = line.b(Col::Magenta, "@");
                 } else if people.contains(&(x, y)) {
                     line = line.b(Col::White, "☺");
+                } else if self.homes.iter().any(|h| (h.x, h.y) == (x, y)) {
+                    line = line.b(Col::Magenta, "⌂");
                 } else if self.things_at(x, y).any(|t| t.is_board()) {
                     line = line.b(Col::Yellow, "▣");
                 } else if self.things_at(x, y).next().is_some() {

@@ -69,6 +69,10 @@ impl Db {
                  player TEXT NOT NULL, muted TEXT NOT NULL, PRIMARY KEY (player, muted));
              CREATE TABLE IF NOT EXISTS bans (
                  name TEXT NOT NULL, key_hash TEXT, until INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS homes (
+                 owner TEXT PRIMARY KEY, x INTEGER NOT NULL, y INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS home_guests (
+                 owner TEXT NOT NULL, guest TEXT NOT NULL, PRIMARY KEY (owner, guest));
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -433,6 +437,40 @@ impl Db {
         self.conn.execute("UPDATE players SET key_hash = ?2 WHERE name = ?1", params![stored, hash])?;
         self.conn.execute("DELETE FROM door_knocks WHERE name = ?1", [&stored])?;
         Ok(Some(stored))
+    }
+
+    // ---- homes ---------------------------------------------------------------
+
+    /// Every home: (owner, x, y, guests).
+    pub fn homes(&self) -> anyhow::Result<Vec<(String, i64, i64, Vec<String>)>> {
+        let mut stmt = self.conn.prepare("SELECT owner, x, y FROM homes")?;
+        let rows: Vec<(String, i64, i64)> =
+            stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_, _>>()?;
+        let mut out = Vec::new();
+        for (owner, x, y) in rows {
+            let mut g = self.conn.prepare("SELECT guest FROM home_guests WHERE owner = ?1 ORDER BY guest")?;
+            let guests = g.query_map([&owner], |r| r.get(0))?.collect::<Result<_, _>>()?;
+            out.push((owner, x, y, guests));
+        }
+        Ok(out)
+    }
+
+    pub fn set_home(&self, owner: &str, x: i64, y: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO homes (owner, x, y) VALUES (?1, ?2, ?3)
+             ON CONFLICT(owner) DO UPDATE SET x = excluded.x, y = excluded.y",
+            params![owner, x, y],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_guest(&self, owner: &str, guest: &str, on: bool) -> anyhow::Result<()> {
+        if on {
+            self.conn.execute("INSERT OR IGNORE INTO home_guests (owner, guest) VALUES (?1, ?2)", params![owner, guest])?;
+        } else {
+            self.conn.execute("DELETE FROM home_guests WHERE owner = ?1 AND guest = ?2 COLLATE NOCASE", params![owner, guest])?;
+        }
+        Ok(())
     }
 
     // ---- mutes and kicks ----------------------------------------------------

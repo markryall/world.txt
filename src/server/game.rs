@@ -3,6 +3,7 @@
 
 mod boards;
 mod gather;
+mod homes;
 
 use super::nature::Find;
 use super::rng::Rng;
@@ -321,6 +322,9 @@ impl Game {
         if let Some(&(_, _, dx, dy)) = DIRS.iter().find(|d| d.0 == verb || d.1 == verb) {
             return self.walk(id, dx, dy);
         }
+        if homes::BUILDING.contains(&verb.as_str()) && !self.may_build_here(id) {
+            return Ok(());
+        }
 
         match verb.as_str() {
             "help" | "?" => self.send(id, help()),
@@ -335,6 +339,11 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "claim" => return self.cmd_claim(id),
+            "home" => return self.cmd_home(id),
+            "invite" => return self.cmd_invite(id, rest, true),
+            "uninvite" => return self.cmd_invite(id, rest, false),
+            "guests" => return self.cmd_guests(id),
             "read" => return self.cmd_read(id, rest),
             "post" | "note" => return self.cmd_post(id, rest),
             "follow" => return self.cmd_follow(id, true),
@@ -1364,6 +1373,10 @@ fn help() -> Vec<Line> {
         h("satchel / journal", "what you carry / everything you've found"),
         h("give daisy to Poppy", "share with someone here"),
         h("place daisy / release moth", "decorate, or set something free"),
+        Line::col(Col::Pink, "home"),
+        h("claim", "make the patch around you your home (one each)"),
+        h("home", "go straight home from anywhere"),
+        h("invite Lu / uninvite Lu / guests", "who else may build at your home"),
         Line::col(Col::Pink, "noticeboards"),
         h("make a noticeboard", "put one up for everyone"),
         h("read / read more", "the notes here, then older ones"),

@@ -133,6 +133,15 @@ Progress is saved by name, so returning visitors never see it again
 
 Clouds drift across the island on the wind, and a whole day passes in 24 minutes.
 
+### Homes
+
+`claim` makes the 3x3 patch around you your home (one each, not too close to
+anyone else's or to where newcomers arrive). It shows as `⌂` on the map and is
+called "Poppy's Home" (with "Poppy's Garden" around it) unless you `name` it.
+`home` takes you straight back from anywhere. Anyone can visit, but only you,
+the friends you `invite`, and keepers can make, place, dig, plant or name things
+there (`uninvite`, `guests`). Claiming somewhere else moves your home.
+
 ### Gathering
 
 Little finds pop up around anyone wandering, shown as pink `•` on the map:
