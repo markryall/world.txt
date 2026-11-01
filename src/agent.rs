@@ -136,7 +136,7 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                         status = Some(Status { place, weather, clock, here, humans });
                     }
                     Ok(ToClient::Bye { reason }) => { log(&opts.name, &format!("bye: {reason}")); break }
-                    Err(_) => {}
+                    Ok(ToClient::Hint { .. }) | Err(_) => {}
                 }
                 continue;
             }
@@ -233,7 +233,9 @@ pub(crate) fn trigger(text: &str, me: &str) -> Option<&'static str> {
     if lower.starts_with("you ") || lower.starts_with(me) {
         return None; // our own actions echoed back
     }
-    if lower.contains(" tells you:") {
+    if lower.contains("for the first time") {
+        Some("someone new just arrived on the island; maybe welcome them with @Name")
+    } else if lower.contains(" tells you:") {
         Some("someone sent you a message")
     } else if lower.contains(me) {
         Some("someone mentioned you")
@@ -470,5 +472,7 @@ mod tests {
         assert!(trigger("You say, \"hi\"", "moss").is_none());
         assert!(trigger("Moss says, \"mrrp\"", "moss").is_none());
         assert!(trigger("A wave rolls in and hushes back out.", "moss").is_none());
+        assert!(trigger("🐣 Poppy has arrived on the island for the first time!", "moss").is_some());
+        assert!(trigger("✧ Poppy has wandered into the world.", "moss").is_none());
     }
 }

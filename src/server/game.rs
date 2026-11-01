@@ -3,6 +3,7 @@
 
 use super::rng::Rng;
 use super::terrain::Terrain;
+use super::tutorial::{self, Act};
 use super::weather::{Clock, Phase, Sky};
 use super::world::{DIRS, SIZE, Trigger, World, capitalise, in_bounds, strip_article};
 use super::{ClientTx, Event};
@@ -23,6 +24,8 @@ struct Player {
     bot: bool,
     /// Who last told us something, for `reply`.
     reply_to: Option<String>,
+    /// First-steps progress: an index into tutorial::STEPS, or DONE.
+    tutorial: u8,
 }
 
 struct Game {
@@ -53,9 +56,13 @@ impl Game {
             Event::Join { id, name, bot, tx } => self.join(id, name, bot, tx),
             Event::Leave { id } => self.leave(id),
             Event::Cmd { id, text } => {
+                let before = self.snapshot(id);
                 if let Err(e) = self.command(id, text.trim()) {
                     eprintln!("command error: {e}");
                     self.send(id, vec![Line::col(Col::Red, "Something went wobbly. Try again?")]);
+                }
+                if let Some(act) = self.what_happened(id, text.trim(), before) {
+                    self.progress(id, act);
                 }
             }
         }
@@ -136,14 +143,15 @@ impl Game {
             let _ = tx.send(ToClient::Bye { reason: format!("Someone called {name} is already here.") });
             return;
         }
-        let (x, y) = self
-            .world
-            .db
-            .player_pos(&name)
+        let saved = self.world.db.player(&name);
+        let first_time = saved.is_none() && !bot;
+        let tutorial = if bot { tutorial::DONE } else { saved.map_or(0, |s| s.2) };
+        let (x, y) = saved
+            .map(|s| (s.0, s.1))
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None });
+        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial });
 
         self.send(
             id,
@@ -155,10 +163,16 @@ impl Game {
         );
         self.look(id);
         self.status(id);
+        if first_time {
+            self.say1(id, Line::new().b(Col::Yellow, format!("🐣 Welcome to the island, {name}! Here's how to get started.")));
+        }
+        self.show_hint(id);
         for (&pid, p) in &self.players {
             if pid != id {
                 let line = if p.x == x && p.y == y {
                     Line::new().b(Col::Cyan, &name).c(Col::Cyan, " appears, blinking, as if from a dream.")
+                } else if first_time {
+                    Line::col(Col::Dim, format!("🐣 {name} has arrived on the island for the first time!"))
                 } else {
                     Line::col(Col::Dim, format!("✧ {name} has wandered into the world."))
                 };
@@ -170,7 +184,9 @@ impl Game {
 
     fn leave(&mut self, id: u64) {
         let Some(p) = self.players.remove(&id) else { return };
-        if let Err(e) = self.world.db.save_player(&p.name, p.x, p.y) {
+        if p.bot {
+            // Residents keep no position or progress.
+        } else if let Err(e) = self.world.db.save_player(&p.name, p.x, p.y, p.tutorial) {
             eprintln!("saving {}: {e}", p.name);
         }
         for o in self.players.values() {
@@ -227,6 +243,20 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "skip" => {
+                if let Some(p) = self.players.get_mut(&id) {
+                    p.tutorial = tutorial::DONE;
+                }
+                self.show_hint(id);
+                self.save_progress(id);
+                self.say1(id, Line::col(Col::Dim, "Okay! Type tutorial any time to see the first steps again."));
+            }
+            "tutorial" | "start" => {
+                if let Some(p) = self.players.get_mut(&id) {
+                    p.tutorial = 0;
+                }
+                self.show_hint(id);
+            }
             "tell" | "whisper" | "msg" | "t" => {
                 let (to, msg) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
                 return self.cmd_tell(id, to, msg.trim());
@@ -386,6 +416,68 @@ impl Game {
             }
         }
         Ok(())
+    }
+
+    // ---- first steps --------------------------------------------------
+
+    fn snapshot(&self, id: u64) -> Option<(i64, i64, Terrain, usize)> {
+        let p = self.players.get(&id)?;
+        Some((p.x, p.y, self.world.terrain(p.x, p.y), self.world.things.len()))
+    }
+
+    /// Work out what a command actually did, by comparing before and after.
+    fn what_happened(&self, id: u64, input: &str, before: Option<(i64, i64, Terrain, usize)>) -> Option<Act> {
+        let (bx, by, bt, bn) = before?;
+        let (ax, ay, at, an) = self.snapshot(id)?;
+        let verb = input.split_whitespace().next().unwrap_or("").to_lowercase();
+        if (ax, ay) != (bx, by) {
+            Some(Act::Walk)
+        } else if an > bn {
+            Some(Act::Make)
+        } else if verb == "plant" && (at != bt || matches!(at, Terrain::Meadow | Terrain::Forest | Terrain::Grass)) {
+            Some(Act::Plant)
+        } else if verb == "who" {
+            Some(Act::Who)
+        } else if said_something(input, &verb) {
+            Some(Act::Say)
+        } else {
+            None
+        }
+    }
+
+    /// Remember progress straight away, so a returning visitor never has to
+    /// repeat first steps, even if the world restarts before they leave.
+    fn save_progress(&self, id: u64) {
+        let Some(p) = self.players.get(&id) else { return };
+        if !p.bot {
+            if let Err(e) = self.world.db.save_player(&p.name, p.x, p.y, p.tutorial) {
+                eprintln!("saving {}: {e}", p.name);
+            }
+        }
+    }
+
+    fn progress(&mut self, id: u64, act: Act) {
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let Some(step) = tutorial::step(p.tutorial) else { return };
+        if step.act != act {
+            return;
+        }
+        p.tutorial = if (p.tutorial as usize) + 1 >= tutorial::STEPS.len() { tutorial::DONE } else { p.tutorial + 1 };
+        self.say1(id, Line::new().b(Col::Yellow, step.cheer));
+        self.show_hint(id);
+        self.save_progress(id);
+    }
+
+    fn show_hint(&self, id: u64) {
+        let Some(p) = self.players.get(&id) else { return };
+        let msg = match tutorial::step(p.tutorial) {
+            Some(step) => {
+                self.say1(id, Line::new().c(Col::Yellow, "→ ").b(Col::Yellow, step.hint));
+                ToClient::Hint { text: Some(step.hint.into()), cmd: Some(step.cmd.into()) }
+            }
+            None => ToClient::Hint { text: None, cmd: None },
+        };
+        let _ = p.tx.send(msg);
     }
 
     fn find_player(&self, name: &str) -> Option<u64> {
@@ -768,6 +860,18 @@ impl Game {
     }
 }
 
+/// `say hi`, `'hi` or `"hi`, with something actually said.
+fn said_something(input: &str, verb: &str) -> bool {
+    let text = if verb == "say" {
+        input.split_once(char::is_whitespace).map_or("", |(_, r)| r)
+    } else if let Some(r) = input.strip_prefix(['\'', '"']) {
+        r
+    } else {
+        ""
+    };
+    !text.trim().is_empty()
+}
+
 fn sky_change(from: Sky, to: Sky) -> Option<&'static str> {
     Some(match (from, to) {
         (_, Sky::Rain) if from != Sky::Drizzle => "Fat drops start to fall, and then it's properly raining. ☔",
@@ -897,6 +1001,7 @@ fn help() -> Vec<Line> {
         Line::col(Col::Pink, "wander"),
         h("n s e w ne nw se sw", "walk about"),
         h("look / look <thing>", "take it all in"),
+        h("tutorial / skip", "first steps again, or hide them"),
         h("who", "who's out in the world"),
         Line::col(Col::Pink, "chat"),
         h("say hi  (or 'hi)", "talk to people here"),

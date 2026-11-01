@@ -79,7 +79,7 @@ pub async fn run(name: String, server: &str, password: Option<String>, dir: Path
                         }
                     }
                     Ok(ToClient::Bye { reason }) => { note(&mut log, &format!("bye: {reason}")); break }
-                    Err(_) => {}
+                    Ok(ToClient::Hint { .. }) | Err(_) => {}
                 }
             }
             Some(cmd) = cmd_rx.recv() => {

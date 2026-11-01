@@ -41,6 +41,12 @@ impl Db {
              CREATE TABLE IF NOT EXISTS players (
                  name TEXT PRIMARY KEY, x INTEGER NOT NULL, y INTEGER NOT NULL);",
         )?;
+        // Added later: first-steps progress. Players from before it existed
+        // have clearly found their feet, so they start as done (99).
+        let _ = conn.execute(
+            "ALTER TABLE players ADD COLUMN tutorial INTEGER NOT NULL DEFAULT 99",
+            [],
+        );
         Ok(Db { conn })
     }
 
@@ -119,19 +125,20 @@ impl Db {
         Ok(())
     }
 
-    pub fn player_pos(&self, name: &str) -> Option<(i64, i64)> {
+    /// Where a returning player was, and how far through first steps.
+    pub fn player(&self, name: &str) -> Option<(i64, i64, u8)> {
         self.conn
-            .query_row("SELECT x, y FROM players WHERE name = ?1", [name], |r| {
-                Ok((r.get(0)?, r.get(1)?))
+            .query_row("SELECT x, y, tutorial FROM players WHERE name = ?1", [name], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
             })
             .ok()
     }
 
-    pub fn save_player(&self, name: &str, x: i64, y: i64) -> anyhow::Result<()> {
+    pub fn save_player(&self, name: &str, x: i64, y: i64, tutorial: u8) -> anyhow::Result<()> {
         self.conn.execute(
-            "INSERT INTO players (name, x, y) VALUES (?1, ?2, ?3)
-             ON CONFLICT(name) DO UPDATE SET x = excluded.x, y = excluded.y",
-            params![name, x, y],
+            "INSERT INTO players (name, x, y, tutorial) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(name) DO UPDATE SET x = excluded.x, y = excluded.y, tutorial = excluded.tutorial",
+            params![name, x, y, tutorial],
         )?;
         Ok(())
     }

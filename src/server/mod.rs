@@ -5,6 +5,7 @@ mod db;
 mod game;
 mod rng;
 mod terrain;
+mod tutorial;
 mod weather;
 mod world;
 

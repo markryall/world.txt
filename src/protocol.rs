@@ -77,6 +77,12 @@ pub enum ToClient {
         #[serde(default)]
         humans: u32,
     },
+    /// The current first-steps nudge, or none to clear it.
+    Hint {
+        text: Option<String>,
+        /// What trying the hint sends, e.g. "plant flowers".
+        cmd: Option<String>,
+    },
     /// Connection refused (e.g. name taken).
     Bye { reason: String },
 }

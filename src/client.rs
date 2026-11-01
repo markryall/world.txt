@@ -21,6 +21,7 @@ struct State {
     clock: String,
     map: Vec<Line>,
     here: Vec<String>,
+    hint: Option<String>,
     input: String,
     history: Vec<String>,
     hist: usize,
@@ -69,6 +70,7 @@ pub async fn run(name: Option<String>, server: &str, password: Option<String>) -
                                 st.map = map;
                                 st.here = here;
                             }
+                            Ok(ToClient::Hint { text, .. }) => st.hint = text,
                             Ok(ToClient::Bye { reason }) => st.closed = Some(reason),
                             Err(_) => {}
                         }
@@ -156,6 +158,14 @@ fn draw(f: &mut Frame, st: &mut State) {
             format!("☺ {}", st.here.join(", ")),
             Style::default().fg(colour(Col::Cyan)),
         )));
+    }
+    if let Some(h) = &st.hint {
+        side_lines.push(RLine::from(RSpan::styled(
+            h.clone(),
+            Style::default().fg(colour(Col::Yellow)).add_modifier(Modifier::BOLD),
+        )));
+        side_lines.push(RLine::from(RSpan::styled("(skip to hide)", dim())));
+        side_lines.push(RLine::default());
     }
     side_lines.push(RLine::from(RSpan::styled("PgUp/PgDn scroll · Esc leave", dim())));
     f.render_widget(

@@ -39,6 +39,15 @@
   #join input { width: 100%; font: inherit; font-size: 18px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); text-align: center; outline: none; }
   #join button { margin-top: 12px; width: 100%; font: inherit; font-size: 17px; padding: 12px; border: 0; border-radius: 12px; background: var(--magenta); color: var(--bg); cursor: pointer; }
   #here a { color: var(--cyan); }
+  #hint { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel);
+    border-top: 1px solid var(--line); color: var(--yellow); font-weight: bold; cursor: pointer; }
+  #hint.on { display: flex; animation: glow 2s ease-in-out infinite; }
+  #hint .go { margin-left: auto; background: var(--yellow); color: var(--bg); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+  #hint .skip { color: var(--dim); font-weight: normal; font-size: 12px; text-decoration: underline; }
+  @keyframes glow { 50% { background: #2a2333; } }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { background: var(--yellow); color: var(--bg); } }
+  @media (prefers-reduced-motion: reduce) { #hint.on, .pulse { animation: none; } .pulse { outline: 2px solid var(--yellow); } }
   #sound { background: none; border: 0; color: var(--dim); font: inherit; cursor: pointer; padding: 0; }
   @media (max-width: 720px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -74,6 +83,9 @@
       <button data-c="plant tree">🌳</button><button data-c="dance">💃</button>
     </div>
   </div>
+</div>
+<div id="hint" role="button" tabindex="0">
+  <span id="hint-text"></span><span class="go">try it</span><span class="skip" id="hint-skip">skip</span>
 </div>
 <form id="input" autocomplete="off">
   <input id="cmd" placeholder="say hi, dig, make a frog that croaks when it rains…" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
@@ -151,6 +163,7 @@ function connect(name, password) {
     const m = JSON.parse(e.data);
     if (m.type === 'lines') addLines(m.lines);
     else if (m.type === 'status') status(m);
+    else if (m.type === 'hint') hint(m);
     else if (m.type === 'bye') {
       addLines([[{ t: m.reason, c: 'magenta' }]]);
       if (m.reason.includes('password')) {
@@ -162,6 +175,42 @@ function connect(name, password) {
   };
   ws.onclose = () => addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
 }
+
+let hintCmd = null;
+function hint(m) {
+  hintCmd = m.cmd;
+  $('#hint-text').textContent = m.text || '';
+  $('#hint').classList.toggle('on', !!m.text);
+  document.querySelectorAll('.pulse').forEach((b) => b.classList.remove('pulse'));
+  if (m.cmd) document.querySelectorAll('[data-c]').forEach((b) => {
+    if (b.dataset.c === m.cmd) b.classList.add('pulse');
+  });
+}
+$('#hint').onclick = (e) => {
+  if (e.target.id === 'hint-skip') send('skip');
+  else if (hintCmd) send(hintCmd);
+};
+$('#hint').onkeydown = (e) => { if (e.key === 'Enter' && hintCmd) send(hintCmd); };
+
+// Keep people discovering things after first steps.
+const IDEAS = [
+  'say hi, dig, make a frog that croaks when it rains…',
+  'try: make a lantern that glows at night',
+  'try: plant tree',
+  'try: name The Willow Bank',
+  'try: hum C E G E C',
+  'try: @Moss hello!',
+  'try: dig twice to make a pond',
+  'try: find Poppy',
+  'try: make a doorbell that rings when someone arrives',
+];
+let idea = 0;
+setInterval(() => {
+  const c = $('#cmd');
+  if (c.value || document.activeElement === c) return;
+  idea = (idea + 1) % IDEAS.length;
+  c.placeholder = IDEAS[idea];
+}, 6000);
 
 function prefill(text) {
   const c = $('#cmd');

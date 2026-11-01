@@ -81,6 +81,12 @@ exposed to the internet.
 
 ## In the world
 
+New arrivals get five tiny first steps: walk, say hi, make something, plant
+something, see who's around. One hint shows at a time and clears when they do it.
+In the browser the hint glows above the input, and tapping it does the step.
+Progress is saved by name, so returning visitors never see it again
+(`skip` hides it, `tutorial` brings it back).
+
 - `n s e w ne nw se sw`, `look`, `who`
 - `say hi` (or `'hi`), `:waves`, `shout`, `hum C E G`
 - `@Poppy hi` talks to someone anywhere, `reply` answers them, `chat` (or `@all`) reaches
