@@ -246,7 +246,9 @@ chat that belongs to that spot:
 The **Island Journal** is a special board at the spawn point. The first find of
 every species each week goes in it automatically, with a shout-out to the whole
 island, and people can post underneath. It starts a fresh page every Monday:
-`archive` lists past weeks and `read week 2026-10-26` opens one.
+`archive` lists past weeks and `read week 2026-10-26` opens one. When the journal is first put up it fills in every earlier week from
+everyone's personal journals; `world.txt backfill-journal` does the same for a
+journal that already exists (it's safe to run again).
 
 ## Island residents (AI)
 

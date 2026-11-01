@@ -46,6 +46,7 @@ pub fn week_key(ts: i64) -> String {
     monday.format("%Y-%m-%d").to_string()
 }
 
+#[cfg(test)]
 fn week_start(key: &str) -> Option<i64> {
     let d = NaiveDate::parse_from_str(key, "%Y-%m-%d").ok()?;
     let dt = d.and_hms_opt(0, 0, 0)?;
@@ -85,20 +86,8 @@ impl Game {
         let (x, y) = self.world.spawn_point();
         let id = self.world.add_thing(x, y, "the Island Journal".into(), None, Trigger::Always, "the island", Some(JOURNAL_KIND))?;
         self.journal_board = Some(id);
-
-        let week = week_key(now());
-        let since = week_start(&week).unwrap_or(now());
-        let mut noted: Vec<String> = Vec::new();
-        for (player, sid, at) in self.world.db.discoveries_since(since)? {
-            if noted.contains(&sid) {
-                continue;
-            }
-            if let Some(s) = crate::server::nature::by_id(&sid) {
-                self.world.db.add_note(id, &player, &discovery_text(s), at, &week, Some(s.id))?;
-                noted.push(sid);
-            }
-        }
-        println!("📖 put up the Island Journal ({} discoveries so far this week)", noted.len());
+        let added = backfill_journal(&self.world.db, id)?;
+        println!("📖 put up the Island Journal ({added} past discoveries written in)");
         Ok(())
     }
 
@@ -355,6 +344,23 @@ impl Game {
         self.send(id, lines);
         Ok(())
     }
+}
+
+/// Write every week's first find of each species into the journal, from
+/// everyone's personal journals, skipping any already there. Earlier weeks
+/// land in the archive. Returns how many it added.
+pub fn backfill_journal(db: &crate::server::db::Db, board: i64) -> anyhow::Result<usize> {
+    let mut added = 0;
+    for (player, sid, at) in db.discoveries_since(0)? {
+        let Some(s) = crate::server::nature::by_id(&sid) else { continue };
+        let week = week_key(at);
+        if db.species_noted(board, s.id, &week)? {
+            continue;
+        }
+        db.add_note(board, &player, &discovery_text(s), at, &week, Some(s.id))?;
+        added += 1;
+    }
+    Ok(added)
 }
 
 fn discovery_text(s: &Species) -> String {

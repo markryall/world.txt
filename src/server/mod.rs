@@ -198,3 +198,16 @@ pub fn promote(db_path: &str, name: &str) -> anyhow::Result<()> {
     println!("🗝  {} ({user}) is an island keeper now.", db.nickname(&user).unwrap_or_default());
     Ok(())
 }
+
+/// `world.txt backfill-journal`: write past weeks' discoveries into an
+/// existing Island Journal (safe to run again).
+pub fn backfill_journal(db_path: &str) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let Some(board) = db.things()?.into_iter().find(|t| t.kind.as_deref() == Some("journal")).map(|t| t.id) else {
+        println!("There's no Island Journal yet: it's put up (and filled in) the first time the world starts.");
+        return Ok(());
+    };
+    let added = game::backfill_journal(&db, board)?;
+    println!("📖 wrote {added} past discoveries into the Island Journal (earlier weeks are in its archive).");
+    Ok(())
+}

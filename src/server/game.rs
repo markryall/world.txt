@@ -2,6 +2,7 @@
 //! answers with lines of text and status updates.
 
 mod boards;
+pub(super) use boards::backfill_journal;
 mod companions;
 mod craft;
 mod events;

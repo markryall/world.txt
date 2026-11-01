@@ -102,6 +102,11 @@ enum Cmd {
         #[arg(long, default_value = "world.db")]
         db: String,
     },
+    /// Write past weeks' discoveries into the Island Journal's archive.
+    BackfillJournal {
+        #[arg(long, default_value = "world.db")]
+        db: String,
+    },
     /// Make someone an island keeper (run on the server's machine).
     Promote {
         /// Their nickname or username.
@@ -151,6 +156,7 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Invite { nickname, keeper, url, db } => server::invite(&db, &nickname, keeper, url.as_deref()),
         Cmd::Link { name, url, db } => server::link(&db, &name, url.as_deref()),
         Cmd::Promote { name, db } => server::promote(&db, &name),
+        Cmd::BackfillJournal { db } => server::backfill_journal(&db),
         Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
     }
 }
