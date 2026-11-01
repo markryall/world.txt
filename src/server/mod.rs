@@ -18,7 +18,7 @@ use tokio_tungstenite::tungstenite::Message;
 pub type ClientTx = UnboundedSender<ToClient>;
 
 pub enum Event {
-    Join { id: u64, name: String, tx: ClientTx },
+    Join { id: u64, name: String, bot: bool, tx: ClientTx },
     Cmd { id: u64, text: String },
     Leave { id: u64 },
 }
@@ -99,9 +99,9 @@ async fn connection(
                 });
                 break;
             }
-            ToServer::Hello { name, .. } if !joined => {
+            ToServer::Hello { name, bot, .. } if !joined => {
                 joined = true;
-                events.send(Event::Join { id, name, tx: tx.clone() })?;
+                events.send(Event::Join { id, name, bot, tx: tx.clone() })?;
             }
             ToServer::Cmd { text } if joined => {
                 events.send(Event::Cmd { id, text })?;

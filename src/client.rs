@@ -43,7 +43,7 @@ pub async fn run(name: Option<String>, server: &str, password: Option<String>) -
 
     let (ws, _) = tokio_tungstenite::connect_async(server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = serde_json::to_string(&ToServer::Hello { name, password })?;
+    let hello = serde_json::to_string(&ToServer::Hello { name, password, bot: false })?;
     sink.send(Message::Text(hello.into())).await?;
 
     let mut terminal = ratatui::init();
@@ -62,7 +62,7 @@ pub async fn run(name: Option<String>, server: &str, password: Option<String>) -
                                 let excess = st.log.len().saturating_sub(2000);
                                 st.log.drain(..excess);
                             }
-                            Ok(ToClient::Status { place, weather, clock, map, here }) => {
+                            Ok(ToClient::Status { place, weather, clock, map, here, .. }) => {
                                 st.place = place;
                                 st.weather = weather;
                                 st.clock = clock;

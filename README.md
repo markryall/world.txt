@@ -83,10 +83,37 @@ exposed to the internet.
 
 - `n s e w ne nw se sw`, `look`, `who`
 - `say hi` (or `'hi`), `:waves`, `shout`, `hum C E G`
+- `@Poppy hi` talks to someone anywhere, `reply` answers them, `chat` (or `@all`) reaches
+  everyone, and `find Poppy` tells you which way to walk. In the browser, tap a name to message them.
 - `dig`, `fill`, `plant tree|flowers|grass`, `raise`, `path`, `name The Willow Bank`
 - `make a frog that croaks when it rains`, `push frog north`, `unmake frog`
 
 Clouds drift across the island on the wind, and a whole day passes in 24 minutes.
+
+## Island residents (AI)
+
+Residents are AI characters who join like any other player and call Claude
+(Haiku 5.5) to decide what to do. Each one has a character sheet in `personas/`.
+
+```
+export ANTHROPIC_API_KEY=...
+world.txt agent Moss                     # uses personas/moss.md
+world.txt agent Moss --dry-run           # prints what it would ask Claude, calls nothing
+```
+
+They're built not to burn tokens:
+
+- They sleep while no humans are in the world, and don't call Claude at all.
+- They wake when spoken to, when someone talks or builds nearby, or every 10
+  minutes when someone's around. A few seconds of conversation is batched into one call.
+- There's at least 20 seconds between calls and at most 40 calls an hour.
+- Each one has a daily budget (default $0.50, `--daily-usd` or `WORLD_AGENT_DAILY_USD`),
+  tracked from the API's reported usage. When it's spent, the resident naps until tomorrow.
+- The persona and rules are a cached prefix. Each call adds only the last ~40 lines seen
+  and a few remembered notes.
+- They can only use gentle commands: no `unmake`, `push`, `shout` or `chat`.
+
+Spend and memories live in `agent-state/<name>.json`.
 
 ## Layout
 
@@ -94,4 +121,5 @@ Clouds drift across the island on the wind, and a whole day passes in 24 minutes
 - `src/server/`: networking (`mod.rs`), the game loop and commands (`game.rs`),
   the island (`world.rs`, `terrain.rs`), weather and clock (`weather.rs`), SQLite (`db.rs`)
 - `src/client.rs`: the ratatui terminal client
+- `src/agent.rs`: AI residents
 - `web/index.html`: the browser client

@@ -73,6 +73,9 @@ pub enum ToClient {
         clock: String,
         map: Vec<Line>,
         here: Vec<String>,
+        /// People (not residents) currently in the world.
+        #[serde(default)]
+        humans: u32,
     },
     /// Connection refused (e.g. name taken).
     Bye { reason: String },
@@ -85,6 +88,9 @@ pub enum ToServer {
         name: String,
         #[serde(default)]
         password: Option<String>,
+        /// True for AI residents, so the world can tell them from people.
+        #[serde(default)]
+        bot: bool,
     },
     Cmd { text: String },
 }

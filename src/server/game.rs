@@ -20,6 +20,9 @@ struct Player {
     y: i64,
     tx: ClientTx,
     sky: Sky,
+    bot: bool,
+    /// Who last told us something, for `reply`.
+    reply_to: Option<String>,
 }
 
 struct Game {
@@ -47,7 +50,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>) {
 impl Game {
     fn handle(&mut self, ev: Event) {
         match ev {
-            Event::Join { id, name, tx } => self.join(id, name, tx),
+            Event::Join { id, name, bot, tx } => self.join(id, name, bot, tx),
             Event::Leave { id } => self.leave(id),
             Event::Cmd { id, text } => {
                 if let Err(e) = self.command(id, text.trim()) {
@@ -104,6 +107,7 @@ impl Game {
             clock: Clock::label(),
             map: self.world.minimap(p.x, p.y, &people),
             here: self.others_here(id),
+            humans: self.players.values().filter(|p| !p.bot).count() as u32,
         };
         let _ = p.tx.send(msg);
     }
@@ -122,7 +126,7 @@ impl Game {
 
     // ---- arriving and leaving -----------------------------------------
 
-    fn join(&mut self, id: u64, raw: String, tx: ClientTx) {
+    fn join(&mut self, id: u64, raw: String, bot: bool, tx: ClientTx) {
         let name = clean_name(&raw);
         if name.is_empty() {
             let _ = tx.send(ToClient::Bye { reason: "Names need a letter or two, darling.".into() });
@@ -139,7 +143,7 @@ impl Game {
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky });
+        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None });
 
         self.send(
             id,
@@ -193,6 +197,14 @@ impl Game {
         if let Some(rest) = input.strip_prefix(':') {
             return self.cmd_emote(id, rest.trim());
         }
+        // @Poppy hi  → tell Poppy hi;  @all hi → chat hi
+        if let Some(rest) = input.strip_prefix('@') {
+            let (to, msg) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+            if to.eq_ignore_ascii_case("all") || to.eq_ignore_ascii_case("everyone") {
+                return self.cmd_chat(id, msg.trim());
+            }
+            return self.cmd_tell(id, to, msg.trim());
+        }
         let (verb, rest) = match input.split_once(char::is_whitespace) {
             Some((v, r)) => (v.to_lowercase(), r.trim()),
             None => (input.to_lowercase(), ""),
@@ -215,6 +227,19 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "tell" | "whisper" | "msg" | "t" => {
+                let (to, msg) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+                return self.cmd_tell(id, to, msg.trim());
+            }
+            "reply" | "r" => {
+                let to = self.players.get(&id).and_then(|p| p.reply_to.clone());
+                match to {
+                    Some(to) => return self.cmd_tell(id, &to, rest),
+                    None => self.say1(id, Line::plain("Nobody's told you anything yet. Try '@Name hello'.")),
+                }
+            }
+            "chat" | "all" => return self.cmd_chat(id, rest),
+            "find" | "where" => self.cmd_find(id, rest.trim_start_matches("is ").trim()),
             "sit" => return self.cmd_emote(id, "sits down for a while."),
             "lie" | "rest" => return self.cmd_emote(id, "lies back and gazes at the sky."),
             "dance" => return self.cmd_emote(id, "dances, a little twirl and a sway. 💃"),
@@ -363,16 +388,88 @@ impl Game {
         Ok(())
     }
 
+    fn find_player(&self, name: &str) -> Option<u64> {
+        let n = name.trim().trim_end_matches([',', ':']).to_lowercase();
+        if n.is_empty() {
+            return None;
+        }
+        let exact = self.players.iter().find(|(_, p)| p.name.to_lowercase() == n);
+        let prefix = || self.players.iter().find(|(_, p)| p.name.to_lowercase().starts_with(&n));
+        exact.or_else(prefix).map(|(&pid, _)| pid)
+    }
+
+    fn cmd_tell(&mut self, id: u64, to: &str, msg: &str) -> anyhow::Result<()> {
+        if to.is_empty() || msg.is_empty() {
+            self.say1(id, Line::plain("Tell who what? e.g. '@Poppy want to build a boat?'"));
+            return Ok(());
+        }
+        let Some(tid) = self.find_player(to) else {
+            self.say1(id, Line::plain(format!("Nobody called {to} is in the world right now. Try 'who'.")));
+            return Ok(());
+        };
+        if tid == id {
+            self.say1(id, Line::plain("You mutter to yourself. Very wise."));
+            return Ok(());
+        }
+        let from = self.players[&id].name.clone();
+        let target = self.players[&tid].name.clone();
+        self.say1(id, Line::new().c(Col::Pink, format!("✉ You tell {target}: ")).c(Col::White, msg));
+        self.say1(tid, Line::new().b(Col::Pink, format!("✉ {from}")).c(Col::Pink, " tells you: ").c(Col::White, msg));
+        if let Some(t) = self.players.get_mut(&tid) {
+            t.reply_to = Some(from);
+        }
+        if let Some(me) = self.players.get_mut(&id) {
+            me.reply_to.get_or_insert(target);
+        }
+        Ok(())
+    }
+
+    fn cmd_chat(&mut self, id: u64, msg: &str) -> anyhow::Result<()> {
+        if msg.is_empty() {
+            self.say1(id, Line::plain("Chat what? Everyone in the world will hear it."));
+            return Ok(());
+        }
+        let from = self.players[&id].name.clone();
+        let line = Line::new().c(Col::Green, "💬 ").b(Col::Green, &from).c(Col::Green, ": ").c(Col::White, msg);
+        for p in self.players.values() {
+            let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
+        }
+        Ok(())
+    }
+
+    fn cmd_find(&self, id: u64, name: &str) {
+        let Some(tid) = self.find_player(name) else {
+            self.say1(id, Line::plain(format!("You can't find anyone called '{name}'. Try 'who'.")));
+            return;
+        };
+        let (me, them) = (&self.players[&id], &self.players[&tid]);
+        let place = self.world.place_title(them.x, them.y);
+        let (dx, dy) = (them.x - me.x, them.y - me.y);
+        let d = dx.abs().max(dy.abs());
+        let line = if tid == id {
+            "You're right here, silly.".to_string()
+        } else if d == 0 {
+            format!("{} is right here with you!", them.name)
+        } else {
+            let dir = DIRS.iter().find(|q| q.2 == dx.signum() && q.3 == dy.signum()).map_or("away", |q| q.1);
+            let steps = if d == 1 { "1 step".to_string() } else { format!("{d} steps") };
+            format!("{} is at {place}, about {steps} to the {dir}.", them.name)
+        };
+        self.say1(id, Line::col(Col::Cyan, format!("🧭 {line}")));
+    }
+
     fn cmd_who(&self, id: u64) {
         let mut lines = vec![Line::new().b(Col::Magenta, "Out in the world:")];
         for p in self.players.values() {
             lines.push(
                 Line::new()
-                    .c(Col::Cyan, "  ☺ ")
+                    .c(Col::Cyan, if p.bot { "  🐾 " } else { "  ☺ " })
                     .b(Col::Cyan, &p.name)
-                    .c(Col::Dim, format!("  ({})", self.world.place_title(p.x, p.y))),
+                    .c(Col::Dim, format!("  ({})", self.world.place_title(p.x, p.y)))
+                    .c(Col::Dim, if p.bot { "  island resident" } else { "" }),
             );
         }
+        lines.push(Line::col(Col::Dim, "Talk to anyone, anywhere: @Name hello"));
         self.send(id, lines);
     }
 
@@ -804,6 +901,10 @@ fn help() -> Vec<Line> {
         Line::col(Col::Pink, "chat"),
         h("say hi  (or 'hi)", "talk to people here"),
         h("emote waves  (or :waves)", "do a little something"),
+        h("@Poppy hi  (or tell)", "talk to someone anywhere"),
+        h("reply thanks!  (or r)", "answer whoever told you"),
+        h("chat hi everyone  (@all)", "everyone in the world hears"),
+        h("find Poppy", "which way to walk to them"),
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune"),
         h("sit / rest / dance / wave", "vibes"),

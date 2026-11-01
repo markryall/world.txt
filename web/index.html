@@ -38,6 +38,7 @@
   #join p { color: var(--dim); }
   #join input { width: 100%; font: inherit; font-size: 18px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); text-align: center; outline: none; }
   #join button { margin-top: 12px; width: 100%; font: inherit; font-size: 17px; padding: 12px; border: 0; border-radius: 12px; background: var(--magenta); color: var(--bg); cursor: pointer; }
+  #here a { color: var(--cyan); }
   #sound { background: none; border: 0; color: var(--dim); font: inherit; cursor: pointer; padding: 0; }
   @media (max-width: 720px) {
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -68,7 +69,7 @@
       <button data-c="sw">↙</button><button data-c="s">↓</button><button data-c="se">↘</button>
     </div>
     <div class="quick">
-      <button data-c="who">who</button><button data-c="help">help</button>
+      <button data-prefill="chat ">💬 chat</button><button data-c="who">who</button><button data-c="help">help</button>
       <button data-c="dig">dig</button><button data-c="plant flowers">🌼</button>
       <button data-c="plant tree">🌳</button><button data-c="dance">💃</button>
     </div>
@@ -122,7 +123,16 @@ function status(m) {
   $('#place').textContent = m.place;
   $('#weather').textContent = m.weather;
   $('#clock').textContent = m.clock;
-  $('#here').textContent = m.here.length ? '☺ ' + m.here.join(', ') : '';
+  const here = $('#here');
+  here.replaceChildren();
+  if (m.here.length) here.append('☺ ');
+  m.here.forEach((name, i) => {
+    if (i) here.append(', ');
+    const a = document.createElement('a');
+    a.textContent = name; a.href = '#'; a.title = 'talk to ' + name;
+    a.onclick = (e) => { e.preventDefault(); prefill('@' + name + ' '); };
+    here.append(a);
+  });
   const map = $('#map');
   map.replaceChildren();
   m.map.forEach((line, i) => {
@@ -151,6 +161,13 @@ function connect(name, password) {
     }
   };
   ws.onclose = () => addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
+}
+
+function prefill(text) {
+  const c = $('#cmd');
+  c.value = text;
+  c.focus();
+  c.setSelectionRange(text.length, text.length);
 }
 
 function send(text) {
@@ -192,6 +209,7 @@ $('#cmd').onkeydown = (e) => {
   if (e.key === 'ArrowDown') { hist = Math.min(history.length, hist + 1); $('#cmd').value = history[hist] || ''; e.preventDefault(); }
 };
 document.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => send(b.dataset.c));
+document.querySelectorAll('[data-prefill]').forEach((b) => b.onclick = () => prefill(b.dataset.prefill));
 
 // ---- sound: hums become notes, rain sounds like rain --------------------
 
