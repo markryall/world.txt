@@ -111,6 +111,18 @@ cloudflared tunnel run --url http://localhost:4040 world
   the db) once a day while it runs, and keeps the newest 14 (`--keep-backups 14`,
   0 turns it off). `world.txt backup` makes one right now. To restore, stop the
   server and copy a backup over `world.db`.
+- **Keep a copy off this machine.** Backups next to `world.db` cover mistakes and
+  a damaged file, but not a dead disk, a lost laptop or a wipe: the island and
+  its backups would go together. So also get them somewhere else:
+  - Point the backups straight at cloud or external storage:
+    `world.txt serve --backup-dir ~/Library/Mobile\ Documents/com~apple~CloudDocs/world-backups`
+    (iCloud Drive), a Dropbox or Google Drive folder, or an external drive
+    (`--backup-dir /Volumes/Backup/world`, also `WORLD_BACKUP_DIR`).
+  - Or keep the default and let Time Machine, or a sync tool, copy the
+    `backups` folder.
+  - Copying the finished backup files is always safe. Don't sync the live
+    `world.db` (or its `-wal`/`-shm` files) while the server runs: a half-copied
+    live database can be corrupt. That's what the backups are for.
 
 For family only, [Tailscale](https://tailscale.com) is a nice alternative: share
 the machine with them and they join at `http://<machine-name>:4040`, with nothing

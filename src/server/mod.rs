@@ -34,6 +34,7 @@ pub async fn run(
     password: Option<String>,
     keepers: Vec<String>,
     keep_backups: usize,
+    backup_dir: Option<std::path::PathBuf>,
 ) -> anyhow::Result<()> {
     let password: Arc<Option<String>> = Arc::new(password.filter(|p| !p.is_empty()));
     let db = db::Db::open(db_path)?;
@@ -44,7 +45,7 @@ pub async fn run(
     }
     tokio::spawn(game::run(world, events_rx, keepers));
     if keep_backups > 0 {
-        tokio::spawn(backup::run_daily(db_path.to_string(), keep_backups));
+        tokio::spawn(backup::run_daily(db_path.to_string(), backup_dir, keep_backups));
     }
 
     let listener = TcpListener::bind(addr).await?;

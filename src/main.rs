@@ -32,9 +32,13 @@ enum Cmd {
         /// Island keepers (comma-separated names) can tidy up anyone's things.
         #[arg(long, env = "WORLD_KEEPERS", value_delimiter = ',')]
         keeper: Vec<String>,
-        /// Daily copies to keep in backups/ next to the db (0 turns backups off).
+        /// Daily copies to keep (0 turns backups off).
         #[arg(long, default_value_t = 14)]
         keep_backups: usize,
+        /// Where daily copies go (default: backups/ next to the db). Somewhere
+        /// off this disk is best, e.g. an iCloud Drive folder or an external drive.
+        #[arg(long, env = "WORLD_BACKUP_DIR")]
+        backup_dir: Option<std::path::PathBuf>,
     },
     /// Copy the world to backups/ right now.
     Backup {
@@ -42,6 +46,8 @@ enum Cmd {
         db: String,
         #[arg(long, default_value_t = 14)]
         keep_backups: usize,
+        #[arg(long, env = "WORLD_BACKUP_DIR")]
+        backup_dir: Option<std::path::PathBuf>,
     },
     /// Wander in.
     Play {
@@ -114,11 +120,11 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     match Cli::parse().cmd {
-        Cmd::Serve { addr, db, seed, password, keeper, keep_backups } => {
-            server::run(&addr, &db, seed, password, keeper, keep_backups).await
+        Cmd::Serve { addr, db, seed, password, keeper, keep_backups, backup_dir } => {
+            server::run(&addr, &db, seed, password, keeper, keep_backups, backup_dir).await
         }
-        Cmd::Backup { db, keep_backups } => {
-            let made = server::backup::backup(&db, keep_backups, true)?;
+        Cmd::Backup { db, keep_backups, backup_dir } => {
+            let made = server::backup::backup(&db, backup_dir.as_deref(), keep_backups, true)?;
             if let Some(p) = made {
                 println!("💾 backed up the world to {}", p.display());
             }
