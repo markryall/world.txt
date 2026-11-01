@@ -168,6 +168,16 @@ crystals up on the rocks. There are 40 species, some rare.
 - `give daisy to Poppy` (when you're together), `place daisy` to decorate,
   `release butterfly` to let it go.
 
+### Crafting
+
+`recipes` shows what can be made from gathered things, ticking the ones your
+satchel is ready for: flower crowns, bouquets, shell wind chimes, dreamcatchers,
+crystal lanterns, mushroom soup, shell necklaces, stone cairns, a conch horn and
+a rainbow garland. `craft wind chime` makes one (using your commonest finds
+first, so rare ones aren't spent by accident). Crafts go in your satchel to
+`give` or `place`, and placed crafts come alive: a wind chime tinkles in the
+breeze, a lantern glows at night.
+
 ### Noticeboards
 
 `make a noticeboard` puts one up (shown as `▣` on the map). It works like a group

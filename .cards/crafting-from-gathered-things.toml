@@ -1,7 +1,7 @@
 name = "Crafting from gathered things"
-status = "todo"
+status = "done"
 description = "Give gathering a purpose: daisies into a flower crown, shells into a wind chime, feathers into a dreamcatcher. Recipes to discover, things to give and place."
 created_at = "2026-11-01T14:36:29.469690Z"
-updated_at = "2026-11-01T14:36:29.469690Z"
+updated_at = "2026-11-01T15:00:46.246894Z"
 tags = ["belonging"]
 priority = "medium"

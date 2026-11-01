@@ -2,6 +2,7 @@
 //! answers with lines of text and status updates.
 
 mod boards;
+mod craft;
 mod gather;
 mod homes;
 
@@ -395,7 +396,9 @@ impl Game {
             "raise" | "pile" => return self.cmd_raise(id),
             "path" | "pave" => return self.cmd_path(id),
             "name" | "call-this" => return self.cmd_name(id, rest),
-            "make" | "build" | "create" | "craft" => return self.cmd_make(id, rest),
+            "make" | "build" | "create" => return self.cmd_make(id, rest),
+            "craft" => return self.cmd_craft(id, rest),
+            "recipes" => return self.cmd_recipes(id),
             "unmake" | "destroy" | "remove" => return self.cmd_unmake(id, rest),
             "undo" => return self.cmd_undo(id),
             "welcome" | "letin" => return self.cmd_welcome(id, rest),
@@ -1373,6 +1376,9 @@ fn help() -> Vec<Line> {
         h("satchel / journal", "what you carry / everything you've found"),
         h("give daisy to Poppy", "share with someone here"),
         h("place daisy / release moth", "decorate, or set something free"),
+        Line::col(Col::Pink, "crafting"),
+        h("recipes", "what you can make from what you've gathered"),
+        h("craft wind chime", "make it (then place it, or give it away)"),
         Line::col(Col::Pink, "home"),
         h("claim", "make the patch around you your home (one each)"),
         h("home", "go straight home from anywhere"),

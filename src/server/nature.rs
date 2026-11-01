@@ -18,6 +18,8 @@ pub enum Kind {
     Feather,
     Stone,
     Fish,
+    /// Made by crafting, never found lying about.
+    Craft,
 }
 
 impl Kind {
@@ -41,6 +43,7 @@ impl Kind {
             Kind::Feather => "🪶 Feathers",
             Kind::Stone => "💎 Stones",
             Kind::Fish => "🐟 Fish",
+            Kind::Craft => "✂️ Crafts",
         }
     }
     /// Living things get released rather than placed.
@@ -176,6 +179,17 @@ pub const SPECIES: &[Species] = &[
     Species { id: "crab", name: "little crab", kind: Fish, rarity: Common, when: Any, ground: SEA, here: "" },
     Species { id: "sea_bass", name: "sea bass", kind: Fish, rarity: Uncommon, when: Any, ground: SEA, here: "" },
     Species { id: "sunfish", name: "ocean sunfish", kind: Fish, rarity: Rare, when: Day, ground: SEA, here: "" },
+    // crafts: `here` is what they do once placed, and `when` is when they do it
+    Species { id: "flower_crown", name: "flower crown", kind: Craft, rarity: Common, when: Any, ground: &[], here: "smells sweetly of summer" },
+    Species { id: "bouquet", name: "bouquet", kind: Craft, rarity: Common, when: Any, ground: &[], here: "nods its petals in the breeze" },
+    Species { id: "wind_chime", name: "shell wind chime", kind: Craft, rarity: Common, when: Any, ground: &[], here: "tinkles softly in the breeze" },
+    Species { id: "dreamcatcher", name: "dreamcatcher", kind: Craft, rarity: Common, when: Night, ground: &[], here: "twirls slowly, catching the night's dreams" },
+    Species { id: "crystal_lantern", name: "crystal lantern", kind: Craft, rarity: Uncommon, when: Night, ground: &[], here: "glows softly in the dark" },
+    Species { id: "mushroom_soup", name: "bowl of mushroom soup", kind: Craft, rarity: Common, when: Any, ground: &[], here: "steams, warm and savoury" },
+    Species { id: "shell_necklace", name: "shell necklace", kind: Craft, rarity: Uncommon, when: DryDay, ground: &[], here: "glitters in the sunshine" },
+    Species { id: "cairn", name: "little stone cairn", kind: Craft, rarity: Common, when: Any, ground: &[], here: "" },
+    Species { id: "conch_horn", name: "conch horn", kind: Craft, rarity: Rare, when: Any, ground: &[], here: "hums with the faraway sound of the sea" },
+    Species { id: "garland", name: "rainbow garland", kind: Craft, rarity: Uncommon, when: Any, ground: &[], here: "flutters in every colour" },
 ];
 
 pub fn by_id(id: &str) -> Option<&'static Species> {

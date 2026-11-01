@@ -28,6 +28,7 @@ impl Kind {
             Kind::Feather => "🪶",
             Kind::Stone => "💎",
             Kind::Fish => "🐟",
+            Kind::Craft => "✨",
         }
     }
     fn verb(self) -> &'static str {
@@ -47,6 +48,7 @@ impl Kind {
             Kind::Feather => &["feather", "feathers"],
             Kind::Stone => &["stone", "stones", "rock", "crystal", "gem"],
             Kind::Fish => &["fish"],
+            Kind::Craft => &["craft", "crafts"],
         }
     }
 }
@@ -274,7 +276,11 @@ impl Game {
         let found = self.world.db.journal(&name)?;
         let mut lines = vec![Line::new().b(
             Col::Magenta,
-            format!("📖 Your journal: {} of {} discovered", found.len(), nature::SPECIES.len()),
+            format!(
+                "📖 Your journal: {} of {} discovered",
+                found.len(),
+                nature::SPECIES.iter().filter(|s| s.kind != Kind::Craft).count()
+            ),
         )];
         for kind in Kind::ALL {
             let all: Vec<&Species> = nature::SPECIES.iter().filter(|s| s.kind == kind).collect();
@@ -381,7 +387,20 @@ impl Game {
             return Ok(());
         }
         self.world.db.satchel_add(&name, s.id, -1)?;
-        self.world.add_thing(x, y, nature::a(s.name), None, Trigger::Always, &name, None)?;
+        // Crafted things come alive once placed: a wind chime tinkles, a lantern glows.
+        let (action, trigger) = if s.kind == Kind::Craft && !s.here.is_empty() {
+            let t = match s.when {
+                nature::When::Night => Trigger::Night,
+                nature::When::Rain => Trigger::Rain,
+                nature::When::Day => Trigger::Day,
+                nature::When::DryDay => Trigger::Sun,
+                nature::When::Any => Trigger::Always,
+            };
+            (Some(s.here.to_string()), t)
+        } else {
+            (None, Trigger::Always)
+        };
+        self.world.add_thing(x, y, nature::a(s.name), action, trigger, &name, None)?;
         self.say1(id, Line::col(Col::Yellow, format!("{} You place {} here, just so.", s.kind.icon(), nature::a(s.name))));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("{} {name} places {} here.", s.kind.icon(), nature::a(s.name))));
         self.status_all();
