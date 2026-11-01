@@ -1,0 +1,7 @@
+name = "Join a friend"
+status = "todo"
+description = "'join Poppy' walks you to a friend, a step at a time, instead of lots of n n n on small thumbs."
+created_at = "2026-11-01T14:36:29.477001Z"
+updated_at = "2026-11-01T14:36:29.477001Z"
+tags = ["getting-around"]
+priority = "medium"

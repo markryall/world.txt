@@ -3,3 +3,5 @@ tmp/
 *.db
 *.db-*
 agent-state/
+.cards/.logs/
+.cards/.claims/

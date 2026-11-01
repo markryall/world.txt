@@ -1,0 +1,7 @@
+name = "Backfill the Island Journal's past weeks"
+status = "todo"
+description = "When the Island Journal is first put up it only fills in the current week, so finds from before (like Claudia's cabbage white, caught on Sunday 1 Nov) never reach it. Backfill every earlier week from the personal journals' found_at times (first find of each species per week), so they land in the archive. For a world whose journal already exists, a one-off 'world.txt backfill-journal' could fill in the missing weeks."
+created_at = "2026-11-01T14:39:42.192146Z"
+updated_at = "2026-11-01T14:39:42.192146Z"
+tags = ["journal"]
+priority = "low"

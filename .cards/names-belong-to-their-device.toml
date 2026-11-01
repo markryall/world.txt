@@ -1,0 +1,7 @@
+name = "Names belong to their device"
+status = "done"
+description = "Anyone can log in as any name and get that person's satchel, journal and boards. The browser (and terminal client) keeps a secret key; the first device to use a name claims it, and only that key can use it after. Mark can release a name for a kid who changes devices."
+created_at = "2026-11-01T14:36:29.448071Z"
+updated_at = "2026-11-01T14:38:15.438117Z"
+tags = ["safety"]
+priority = "high"

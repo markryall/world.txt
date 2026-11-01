@@ -1,0 +1,7 @@
+name = "Only makers can unmake or push their things"
+status = "todo"
+description = "Anyone can unmake anyone's builds. Only the maker (or Mark) can unmake or push something, and unmaking keeps an undo so mistakes can be put back."
+created_at = "2026-11-01T14:36:29.453385Z"
+updated_at = "2026-11-01T14:36:29.453385Z"
+tags = ["safety"]
+priority = "high"

@@ -1,0 +1,7 @@
+name = "Mute and admin kick"
+status = "todo"
+description = "No way to stop someone being unkind. Personal 'mute <name>' hides their words from you; Mark gets an admin 'kick' for the public link."
+created_at = "2026-11-01T14:36:29.457691Z"
+updated_at = "2026-11-01T14:36:29.457691Z"
+tags = ["safety"]
+priority = "high"
