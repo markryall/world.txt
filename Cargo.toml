@@ -1,8 +1,15 @@
 [package]
-name = "world"
+name = "world-txt"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+description = "A cozy multiplayer text world: wander, chat, garden and craft on a shared island. No battles, just vibes."
+repository = "https://github.com/markryall/world.txt"
+homepage = "https://github.com/markryall/world.txt"
+readme = "README.md"
+keywords = ["game", "mud", "multiplayer", "terminal", "cozy"]
+categories = ["games", "command-line-utilities"]
+exclude = [".cards/", ".cards.toml", ".claude/", "tmp/", "*.db", "*.db-*"]
 
 [dependencies]
 anyhow = "1.0.104"

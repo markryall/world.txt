@@ -4,7 +4,7 @@ A small shared island made of text. You can wander, chat, dig ponds, plant trees
 name places and make things. There are no battles, just vibes.
 
 ```
-make install                         # builds and installs ~/.local/bin/world.txt
+brew install markryall/tap/world-txt  # or: make install (builds ~/.local/bin/world.txt)
 world.txt serve                      # opens the world on :4040, saves to world.db
 world.txt invite Mark --keeper       # your account, and its magic link: open it!
 world.txt play --invite <link>       # or the terminal client (just `world.txt play` after)
@@ -29,8 +29,9 @@ someone's devices (a lost iPad: then `link Sam` for a fresh start), and `users`
 to see everyone with their devices and when they were last seen. On the server's
 machine, `world.txt promote Lu` always works.
 
-Cargo won't put a `.` in a binary name, so `cargo build` makes `target/release/world`
-and `make install` copies it into place as `world.txt`. `cargo run -- serve` works too.
+Cargo won't put a `.` in a binary name, so the crate is called `world-txt`.
+Homebrew and `make install` put it in place as `world.txt`; `cargo install world-txt`
+gives you `world-txt` (alias it, or just type that). `cargo run -- serve` works too.
 
 **Everyone has a username and a nickname.** Your username (like
 `sunny-otter-42`) is made up for you the first time you arrive and never changes;

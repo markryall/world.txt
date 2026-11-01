@@ -4,4 +4,4 @@ PREFIX ?= $(HOME)/.local
 install:
 	cargo build --release
 	install -d $(PREFIX)/bin
-	install -m 755 target/release/world $(PREFIX)/bin/world.txt
+	install -m 755 target/release/world-txt $(PREFIX)/bin/world.txt
