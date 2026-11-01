@@ -100,6 +100,68 @@ world.txt serve --url https://world.example.com
 cloudflared tunnel run --url http://localhost:4040 world
 ```
 
+### Your own domain, step by step
+
+1. **Put the domain on Cloudflare.** If you bought it somewhere else, add it as a
+   site in the Cloudflare dashboard (the free plan is fine), then go to your
+   registrar and change the domain's **nameservers** to the two Cloudflare gives
+   you. The switch can take from minutes to a day; Cloudflare emails you when the
+   domain is active.
+
+2. **Pick the address** the world will live at, either the bare domain
+   (`example.com`) or a subdomain (`world.example.com`). Both work. Settle on one
+   and keep it: it's in every magic link, browsers keep their sign-in per address,
+   and it's your world's identity when visiting other worlds (changing it means
+   fresh links for everyone, and friendly worlds would need to trust you again).
+
+3. **Make the tunnel and point the address at it** (once):
+
+   ```
+   cloudflared tunnel login                         # choose the domain in the browser
+   cloudflared tunnel create world
+   cloudflared tunnel route dns world example.com   # or world.example.com
+   ```
+
+4. **Tell world.txt its address,** so `serve`, `invite` and `link` all use it. Put
+   this in your shell's startup file (e.g. `~/.zshrc`, or `set -gx` in fish):
+
+   ```
+   export WORLD_URL=https://example.com
+   ```
+
+5. **Open the world:**
+
+   ```
+   world.txt serve
+   cloudflared tunnel run --url http://localhost:4040 world
+   ```
+
+   Check it with `curl https://example.com/.well-known/world.txt`: it should show
+   your world's name and address.
+
+6. **Make yourself a keeper** and open the link it prints:
+
+   ```
+   world.txt invite YourName --keeper
+   ```
+
+7. **Keep the tunnel up after a restart** (optional): give `cloudflared` a config
+   file at `~/.cloudflared/config.yml`
+
+   ```yaml
+   tunnel: world
+   credentials-file: /Users/you/.cloudflared/<tunnel-id>.json   # printed by `tunnel create`
+   ingress:
+     - hostname: example.com
+       service: http://localhost:4040
+     - service: http_status:404
+   ```
+
+   then `cloudflared tunnel run world` uses it, and `cloudflared service install`
+   runs it in the background whenever the machine is on (see Cloudflare's
+   [run as a service](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/as-a-service/)
+   guide for your system). `world.txt serve` still needs to be running too.
+
 ### Inviting people
 
 - Make their account and link: `invite Sam` in the world (keepers), or
