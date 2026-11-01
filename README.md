@@ -110,6 +110,22 @@ crystals up on the rocks. There are 40 species, some rare.
 - `give daisy to Poppy` (when you're together), `place daisy` to decorate,
   `release butterfly` to let it go.
 
+### Noticeboards
+
+`make a noticeboard` puts one up (shown as `▣` on the map). It works like a group
+chat that belongs to that spot:
+
+- `read` shows the latest notes and `read more` scrolls back. In the browser, a
+  board opens as a chat panel that loads older notes as you scroll up.
+- `post see you at sunset!` leaves a note. Everyone standing there sees it, and
+  posting **follows** the board, so you hear about new notes wherever you are.
+  `follow` / `unfollow` to change that, and `boards` lists the ones you follow.
+
+The **Island Journal** is a special board at the spawn point. The first find of
+every species each week goes in it automatically, with a shout-out to the whole
+island, and people can post underneath. It starts a fresh page every Monday:
+`archive` lists past weeks and `read week 2026-10-26` opens one.
+
 ## Island residents (AI)
 
 Residents are AI characters who join like any other player and call Claude
@@ -175,6 +191,7 @@ that's guidance, not a lock. So:
   the island (`world.rs`, `terrain.rs`), weather and clock (`weather.rs`), SQLite (`db.rs`)
 - `src/client.rs`: the ratatui terminal client
 - `src/server/nature.rs` and `src/server/game/gather.rs`: things to find, and gathering
+- `src/server/game/boards.rs`: noticeboards and the Island Journal
 - `src/agent.rs`: AI residents
 - `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside
 - `.claude/skills/world-resident/`: the Claude Code skill

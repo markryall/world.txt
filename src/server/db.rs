@@ -21,6 +21,15 @@ pub struct ThingRow {
     pub action: Option<String>,
     pub trigger: Option<String>,
     pub maker: String,
+    /// "board" or "journal" for noticeboards; none for ordinary things.
+    pub kind: Option<String>,
+}
+
+pub struct NoteRow {
+    pub id: i64,
+    pub author: String,
+    pub text: String,
+    pub at: i64,
 }
 
 impl Db {
@@ -43,6 +52,15 @@ impl Db {
              CREATE TABLE IF NOT EXISTS satchel (
                  player TEXT NOT NULL, species TEXT NOT NULL, count INTEGER NOT NULL,
                  PRIMARY KEY (player, species));
+             CREATE TABLE IF NOT EXISTS notes (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 board INTEGER NOT NULL, author TEXT NOT NULL, text TEXT NOT NULL,
+                 at INTEGER NOT NULL, week TEXT NOT NULL, species TEXT);
+             CREATE INDEX IF NOT EXISTS notes_board ON notes (board, week, id);
+             CREATE TABLE IF NOT EXISTS board_members (
+                 player TEXT NOT NULL, board INTEGER NOT NULL,
+                 following INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0,
+                 PRIMARY KEY (player, board));
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -53,6 +71,7 @@ impl Db {
             "ALTER TABLE players ADD COLUMN tutorial INTEGER NOT NULL DEFAULT 99",
             [],
         );
+        let _ = conn.execute("ALTER TABLE things ADD COLUMN kind TEXT", []);
         Ok(Db { conn })
     }
 
@@ -97,7 +116,7 @@ impl Db {
     pub fn things(&self) -> anyhow::Result<Vec<ThingRow>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, x, y, name, action, trigger, maker FROM things")?;
+            .prepare("SELECT id, x, y, name, action, trigger, maker, kind FROM things")?;
         let rows = stmt.query_map([], |r| {
             Ok(ThingRow {
                 id: r.get(0)?,
@@ -107,6 +126,7 @@ impl Db {
                 action: r.get(4)?,
                 trigger: r.get(5)?,
                 maker: r.get(6)?,
+                kind: r.get(7)?,
             })
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -114,8 +134,8 @@ impl Db {
 
     pub fn add_thing(&self, t: &ThingRow) -> anyhow::Result<i64> {
         self.conn.execute(
-            "INSERT INTO things (x, y, name, action, trigger, maker) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![t.x, t.y, t.name, t.action, t.trigger, t.maker],
+            "INSERT INTO things (x, y, name, action, trigger, maker, kind) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![t.x, t.y, t.name, t.action, t.trigger, t.maker, t.kind],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
@@ -148,6 +168,136 @@ impl Db {
         )?;
         self.conn.execute("DELETE FROM satchel WHERE count <= 0", [])?;
         Ok(())
+    }
+
+    // ---- noticeboards ---------------------------------------------------
+
+    pub fn add_note(
+        &self,
+        board: i64,
+        author: &str,
+        text: &str,
+        at: i64,
+        week: &str,
+        species: Option<&str>,
+    ) -> anyhow::Result<i64> {
+        self.conn.execute(
+            "INSERT INTO notes (board, author, text, at, week, species) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![board, author, text, at, week, species],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// Up to `limit` notes before `before` (newest first in the query, returned
+    /// oldest first), optionally one week's page only. Also says whether older
+    /// ones exist.
+    pub fn notes(
+        &self,
+        board: i64,
+        week: Option<&str>,
+        before: Option<i64>,
+        limit: i64,
+    ) -> anyhow::Result<(Vec<NoteRow>, bool)> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, author, text, at FROM notes
+             WHERE board = ?1 AND (?2 IS NULL OR week = ?2) AND id < ?3
+             ORDER BY id DESC LIMIT ?4",
+        )?;
+        let rows = stmt.query_map(params![board, week, before.unwrap_or(i64::MAX), limit + 1], |r| {
+            Ok(NoteRow { id: r.get(0)?, author: r.get(1)?, text: r.get(2)?, at: r.get(3)? })
+        })?;
+        let mut notes: Vec<NoteRow> = rows.collect::<Result<_, _>>()?;
+        let more = notes.len() as i64 > limit;
+        notes.truncate(limit as usize);
+        notes.reverse();
+        Ok((notes, more))
+    }
+
+    pub fn notes_after(&self, board: i64, after: i64) -> anyhow::Result<i64> {
+        Ok(self.conn.query_row(
+            "SELECT COUNT(*) FROM notes WHERE board = ?1 AND id > ?2",
+            params![board, after],
+            |r| r.get(0),
+        )?)
+    }
+
+    pub fn last_note(&self, board: i64) -> anyhow::Result<i64> {
+        Ok(self.conn.query_row(
+            "SELECT COALESCE(MAX(id), 0) FROM notes WHERE board = ?1",
+            [board],
+            |r| r.get(0),
+        )?)
+    }
+
+    /// Past weeks with notes, newest first: (week, count).
+    pub fn weeks(&self, board: i64) -> anyhow::Result<Vec<(String, i64)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT week, COUNT(*) FROM notes WHERE board = ?1 GROUP BY week ORDER BY week DESC",
+        )?;
+        let rows = stmt.query_map([board], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn species_noted(&self, board: i64, species: &str, week: &str) -> anyhow::Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT EXISTS (SELECT 1 FROM notes WHERE board = ?1 AND species = ?2 AND week = ?3)",
+            params![board, species, week],
+            |r| r.get(0),
+        )?)
+    }
+
+    /// (following, last seen note id), if this player has been at this board.
+    pub fn membership(&self, player: &str, board: i64) -> Option<(bool, i64)> {
+        self.conn
+            .query_row(
+                "SELECT following, last_seen FROM board_members WHERE player = ?1 AND board = ?2",
+                params![player, board],
+                |r| Ok((r.get::<_, i64>(0)? != 0, r.get(1)?)),
+            )
+            .ok()
+    }
+
+    pub fn set_seen(&self, player: &str, board: i64, last_seen: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO board_members (player, board, last_seen) VALUES (?1, ?2, ?3)
+             ON CONFLICT(player, board) DO UPDATE SET last_seen = MAX(last_seen, excluded.last_seen)",
+            params![player, board, last_seen],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_following(&self, player: &str, board: i64, following: bool) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO board_members (player, board, following) VALUES (?1, ?2, ?3)
+             ON CONFLICT(player, board) DO UPDATE SET following = excluded.following",
+            params![player, board, following as i64],
+        )?;
+        Ok(())
+    }
+
+    pub fn followers(&self, board: i64) -> anyhow::Result<Vec<String>> {
+        let mut stmt =
+            self.conn.prepare("SELECT player FROM board_members WHERE board = ?1 AND following = 1")?;
+        let rows = stmt.query_map([board], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Boards someone follows: (board, last seen note id).
+    pub fn followed(&self, player: &str) -> anyhow::Result<Vec<(i64, i64)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT board, last_seen FROM board_members WHERE player = ?1 AND following = 1")?;
+        let rows = stmt.query_map([player], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Everyone's discoveries since a moment: (player, species, found_at), oldest first.
+    pub fn discoveries_since(&self, since: i64) -> anyhow::Result<Vec<(String, String, i64)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT player, species, found_at FROM journal WHERE found_at >= ?1 ORDER BY found_at",
+        )?;
+        let rows = stmt.query_map([since], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     /// Note a discovery. True if it's the first of its kind for this player.

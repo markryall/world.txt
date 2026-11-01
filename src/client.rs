@@ -71,6 +71,12 @@ pub async fn run(name: Option<String>, server: &str, password: Option<String>) -
                                 st.here = here;
                             }
                             Ok(ToClient::Hint { text, .. }) => st.hint = text,
+                            Ok(msg @ ToClient::Board { .. }) => {
+                                if let Some(lines) = crate::protocol::board_lines(&msg) {
+                                    st.log.extend(lines);
+                                    st.scroll = 0;
+                                }
+                            }
                             Ok(ToClient::Bye { reason }) => st.closed = Some(reason),
                             Err(_) => {}
                         }

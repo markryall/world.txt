@@ -54,6 +54,14 @@ pub struct Thing {
     pub action: Option<String>,
     pub trigger: Trigger,
     pub maker: String,
+    /// "board" or "journal" for noticeboards.
+    pub kind: Option<String>,
+}
+
+impl Thing {
+    pub fn is_board(&self) -> bool {
+        self.kind.is_some()
+    }
 }
 
 pub struct World {
@@ -107,6 +115,7 @@ impl World {
                 action: r.action,
                 trigger: Trigger::from_code(r.trigger.as_deref().unwrap_or("always")),
                 maker: r.maker,
+                kind: r.kind,
             })
             .collect();
         Ok(World { seed, tiles, things, weather: Weather::new(SIZE, seed), db })
@@ -162,7 +171,8 @@ impl World {
         action: Option<String>,
         trigger: Trigger,
         maker: &str,
-    ) -> anyhow::Result<()> {
+        kind: Option<&str>,
+    ) -> anyhow::Result<i64> {
         let id = self.db.add_thing(&ThingRow {
             id: 0,
             x,
@@ -171,9 +181,10 @@ impl World {
             action: action.clone(),
             trigger: Some(trigger.code().into()),
             maker: maker.into(),
+            kind: kind.map(Into::into),
         })?;
-        self.things.push(Thing { id, x, y, name, action, trigger, maker: maker.into() });
-        Ok(())
+        self.things.push(Thing { id, x, y, name, action, trigger, maker: maker.into(), kind: kind.map(Into::into) });
+        Ok(id)
     }
 
     /// Find a thing here whose name contains the words given.
@@ -288,6 +299,8 @@ impl World {
                     line = line.b(Col::Magenta, "@");
                 } else if people.contains(&(x, y)) {
                     line = line.b(Col::White, "☺");
+                } else if self.things_at(x, y).any(|t| t.is_board()) {
+                    line = line.b(Col::Yellow, "▣");
                 } else if self.things_at(x, y).next().is_some() {
                     line = line.c(Col::Yellow, "✦");
                 } else if finds.contains(&(x, y)) {

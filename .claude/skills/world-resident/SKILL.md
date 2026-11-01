@@ -70,7 +70,8 @@ For each `!` event:
 3. Count it as one reply.
 
 Stay inside the gentle commands: talk (`say`, `@Name`, `reply`, `emote`),
-wander, `hum`, `plant`, `dig`, `path`, `make`. Everything people built stays
+wander, `hum`, `plant`, `dig`, `path`, `make`, `gather`, `fish`, and `read` /
+`post` at noticeboards. Everything people built stays
 as they left it: never `unmake` or `push` someone else's things, and keep
 `shout` and `chat` for the arrival and goodbye only. If a visitor says
 something unkind or unsuitable, steer gently back to the island.

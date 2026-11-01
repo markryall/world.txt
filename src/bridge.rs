@@ -79,6 +79,15 @@ pub async fn run(name: String, server: &str, password: Option<String>, dir: Path
                         }
                     }
                     Ok(ToClient::Bye { reason }) => { note(&mut log, &format!("bye: {reason}")); break }
+                    Ok(msg @ ToClient::Board { .. }) => {
+                        // Shown as plain lines, so `send <Name> read` prints the board.
+                        for line in crate::protocol::board_lines(&msg).unwrap_or_default() {
+                            let t: String = line.0.iter().map(|s| s.t.as_str()).collect();
+                            let _ = writeln!(log, "  {t}");
+                            let _ = lines_tx.send(t);
+                        }
+                        let _ = log.flush();
+                    }
                     Ok(ToClient::Hint { .. }) | Err(_) => {}
                 }
             }

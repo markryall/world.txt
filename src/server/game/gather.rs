@@ -181,6 +181,9 @@ impl Game {
                 Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, capitalise(s.name)).c(Col::Yellow, s.rarity.label()),
             );
         }
+        if !self.players.get(&id).is_some_and(|p| p.bot) {
+            self.note_discovery(&name, s)?;
+        }
         Ok(true)
     }
 
@@ -378,7 +381,7 @@ impl Game {
             return Ok(());
         }
         self.world.db.satchel_add(&name, s.id, -1)?;
-        self.world.add_thing(x, y, nature::a(s.name), None, Trigger::Always, &name)?;
+        self.world.add_thing(x, y, nature::a(s.name), None, Trigger::Always, &name, None)?;
         self.say1(id, Line::col(Col::Yellow, format!("{} You place {} here, just so.", s.kind.icon(), nature::a(s.name))));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("{} {name} places {} here.", s.kind.icon(), nature::a(s.name))));
         self.status_all();

@@ -1,6 +1,7 @@
 //! The one task that owns the world. Connections send it events; it
 //! answers with lines of text and status updates.
 
+mod boards;
 mod gather;
 
 use super::nature::Find;
@@ -33,6 +34,8 @@ struct Player {
     tutorial: u8,
     /// Ticks until something bites, while a line is in the water.
     fishing: Option<u8>,
+    /// Which board they're reading, for `read more`.
+    reading: Option<boards::Reading>,
 }
 
 struct Game {
@@ -42,11 +45,16 @@ struct Game {
     rng: Rng,
     /// Flowers, butterflies, shells... waiting to be gathered.
     finds: Vec<Find>,
+    /// The Island Journal's thing id.
+    journal_board: Option<i64>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None };
+    if let Err(e) = game.ensure_journal() {
+        eprintln!("couldn't put up the Island Journal: {e}");
+    }
     let mut tick = tokio::time::interval(TICK);
     loop {
         tokio::select! {
@@ -138,6 +146,7 @@ impl Game {
         let Some(p) = self.players.get(&id) else { return };
         let mut lines = self.world.describe(p.x, p.y, &self.others_here(id));
         let exits = lines.pop();
+        lines.extend(self.board_lines_here(id));
         lines.extend(self.find_lines(p.x, p.y));
         lines.extend(exits);
         self.send(id, lines);
@@ -163,7 +172,7 @@ impl Game {
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None });
+        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None });
 
         self.send(
             id,
@@ -256,6 +265,12 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "read" => return self.cmd_read(id, rest),
+            "post" | "note" => return self.cmd_post(id, rest),
+            "follow" => return self.cmd_follow(id, true),
+            "unfollow" => return self.cmd_follow(id, false),
+            "boards" => return self.cmd_boards(id),
+            "archive" => return self.cmd_archive(id),
             "gather" | "pick" | "catch" | "collect" | "forage" | "g" => return self.cmd_gather(id, rest),
             "fish" => return self.cmd_fish(id),
             "satchel" | "bag" | "inventory" | "inv" | "i" => return self.cmd_satchel(id),
@@ -765,7 +780,19 @@ impl Game {
             return Ok(());
         }
         let (name, action, trigger) = parse_make(text);
-        self.world.add_thing(x, y, name.clone(), action, trigger, &who)?;
+        if boards::is_board_name(&name) {
+            if self.world.things_at(x, y).any(|t| t.is_board()) {
+                self.say1(id, Line::plain("There's already a board here. Try 'post hello!'"));
+                return Ok(());
+            }
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &who, Some(boards::board_kind()))?;
+            self.say1(id, Line::new().c(Col::Yellow, "📌 You put up ").b(Col::Yellow, &name).c(Col::Yellow, ". Anyone passing can read it and post notes."));
+            self.say1(id, Line::col(Col::Dim, "Try: post hello everyone! · read · follow"));
+            self.tell_here(x, y, id, Line::col(Col::Yellow, format!("📌 {who} puts up {name}.")));
+            self.status_all();
+            return Ok(());
+        }
+        self.world.add_thing(x, y, name.clone(), action, trigger, &who, None)?;
         self.say1(id, Line::new().c(Col::Yellow, "✨ You make ").b(Col::Yellow, &name).c(Col::Yellow, "."));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("✨ {who} makes {name}.")));
         self.status_all();
@@ -775,6 +802,9 @@ impl Game {
     fn cmd_unmake(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
         let Some((x, y, who)) = self.here(id) else { return Ok(()) };
         match self.world.find_thing(x, y, what) {
+            Some(i) if self.world.things[i].kind.as_deref() == Some(boards::journal_kind()) => {
+                self.say1(id, Line::plain("The Island Journal belongs to everyone. It stays right where it is."));
+            }
             Some(i) if !what.is_empty() => {
                 let t = self.world.remove_thing(i)?;
                 self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
@@ -797,6 +827,10 @@ impl Game {
         };
         if !self.world.terrain(x + dx, y + dy).walkable() {
             self.say1(id, Line::plain("It would sink without a trace."));
+            return Ok(());
+        }
+        if self.world.things[i].kind.as_deref() == Some(boards::journal_kind()) {
+            self.say1(id, Line::plain("The Island Journal won't budge. It belongs right here."));
             return Ok(());
         }
         let name = self.world.things[i].name.clone();
@@ -1053,6 +1087,12 @@ fn help() -> Vec<Line> {
         h("satchel / journal", "what you carry / everything you've found"),
         h("give daisy to Poppy", "share with someone here"),
         h("place daisy / release moth", "decorate, or set something free"),
+        Line::col(Col::Pink, "noticeboards"),
+        h("make a noticeboard", "put one up for everyone"),
+        h("read / read more", "the notes here, then older ones"),
+        h("post see you at sunset!", "leave a note (and follow the board)"),
+        h("boards / follow / unfollow", "boards you hear about from anywhere"),
+        h("archive / read week 2026-11-02", "past pages of the Island Journal"),
         Line::col(Col::Pink, "make things"),
         h("make a frog that croaks when it rains", ""),
         Line::col(Col::Dim, "    also: at night, during the day, when it's sunny, when someone arrives"),

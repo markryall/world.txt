@@ -40,7 +40,7 @@ const MAX_NOTES: usize = 30;
 /// Commands a resident may use. No unmake, push, shout or world-wide chat.
 const ALLOWED: &[&str] = &[
     "say", "emote", "me", "tell", "reply", "look", "hum", "sing", "whistle", "plant", "dig",
-    "path", "make", "gather", "pick", "catch", "fish", "give", "sit", "rest", "dance", "wave", "find", "n", "s", "e", "w", "ne", "nw", "se",
+    "path", "make", "gather", "pick", "catch", "fish", "give", "read", "post", "sit", "rest", "dance", "wave", "find", "n", "s", "e", "w", "ne", "nw", "se",
     "sw", "north", "south", "east", "west", "north-east", "north-west", "south-east", "south-west",
 ];
 
@@ -136,6 +136,12 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                         status = Some(Status { place, weather, clock, here, humans });
                     }
                     Ok(ToClient::Bye { reason }) => { log(&opts.name, &format!("bye: {reason}")); break }
+                    Ok(msg @ ToClient::Board { .. }) => {
+                        for line in crate::protocol::board_lines(&msg).unwrap_or_default() {
+                            seen.push_back(line.0.iter().map(|s| s.t.as_str()).collect());
+                        }
+                        while seen.len() > CONTEXT_LINES { seen.pop_front(); }
+                    }
                     Ok(ToClient::Hint { .. }) | Err(_) => {}
                 }
                 continue;
