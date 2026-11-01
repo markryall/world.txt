@@ -76,6 +76,8 @@ impl Db {
              CREATE TABLE IF NOT EXISTS mail (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  recipient TEXT NOT NULL, sender TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS companions (
+                 owner TEXT PRIMARY KEY, animal TEXT NOT NULL, name TEXT);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -445,6 +447,26 @@ impl Db {
         self.conn.execute("UPDATE players SET key_hash = ?2 WHERE name = ?1", params![stored, hash])?;
         self.conn.execute("DELETE FROM door_knocks WHERE name = ?1", [&stored])?;
         Ok(Some(stored))
+    }
+
+    // ---- companions ---------------------------------------------------------
+
+    pub fn companion(&self, owner: &str) -> Option<(String, Option<String>)> {
+        self.conn
+            .query_row("SELECT animal, name FROM companions WHERE owner = ?1", [owner], |r| Ok((r.get(0)?, r.get(1)?)))
+            .ok()
+    }
+
+    pub fn set_companion(&self, owner: &str, animal: Option<&str>, name: Option<&str>) -> anyhow::Result<()> {
+        match animal {
+            Some(a) => self.conn.execute(
+                "INSERT INTO companions (owner, animal, name) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(owner) DO UPDATE SET animal = excluded.animal, name = excluded.name",
+                params![owner, a, name],
+            )?,
+            None => self.conn.execute("DELETE FROM companions WHERE owner = ?1", [owner])?,
+        };
+        Ok(())
     }
 
     // ---- mail ----------------------------------------------------------------

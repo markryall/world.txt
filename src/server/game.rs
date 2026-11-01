@@ -2,6 +2,7 @@
 //! answers with lines of text and status updates.
 
 mod boards;
+mod companions;
 mod craft;
 mod gather;
 mod homes;
@@ -46,6 +47,8 @@ struct Player {
     key_hash: Option<String>,
     /// Who they're walking to, with `join`.
     travel: Option<String>,
+    /// Their animal friend: (animal id, nickname).
+    companion: Option<(String, Option<String>)>,
 }
 
 impl Player {
@@ -65,13 +68,15 @@ struct Game {
     journal_board: Option<i64>,
     /// Names that may tidy up anyone's things.
     keepers: Vec<String>,
+    /// Animals out in the wild, waiting to be befriended.
+    wild: Vec<companions::Wild>,
     /// Who last hummed where, for noticing a jam.
     last_hum: HashMap<(i64, i64), (String, std::time::Instant)>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Vec<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers, last_hum: HashMap::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers, last_hum: HashMap::new(), wild: Vec::new() };
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -178,6 +183,7 @@ impl Game {
         let mut lines = self.world.describe(p.x, p.y, &self.others_here(id));
         let exits = lines.pop();
         lines.extend(self.board_lines_here(id));
+        lines.extend(self.animal_lines(id));
         lines.extend(self.find_lines(p.x, p.y));
         lines.extend(exits);
         self.send(id, lines);
@@ -243,13 +249,14 @@ impl Game {
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
+        let companion = self.world.db.companion(&name);
         let muted = self.world.db.mutes(&name).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         if let Some(hash) = claim {
             if let Err(e) = self.world.db.claim_name(&name, &hash, x, y) {
                 eprintln!("claiming {name}: {e}");
             }
         }
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None });
+        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, companion });
 
         self.send(
             id,
@@ -350,6 +357,11 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "befriend" | "feed" | "tame" => return self.cmd_befriend(id, rest),
+            "nickname" | "petname" => return self.cmd_nickname(id, rest),
+            "pet" | "pat" | "cuddle" => return self.cmd_pet(id),
+            "dismiss" => return self.cmd_let_go(id),
+            "let" if rest.trim_start().starts_with("go") => return self.cmd_let_go(id),
             "teach" => return self.cmd_teach(id, rest),
             "play" | "wind" => return self.cmd_play(id),
             "join" | "visit" => return self.cmd_join(id, rest),
@@ -454,14 +466,15 @@ impl Game {
         }
         let dir = DIRS.iter().find(|d| d.2 == dx && d.3 == dy).map_or("away", |d| d.1);
         let back = DIRS.iter().find(|d| d.2 == -dx && d.3 == -dy).map_or("somewhere", |d| d.1);
-        self.tell_here(ox, oy, id, Line::col(Col::Cyan, format!("{name} wanders off to the {dir}.")));
+        let with = self.with_companion(id);
+        self.tell_here(ox, oy, id, Line::col(Col::Cyan, format!("{name} wanders off to the {dir}{with}.")));
         if let Some(p) = self.players.get_mut(&id) {
             p.x = nx;
             p.y = ny;
             p.sky = self.world.weather.sky_at(nx, ny);
             p.fishing = None; // walking off reels the line in
         }
-        self.tell_here(nx, ny, id, Line::col(Col::Cyan, format!("{name} arrives from the {back}.")));
+        self.tell_here(nx, ny, id, Line::col(Col::Cyan, format!("{name} arrives from the {back}{with}.")));
         if quiet {
             // just the step, below
         } else {
@@ -1257,6 +1270,7 @@ impl Game {
         }
 
         self.nature_tick();
+        self.animals_tick();
 
         // Things doing their things, but only when someone's there to see.
         let mut acts: Vec<(i64, i64, String)> = Vec::new();
@@ -1458,6 +1472,9 @@ fn help() -> Vec<Line> {
         h("satchel / journal", "what you carry / everything you've found"),
         h("give daisy to Poppy", "share with someone here"),
         h("place daisy / release moth", "decorate, or set something free"),
+        Line::col(Col::Pink, "companions"),
+        h("befriend fox", "offer a wild animal a berry (it may take a few)"),
+        h("nickname Rusty / pet / let go", "your friend follows you everywhere"),
         Line::col(Col::Pink, "crafting"),
         h("recipes", "what you can make from what you've gathered"),
         h("craft wind chime", "make it (then place it, or give it away)"),

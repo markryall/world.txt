@@ -1,7 +1,7 @@
 name = "Companions"
-status = "todo"
+status = "done"
 description = "Befriend a fox or duckling with berries and it follows you about."
 created_at = "2026-11-01T14:36:29.487940Z"
-updated_at = "2026-11-01T14:36:29.487940Z"
+updated_at = "2026-11-01T20:31:41.670101Z"
 tags = ["magic"]
 priority = "low"

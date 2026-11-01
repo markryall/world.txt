@@ -18,12 +18,13 @@ pub enum Kind {
     Feather,
     Stone,
     Fish,
+    Berry,
     /// Made by crafting, never found lying about.
     Craft,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 8] = [
+    pub const ALL: [Kind; 9] = [
         Kind::Flower,
         Kind::Butterfly,
         Kind::Bug,
@@ -32,6 +33,7 @@ impl Kind {
         Kind::Feather,
         Kind::Stone,
         Kind::Fish,
+        Kind::Berry,
     ];
     pub fn title(self) -> &'static str {
         match self {
@@ -43,6 +45,7 @@ impl Kind {
             Kind::Feather => "🪶 Feathers",
             Kind::Stone => "💎 Stones",
             Kind::Fish => "🐟 Fish",
+            Kind::Berry => "🫐 Berries",
             Kind::Craft => "✂️ Crafts",
         }
     }
@@ -179,6 +182,10 @@ pub const SPECIES: &[Species] = &[
     Species { id: "crab", name: "little crab", kind: Fish, rarity: Common, when: Any, ground: SEA, here: "" },
     Species { id: "sea_bass", name: "sea bass", kind: Fish, rarity: Uncommon, when: Any, ground: SEA, here: "" },
     Species { id: "sunfish", name: "ocean sunfish", kind: Fish, rarity: Rare, when: Day, ground: SEA, here: "" },
+    // berries (animals love them)
+    Species { id: "blackberry", name: "blackberry", kind: Berry, rarity: Common, when: Any, ground: &[T::Forest, T::Meadow], here: "hangs dark and juicy on a bramble" },
+    Species { id: "strawberry", name: "wild strawberry", kind: Berry, rarity: Common, when: Any, ground: &[T::Meadow, T::Grass], here: "peeks out red from under its leaves" },
+    Species { id: "bilberry", name: "bilberry", kind: Berry, rarity: Uncommon, when: Any, ground: &[T::Hill, T::Forest], here: "grows low and dusty blue" },
     // crafts: `here` is what they do once placed, and `when` is when they do it
     Species { id: "flower_crown", name: "flower crown", kind: Craft, rarity: Common, when: Any, ground: &[], here: "smells sweetly of summer" },
     Species { id: "bouquet", name: "bouquet", kind: Craft, rarity: Common, when: Any, ground: &[], here: "nods its petals in the breeze" },

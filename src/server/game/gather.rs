@@ -28,12 +28,13 @@ impl Kind {
             Kind::Feather => "🪶",
             Kind::Stone => "💎",
             Kind::Fish => "🐟",
+            Kind::Berry => "🫐",
             Kind::Craft => "✨",
         }
     }
     fn verb(self) -> &'static str {
         match self {
-            Kind::Flower | Kind::Mushroom => "pick",
+            Kind::Flower | Kind::Mushroom | Kind::Berry => "pick",
             Kind::Butterfly | Kind::Bug | Kind::Fish => "catch",
             _ => "collect",
         }
@@ -48,6 +49,7 @@ impl Kind {
             Kind::Feather => &["feather", "feathers"],
             Kind::Stone => &["stone", "stones", "rock", "crystal", "gem"],
             Kind::Fish => &["fish"],
+            Kind::Berry => &["berry", "berries"],
             Kind::Craft => &["craft", "crafts"],
         }
     }
