@@ -81,6 +81,10 @@ pub enum ToClient {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ToServer {
-    Hello { name: String },
+    Hello {
+        name: String,
+        #[serde(default)]
+        password: Option<String>,
+    },
     Cmd { text: String },
 }

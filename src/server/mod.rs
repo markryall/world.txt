@@ -10,6 +10,7 @@ mod world;
 
 use crate::protocol::{ToClient, ToServer};
 use futures_util::{SinkExt, StreamExt};
+use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
@@ -22,7 +23,13 @@ pub enum Event {
     Leave { id: u64 },
 }
 
-pub async fn run(addr: &str, db_path: &str, seed: u64) -> anyhow::Result<()> {
+pub async fn run(
+    addr: &str,
+    db_path: &str,
+    seed: u64,
+    password: Option<String>,
+) -> anyhow::Result<()> {
+    let password: Arc<Option<String>> = Arc::new(password.filter(|p| !p.is_empty()));
     let db = db::Db::open(db_path)?;
     let world = world::World::load_or_create(db, seed)?;
     let (events_tx, events_rx) = mpsc::unbounded_channel();
@@ -30,14 +37,20 @@ pub async fn run(addr: &str, db_path: &str, seed: u64) -> anyhow::Result<()> {
 
     let listener = TcpListener::bind(addr).await?;
     println!("🌍 world.txt is open: browser http://{addr}  ·  terminal ws://{addr}  (db: {db_path})");
+    if password.is_some() {
+        println!("🔐 password required");
+    } else {
+        println!("🔓 no password: anyone who can reach this port can join");
+    }
     let mut next_id = 1u64;
     loop {
         let (stream, peer) = listener.accept().await?;
         let id = next_id;
         next_id += 1;
         let events = events_tx.clone();
+        let password = password.clone();
         tokio::spawn(async move {
-            if let Err(e) = connection(id, stream, events).await {
+            if let Err(e) = connection(id, stream, events, &password).await {
                 eprintln!("connection {peer}: {e}");
             }
         });
@@ -48,6 +61,7 @@ async fn connection(
     id: u64,
     stream: TcpStream,
     events: UnboundedSender<Event>,
+    password: &Option<String>,
 ) -> anyhow::Result<()> {
     if !is_websocket(&stream).await? {
         return serve_page(stream).await;
@@ -78,7 +92,14 @@ async fn connection(
             continue;
         };
         match parsed {
-            ToServer::Hello { name } if !joined => {
+            ToServer::Hello { password: given, .. } if !joined && !password_ok(password, &given) => {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                let _ = tx.send(ToClient::Bye {
+                    reason: "🔐 That's not the password, sweetie.".into(),
+                });
+                break;
+            }
+            ToServer::Hello { name, .. } if !joined => {
                 joined = true;
                 events.send(Event::Join { id, name, tx: tx.clone() })?;
             }
@@ -94,6 +115,13 @@ async fn connection(
     drop(tx);
     let _ = writer.await;
     Ok(())
+}
+
+fn password_ok(expected: &Option<String>, given: &Option<String>) -> bool {
+    match expected {
+        None => true,
+        Some(p) => given.as_deref().map(str::trim) == Some(p.as_str()),
+    }
 }
 
 /// One port, two doors: websocket upgrades go to the game, anything else

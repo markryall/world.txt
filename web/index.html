@@ -82,6 +82,7 @@
     <h1>✨ world.txt ✨</h1>
     <p>a small island · no battles · just vibes</p>
     <input id="name" placeholder="your name" maxlength="16" autofocus>
+    <input id="pw" type="password" placeholder="password (if the world has one)" style="margin-top:8px">
     <button>wander in</button>
   </form>
 </div>
@@ -132,15 +133,22 @@ function status(m) {
   updateRain();
 }
 
-function connect(name) {
+function connect(name, password) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/`);
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', name }));
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', name, password }));
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.type === 'lines') addLines(m.lines);
     else if (m.type === 'status') status(m);
-    else if (m.type === 'bye') addLines([[{ t: m.reason, c: 'magenta' }]]);
+    else if (m.type === 'bye') {
+      addLines([[{ t: m.reason, c: 'magenta' }]]);
+      if (m.reason.includes('password')) {
+        try { localStorage.removeItem('world.pw'); } catch {}
+        history.replaceState(null, '', location.pathname);
+        setTimeout(() => location.reload(), 2000);
+      }
+    }
   };
   ws.onclose = () => addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
 }
@@ -153,13 +161,23 @@ function send(text) {
 $('#join form').onsubmit = (e) => {
   e.preventDefault();
   const name = $('#name').value.trim();
+  const pw = $('#pw').value;
   if (!name) return;
-  try { localStorage.setItem('world.name', name); } catch {}
+  try { localStorage.setItem('world.name', name); localStorage.setItem('world.pw', pw); } catch {}
   $('#join').remove();
-  connect(name);
+  connect(name, pw || null);
   $('#cmd').focus();
 };
-try { $('#name').value = localStorage.getItem('world.name') || ''; } catch {}
+try {
+  $('#name').value = localStorage.getItem('world.name') || '';
+  $('#pw').value = localStorage.getItem('world.pw') || '';
+} catch {}
+// Share a link like https://…/#pw=secret so nobody has to type it.
+const hashPw = new URLSearchParams(location.hash.slice(1)).get('pw');
+if (hashPw) {
+  $('#pw').value = hashPw;
+  $('#pw').style.display = 'none';
+}
 
 $('#input').onsubmit = (e) => {
   e.preventDefault();

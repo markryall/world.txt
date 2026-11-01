@@ -1,4 +1,4 @@
-//! `world play`: a cosy terminal client.
+//! `world.txt play`: a cosy terminal client.
 
 use crate::protocol::{Col, Line, ToClient, ToServer};
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind, KeyModifiers};
@@ -29,7 +29,7 @@ struct State {
     closed: Option<String>,
 }
 
-pub async fn run(name: Option<String>, server: &str) -> anyhow::Result<()> {
+pub async fn run(name: Option<String>, server: &str, password: Option<String>) -> anyhow::Result<()> {
     let name = match name.or_else(|| std::env::var("WORLD_NAME").ok()) {
         Some(n) => n,
         None => {
@@ -43,7 +43,7 @@ pub async fn run(name: Option<String>, server: &str) -> anyhow::Result<()> {
 
     let (ws, _) = tokio_tungstenite::connect_async(server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = serde_json::to_string(&ToServer::Hello { name })?;
+    let hello = serde_json::to_string(&ToServer::Hello { name, password })?;
     sink.send(Message::Text(hello.into())).await?;
 
     let mut terminal = ratatui::init();
