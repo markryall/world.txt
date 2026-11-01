@@ -5,6 +5,7 @@ pub mod accounts;
 pub mod backup;
 mod db;
 mod game;
+pub mod federation;
 pub mod islands;
 pub mod names;
 mod nature;
@@ -16,6 +17,7 @@ mod world;
 
 use crate::protocol::{ToClient, ToServer};
 use futures_util::{SinkExt, StreamExt};
+use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
@@ -38,9 +40,15 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
     let world = world::World::load_or_create(db, seed)?;
+    // This world's public face, for other worlds checking its passports.
+    let info: Arc<Option<federation::WorldInfo>> =
+        Arc::new(url.as_deref().map(|u| federation::WorldInfo::new(u, &federation::world_key(&world.db).expect("a signing key"))));
     let (events_tx, events_rx) = mpsc::unbounded_channel();
     if world.db.keeper_count() == 0 {
         println!("🗝  No island keepers yet. Make yourself one: world.txt invite <YourName> --keeper --db {db_path}");
+    }
+    if let Some(i) = info.as_ref() {
+        println!("🌍 this world is {} (other worlds can check its passports at {}{})", i.name, i.url, federation::WELL_KNOWN);
     }
     tokio::spawn(game::run(world, events_rx, url));
     if keep_backups > 0 {
@@ -56,8 +64,9 @@ pub async fn run(
         let id = next_id;
         next_id += 1;
         let events = events_tx.clone();
+        let info = info.clone();
         tokio::spawn(async move {
-            if let Err(e) = connection(id, stream, events).await {
+            if let Err(e) = connection(id, stream, events, info).await {
                 eprintln!("connection {peer}: {e}");
             }
         });
@@ -68,9 +77,10 @@ async fn connection(
     id: u64,
     stream: TcpStream,
     events: UnboundedSender<Event>,
+    info: Arc<Option<federation::WorldInfo>>,
 ) -> anyhow::Result<()> {
     if !is_websocket(&stream).await? {
-        return serve_page(stream).await;
+        return serve_page(stream, &info).await;
     }
     let ws = tokio_tungstenite::accept_async(stream).await?;
     let (mut sink, mut source) = ws.split();
@@ -136,15 +146,16 @@ async fn is_websocket(stream: &TcpStream) -> anyhow::Result<bool> {
 
 const PAGE: &str = include_str!("../../web/index.html");
 
-async fn serve_page(mut stream: TcpStream) -> anyhow::Result<()> {
+async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>) -> anyhow::Result<()> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let mut buf = [0u8; 4096];
     let n = stream.read(&mut buf).await?;
     let req = String::from_utf8_lossy(&buf[..n]);
     let path = req.split_whitespace().nth(1).unwrap_or("/");
-    let (status, ctype, body) = match path {
-        "/" | "/index.html" => ("200 OK", "text/html; charset=utf-8", PAGE),
-        _ => ("404 Not Found", "text/plain; charset=utf-8", "nothing here, babe\n"),
+    let (status, ctype, body) = match (path, info) {
+        ("/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", PAGE.to_string()),
+        (federation::WELL_KNOWN, Some(info)) => ("200 OK", "application/json", serde_json::to_string(info)?),
+        _ => ("404 Not Found", "text/plain; charset=utf-8", "nothing here, babe\n".to_string()),
     };
     let resp = format!(
         "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",

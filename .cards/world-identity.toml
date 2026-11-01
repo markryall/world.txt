@@ -1,0 +1,7 @@
+name = "World identity"
+status = "done"
+description = "Each world has an Ed25519 signing key (kept in the db) and its public address (--url). GET /.well-known/world.txt returns its name, address and public key, so other worlds can check passports it signs."
+created_at = "2026-11-01T21:15:42.283213Z"
+updated_at = "2026-11-01T21:16:47.797211Z"
+tags = ["federation"]
+priority = "low"

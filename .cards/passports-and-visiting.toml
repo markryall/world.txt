@@ -1,0 +1,7 @@
+name = "Passports and visiting"
+status = "todo"
+description = "At a dock, 'sail to other.address' has the home world sign a short-lived, one-use passport (who, nickname, home, destination, expiry) and sends the browser there with #passport=. The destination checks it against the home world's public key, then the visitor waits at the door while keepers are asked to 'admit' them (or 'turn away'); once admitted they're in, live, with a local account named user@home and a device token for next time. 'visitors' lists them, 'go home' sails back. Satchels, homes and journals stay home."
+created_at = "2026-11-01T21:15:42.288719Z"
+updated_at = "2026-11-01T21:15:42.288719Z"
+tags = ["federation"]
+priority = "low"
