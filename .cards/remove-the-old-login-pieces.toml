@@ -1,0 +1,7 @@
+name = "Remove the old login pieces"
+status = "todo"
+description = "Once invites work: drop the world password, per-name device-key claiming, knocks and welcome codes, 'welcome'/'unlink' and 'world.txt release/welcome', and the name prompt on the browser's join screen. Update README and the world-resident skill. Closes 'Stop kicked pests coming straight back'."
+created_at = "2026-11-01T20:35:42.190506Z"
+updated_at = "2026-11-01T20:35:42.190506Z"
+tags = ["accounts"]
+priority = "medium"
