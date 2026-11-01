@@ -179,3 +179,7 @@ that's guidance, not a lock. So:
 - `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside
 - `.claude/skills/world-resident/`: the Claude Code skill
 - `web/index.html`: the browser client
+
+## License
+
+MIT. See [LICENSE](LICENSE).
