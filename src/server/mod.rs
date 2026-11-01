@@ -1,6 +1,7 @@
 //! Networking. Each connection is a small task that shuttles messages
 //! between its websocket and the single game task that owns the world.
 
+pub mod accounts;
 pub mod backup;
 mod db;
 mod game;
@@ -22,7 +23,7 @@ use tokio_tungstenite::tungstenite::Message;
 pub type ClientTx = UnboundedSender<ToClient>;
 
 pub enum Event {
-    Join { id: u64, name: String, bot: bool, key: Option<String>, tx: ClientTx },
+    Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, tx: ClientTx },
     Cmd { id: u64, text: String },
     Leave { id: u64 },
 }
@@ -35,6 +36,7 @@ pub async fn run(
     keepers: Vec<String>,
     keep_backups: usize,
     backup_dir: Option<std::path::PathBuf>,
+    url: Option<String>,
 ) -> anyhow::Result<()> {
     let password: Arc<Option<String>> = Arc::new(password.filter(|p| !p.is_empty()));
     let db = db::Db::open(db_path)?;
@@ -43,7 +45,10 @@ pub async fn run(
     if !keepers.is_empty() {
         println!("🗝  island keepers: {}", keepers.join(", "));
     }
-    tokio::spawn(game::run(world, events_rx, keepers));
+    if world.db.keeper_count() == 0 && keepers.is_empty() {
+        println!("🗝  No island keepers yet. Make yourself one: world.txt invite <YourName> --keeper --db {db_path}");
+    }
+    tokio::spawn(game::run(world, events_rx, keepers, url));
     if keep_backups > 0 {
         tokio::spawn(backup::run_daily(db_path.to_string(), backup_dir, keep_backups));
     }
@@ -112,9 +117,9 @@ async fn connection(
                 });
                 break;
             }
-            ToServer::Hello { name, bot, key, .. } if !joined => {
+            ToServer::Hello { bot, invite, token, .. } if !joined => {
                 joined = true;
-                events.send(Event::Join { id, name, bot, key, tx: tx.clone() })?;
+                events.send(Event::Join { id, bot, invite, token, tx: tx.clone() })?;
             }
             ToServer::Cmd { text } if joined => {
                 events.send(Event::Cmd { id, text })?;
@@ -202,4 +207,39 @@ pub fn welcome(db_path: &str, name: &str, code: &str) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+/// `world.txt invite <nickname> [--keeper]`: a new account and its magic link.
+pub fn invite(db_path: &str, nickname: &str, keeper: bool, url: Option<&str>) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let nick = names_clean(nickname);
+    if nick.is_empty() {
+        anyhow::bail!("nicknames need a letter or two");
+    }
+    let user = accounts::create_account(&db, &nick, keeper)?;
+    let token = accounts::issue_invite(&db, &user)?;
+    let role = if keeper { " (island keeper)" } else { "" };
+    println!("💌 {nick} is {user}{role}. Their magic link (one use, within {} days):", accounts::INVITE_DAYS);
+    println!("   {}", accounts::link(url, &token));
+    if url.is_none() {
+        println!("   (replace <world address> with how they reach the world, or pass --url / WORLD_URL)");
+    }
+    println!("   In a terminal: world.txt play --invite {token}");
+    Ok(())
+}
+
+/// `world.txt link <name>`: a new magic link for someone's next device.
+pub fn link(db_path: &str, name: &str, url: Option<&str>) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let Some(user) = db.resolve_user(name) else { anyhow::bail!("there's nobody called {name}") };
+    let token = accounts::issue_invite(&db, &user)?;
+    println!("💌 A new link for {} ({user}), one use, within {} days:", db.nickname(&user).unwrap_or_default(), accounts::INVITE_DAYS);
+    println!("   {}", accounts::link(url, &token));
+    Ok(())
+}
+
+fn names_clean(raw: &str) -> String {
+    let n: String = raw.trim().chars().filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_').take(16).collect();
+    let mut c = n.chars();
+    c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
 }

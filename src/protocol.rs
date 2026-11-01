@@ -123,6 +123,13 @@ pub enum ToClient {
         /// Past pages, newest first. Only the Island Journal has these.
         weeks: Vec<Week>,
     },
+    /// Signed in. A new device token comes with it when an invite was used:
+    /// keep it, and send it next time instead of the invite.
+    Welcome {
+        token: Option<String>,
+        user: String,
+        nickname: String,
+    },
     /// Connection refused (e.g. name taken).
     Bye { reason: String },
 }
@@ -131,15 +138,23 @@ pub enum ToClient {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ToServer {
     Hello {
+        /// Not used to sign in any more (invites and device tokens do that).
+        #[serde(default)]
         name: String,
         #[serde(default)]
         password: Option<String>,
         /// True for AI residents, so the world can tell them from people.
         #[serde(default)]
         bot: bool,
-        /// This device's secret: the first device to use a name claims it.
+        /// Old per-device key; ignored now.
         #[serde(default)]
         key: Option<String>,
+        /// A one-use invite from a magic link.
+        #[serde(default)]
+        invite: Option<String>,
+        /// This device's token, from an earlier invite.
+        #[serde(default)]
+        token: Option<String>,
     },
     Cmd { text: String },
 }

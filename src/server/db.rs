@@ -78,6 +78,11 @@ impl Db {
                  recipient TEXT NOT NULL, sender TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS companions (
                  owner TEXT PRIMARY KEY, animal TEXT NOT NULL, name TEXT);
+             CREATE TABLE IF NOT EXISTS invites (
+                 token_hash TEXT PRIMARY KEY, user TEXT NOT NULL, expires INTEGER NOT NULL,
+                 used INTEGER NOT NULL DEFAULT 0);
+             CREATE TABLE IF NOT EXISTS devices (
+                 token_hash TEXT PRIMARY KEY, user TEXT NOT NULL, created INTEGER NOT NULL, last_seen INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -92,6 +97,7 @@ impl Db {
         let _ = conn.execute("ALTER TABLE players ADD COLUMN key_hash TEXT", []);
         // Accounts: players.name is now a fixed username; the nickname is for show.
         let _ = conn.execute("ALTER TABLE players ADD COLUMN nickname TEXT", []);
+        let _ = conn.execute("ALTER TABLE players ADD COLUMN keeper INTEGER NOT NULL DEFAULT 0", []);
         // Unmade things are tucked away rather than deleted, so they can come back.
         let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_by TEXT", []);
         let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_at INTEGER", []);
@@ -107,6 +113,69 @@ impl Db {
                 [name.trim()],
                 |r| r.get(0),
             )
+            .ok()
+    }
+
+    // ---- invites and devices --------------------------------------------------
+
+    pub fn add_invite(&self, user: &str, token_hash: &str, expires: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO invites (token_hash, user, expires) VALUES (?1, ?2, ?3)",
+            params![token_hash, user, expires],
+        )?;
+        Ok(())
+    }
+
+    /// Use up an invite. The user it was for, if it's unused and in date.
+    pub fn redeem_invite(&self, token_hash: &str, now: i64) -> Option<String> {
+        let user: String = self
+            .conn
+            .query_row(
+                "SELECT user FROM invites WHERE token_hash = ?1 AND used = 0 AND expires > ?2",
+                params![token_hash, now],
+                |r| r.get(0),
+            )
+            .ok()?;
+        self.conn.execute("UPDATE invites SET used = 1 WHERE token_hash = ?1", [token_hash]).ok()?;
+        Some(user)
+    }
+
+    pub fn add_device(&self, user: &str, token_hash: &str, now: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO devices (token_hash, user, created, last_seen) VALUES (?1, ?2, ?3, ?3)",
+            params![token_hash, user, now],
+        )?;
+        Ok(())
+    }
+
+    /// Who a device token belongs to (and note that it was just used).
+    pub fn device_user(&self, token_hash: &str, now: i64) -> Option<String> {
+        let user: String = self
+            .conn
+            .query_row("SELECT user FROM devices WHERE token_hash = ?1", [token_hash], |r| r.get(0))
+            .ok()?;
+        let _ = self.conn.execute("UPDATE devices SET last_seen = ?2 WHERE token_hash = ?1", params![token_hash, now]);
+        Some(user)
+    }
+
+    pub fn is_keeper(&self, user: &str) -> bool {
+        self.conn
+            .query_row("SELECT keeper FROM players WHERE name = ?1", [user], |r| r.get::<_, i64>(0))
+            .is_ok_and(|k| k != 0)
+    }
+
+    pub fn set_keeper(&self, user: &str, keeper: bool) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE players SET keeper = ?2 WHERE name = ?1", params![user, keeper as i64])?;
+        Ok(())
+    }
+
+    pub fn keeper_count(&self) -> i64 {
+        self.conn.query_row("SELECT COUNT(*) FROM players WHERE keeper != 0", [], |r| r.get(0)).unwrap_or(0)
+    }
+
+    pub fn nickname(&self, user: &str) -> Option<String> {
+        self.conn
+            .query_row("SELECT COALESCE(nickname, name) FROM players WHERE name = ?1", [user], |r| r.get(0))
             .ok()
     }
 

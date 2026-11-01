@@ -71,15 +71,17 @@ struct Game {
     journal_board: Option<i64>,
     /// Names that may tidy up anyone's things.
     keepers: Vec<String>,
+    /// The world's public address, for invite links.
+    url: Option<String>,
     /// Animals out in the wild, waiting to be befriended.
     wild: Vec<companions::Wild>,
     /// Who last hummed where, for noticing a jam.
     last_hum: HashMap<(i64, i64), (String, std::time::Instant)>,
 }
 
-pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Vec<String>) {
+pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Vec<String>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers, last_hum: HashMap::new(), wild: Vec::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers, last_hum: HashMap::new(), wild: Vec::new(), url };
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -100,7 +102,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Ve
 impl Game {
     fn handle(&mut self, ev: Event) {
         match ev {
-            Event::Join { id, name, bot, key, tx } => self.join(id, name, bot, key, tx),
+            Event::Join { id, bot, invite, token, tx } => self.join(id, bot, invite, token, tx),
             Event::Leave { id } => self.leave(id),
             Event::Cmd { id, text } => {
                 let before = self.snapshot(id);
@@ -194,96 +196,64 @@ impl Game {
 
     // ---- arriving and leaving -----------------------------------------
 
-    fn join(&mut self, id: u64, raw: String, bot: bool, key: Option<String>, tx: ClientTx) {
-        let typed = clean_name(&raw);
-        if typed.is_empty() {
-            let _ = tx.send(ToClient::Bye { reason: "Names need a letter or two, darling.".into() });
+    fn join(&mut self, id: u64, bot: bool, invite: Option<String>, token: Option<String>, tx: ClientTx) {
+        let bye = |reason: &str| {
+            let _ = tx.send(ToClient::Bye { reason: reason.to_string() });
+        };
+        // Who is this? An invite link (once), or a device token from one.
+        let now = super::accounts::now();
+        let mut new_token = None;
+        let user = if let Some(inv) = invite.as_deref().map(str::trim).filter(|i| !i.is_empty()) {
+            let Some(u) = self.world.db.redeem_invite(&super::names::hash(inv), now) else {
+                bye("💌 This invite link has already been used or has expired. Ask an island keeper for a new one!");
+                return;
+            };
+            let Ok(t) = super::accounts::new_secret() else { return };
+            if let Err(e) = self.world.db.add_device(&u, &super::names::hash(&t), now) {
+                eprintln!("adding a device for {u}: {e}");
+                return;
+            }
+            new_token = Some(t);
+            u
+        } else if let Some(t) = token.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+            match self.world.db.device_user(&super::names::hash(t), now) {
+                Some(u) => u,
+                None => {
+                    bye("💌 This device isn't signed in any more. Ask an island keeper for a new invite link!");
+                    return;
+                }
+            }
+        } else {
+            bye("💌 world.txt is invite-only. Open the invite link an island keeper sent you!");
+            return;
+        };
+        let name = self.world.db.nickname(&user).unwrap_or_else(|| user.clone());
+        self.world.nicks.insert(user.clone(), name.clone());
+        if self.players.values().any(|p| p.user == user) {
+            bye(&format!("{name} is already here (on another device?)."));
             return;
         }
-        // Their account, by nickname or username. A name nobody has used starts a new one.
-        let existing = self.world.db.resolve_user(&typed);
-        let name = existing.as_deref().map_or(typed.clone(), |u| self.world.nick(u));
-        if let Some(u) = &existing {
-            if self.players.values().any(|p| &p.user == u) {
-                let _ = tx.send(ToClient::Bye { reason: format!("Someone called {name} is already here.") });
-                return;
-            }
-        }
-        let stored_key = existing.as_deref().and_then(|u| self.world.db.name_key(u));
-        let claim = match super::names::check(stored_key.as_deref(), key.as_deref()) {
-            super::names::NameCheck::Taken(tried) => {
-                let user = existing.clone().unwrap_or_default();
-                let reason = match tried {
-                    Some(hash) => {
-                        let fresh = super::names::knock_code(self.rng.next());
-                        match self.world.db.add_knock(&user, &hash, &fresh) {
-                            Ok(code) => {
-                                self.tell_keepers_about_knocks();
-                                println!("🔐 {name} ({user}) knocked from a new device (ask them for their code, then: welcome {user} <code>)");
-                                format!(
-                                    "🔐 {name} is linked to another device. To use this one, ask an island keeper \
-                                     to let you in and tell them this code: {code} \
-                                     Once they say yes, just join again. (Or pick a different name.)"
-                                )
-                            }
-                            Err(e) => {
-                                eprintln!("remembering a knock for {user}: {e}");
-                                format!("🔐 The name {name} is linked to another device. Try a different name!")
-                            }
-                        }
-                    }
-                    None => format!("🔐 The name {name} is linked to another device. Try a different name!"),
-                };
-                let _ = tx.send(ToClient::Bye { reason });
-                return;
-            }
-            super::names::NameCheck::Claim(hash) => Some(hash),
-            super::names::NameCheck::Welcome => None,
-        };
-        let key_hash = key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(super::names::hash);
-        let now = boards::now();
-        let ban_name = existing.clone().unwrap_or_default();
-        if !existing.as_deref().is_some_and(|u| self.is_keeper(u)) {
-            if let Some(until) = self.world.db.banned_until(&ban_name, key_hash.as_deref(), now) {
+        let key_hash = token.as_deref().or(new_token.as_deref()).map(super::names::hash);
+        if !self.is_keeper(&user) {
+            if let Some(until) = self.world.db.banned_until(&user, key_hash.as_deref(), now) {
                 let mins = ((until - now) / 60).max(1);
-                let _ = tx.send(ToClient::Bye {
-                    reason: format!("🌙 A keeper has asked you to take a break. You can come back in about {mins} minutes."),
-                });
+                bye(&format!("🌙 A keeper has asked you to take a break. You can come back in about {mins} minutes."));
                 return;
             }
         }
-        let saved = existing.as_deref().and_then(|u| self.world.db.player(u));
-        let first_time = existing.is_none() && !bot;
+        let saved = self.world.db.player(&user);
+        // Invited accounts start off the map, until their first arrival.
+        let first_time = !bot && saved.is_none_or(|s| s.0 < 0);
         let tutorial = if bot { tutorial::DONE } else { saved.map_or(0, |s| s.2) };
         let (x, y) = saved
             .map(|s| (s.0, s.1))
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
-        let user = match existing {
-            Some(u) => u,
-            None => {
-                let u = loop {
-                    let u = super::names::username(self.rng.next());
-                    if self.world.db.resolve_user(&u).is_none() {
-                        break u;
-                    }
-                };
-                if let Err(e) = self.world.db.create_user(&u, &name, x, y) {
-                    eprintln!("creating {u}: {e}");
-                }
-                self.world.nicks.insert(u.clone(), name.clone());
-                u
-            }
-        };
         let sky = self.world.weather.sky_at(x, y);
         let companion = self.world.db.companion(&user);
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
-        if let Some(hash) = claim {
-            if let Err(e) = self.world.db.claim_name(&user, &hash, x, y) {
-                eprintln!("claiming {user}: {e}");
-            }
-        }
         let full = super::names::full(&name, &user);
+        let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
         self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, companion });
 
         self.send(
@@ -407,8 +377,10 @@ impl Game {
             }
             "claim" => return self.cmd_claim(id),
             "home" => return self.cmd_home(id),
-            "invite" => return self.cmd_invite(id, rest, true),
-            "uninvite" => return self.cmd_invite(id, rest, false),
+            "share" => return self.cmd_invite(id, rest, true),
+            "unshare" => return self.cmd_invite(id, rest, false),
+            "invite" => return self.cmd_new_invite(id, rest),
+            "link" => return self.cmd_new_link(id, rest),
             "guests" => return self.cmd_guests(id),
             "read" => return self.cmd_read(id, rest),
             "post" | "note" => return self.cmd_post(id, rest),
@@ -1018,7 +990,55 @@ impl Game {
     /// Keepers can be listed by username or nickname.
     fn is_keeper(&self, user: &str) -> bool {
         let nick = self.world.nick(user);
-        self.keepers.iter().any(|k| k.trim().eq_ignore_ascii_case(user) || k.trim().eq_ignore_ascii_case(&nick))
+        self.world.db.is_keeper(user)
+            || self.keepers.iter().any(|k| k.trim().eq_ignore_ascii_case(user) || k.trim().eq_ignore_ascii_case(&nick))
+    }
+
+    fn link_line(&self, who: &str, user: &str, token: &str) -> Vec<Line> {
+        vec![
+            Line::new().b(Col::Magenta, format!("💌 Magic link for {}", super::names::full(who, user))).c(Col::Dim, format!(" (one use, within {} days):", super::accounts::INVITE_DAYS)),
+            Line::new().t("   ").b(Col::Yellow, super::accounts::link(self.url.as_deref(), token)),
+            Line::col(Col::Dim, "   Send it just to them: whoever opens it first becomes them."),
+        ]
+    }
+
+    /// Keepers: `invite Poppy` makes an account and a magic link for it.
+    fn cmd_new_invite(&mut self, id: u64, nickname: &str) -> anyhow::Result<()> {
+        if !self.is_keeper(&self.user(id)) {
+            self.say1(id, Line::plain("Only island keepers can invite people. Ask one! (To let a friend build at your home: share Lu)"));
+            return Ok(());
+        }
+        let nick = clean_name(nickname);
+        if nick.is_empty() {
+            self.say1(id, Line::plain("Invite who? e.g. 'invite Poppy' (that'll be their nickname)"));
+            return Ok(());
+        }
+        if self.world.db.resolve_user(&nick).is_some() {
+            self.say1(id, Line::plain(format!("Someone's already called {nick}. For their new device: link {nick}")));
+            return Ok(());
+        }
+        let user = super::accounts::create_account(&self.world.db, &nick, false)?;
+        self.world.nicks.insert(user.clone(), nick.clone());
+        let token = super::accounts::issue_invite(&self.world.db, &user)?;
+        let lines = self.link_line(&nick, &user, &token);
+        self.send(id, lines);
+        Ok(())
+    }
+
+    /// Keepers: `link Poppy` makes a new magic link for someone's next device.
+    fn cmd_new_link(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        if !self.is_keeper(&self.user(id)) {
+            self.say1(id, Line::plain("Only island keepers can make magic links."));
+            return Ok(());
+        }
+        let Some(user) = self.world.db.resolve_user(name) else {
+            self.say1(id, Line::plain(format!("There's nobody called {} on the island. For someone new: invite {}", name.trim(), name.trim())));
+            return Ok(());
+        };
+        let token = super::accounts::issue_invite(&self.world.db, &user)?;
+        let lines = self.link_line(&self.world.nick(&user), &user, &token);
+        self.send(id, lines);
+        Ok(())
     }
 
     /// `nickname Pip`: change what someone's called. Their username never changes.
@@ -1568,7 +1588,7 @@ fn help() -> Vec<Line> {
         Line::col(Col::Pink, "home"),
         h("claim", "make the patch around you your home (one each)"),
         h("home", "go straight home from anywhere"),
-        h("invite Lu / uninvite Lu / guests", "who else may build at your home"),
+        h("share Lu / unshare Lu / guests", "who else may build at your home"),
         Line::col(Col::Pink, "noticeboards"),
         h("make a noticeboard", "put one up for everyone"),
         h("read / read more", "the notes here, then older ones"),
@@ -1581,6 +1601,8 @@ fn help() -> Vec<Line> {
         h("push bench north", "move something"),
         h("unmake bench / undo", "take away something you made, or bring it back"),
         Line::col(Col::Pink, "island keepers"),
+        h("invite Poppy", "make an account for someone new, and get their magic link"),
+        h("link Poppy", "a new magic link for someone's new device"),
         h("welcome Poppy FROG-42", "let Poppy in from a new device (the code is on her screen)"),
         h("unlink Poppy", "free a name for whoever uses it next"),
         h("kick Sam [minutes] / unkick Sam", "send someone off for a break (30 min)"),

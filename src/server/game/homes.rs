@@ -20,7 +20,7 @@ impl Game {
                 let owner = self.world.nick(&h.owner);
                 self.say1(
                     id,
-                    Line::plain(format!("This is {owner}'s home, so it's theirs to change. Ask them to invite you! (@{owner} ...)")),
+                    Line::plain(format!("This is {owner}'s home, so it's theirs to change. Ask them to share it with you! (@{owner} ...)")),
                 );
                 false
             }
@@ -61,7 +61,7 @@ impl Game {
         }
         let msg = if moved { "🏡 You move your home here." } else { "🏡 This is your home now! The patch around you is yours to decorate." };
         self.say1(id, Line::new().b(Col::Magenta, msg));
-        self.say1(id, Line::col(Col::Dim, "Type home to come back from anywhere · invite a friend to build with you · name it something special"));
+        self.say1(id, Line::col(Col::Dim, "Type home to come back from anywhere · share it with a friend to build together · name it something special"));
         self.tell_here(x, y, id, Line::col(Col::Magenta, format!("🏡 {name} makes a home here.")));
         self.status_all();
         Ok(())
@@ -98,7 +98,7 @@ impl Game {
         let user = self.user(id);
         let guest = who.trim();
         if guest.is_empty() {
-            self.say1(id, Line::plain(if on { "Invite who? e.g. 'invite Lu'" } else { "Uninvite who?" }));
+            self.say1(id, Line::plain(if on { "Share your home with who? e.g. 'share Lu'" } else { "Stop sharing with who?" }));
             return Ok(());
         }
         let Some(_home) = self.world.homes.iter_mut().find(|h| h.owner == user) else {
@@ -122,7 +122,7 @@ impl Game {
         if on {
             self.say1(id, Line::col(Col::Magenta, format!("💌 {guest} can build at your home now.")));
             if let Some(gid) = self.find_player(&guest_user) {
-                self.say1(gid, Line::col(Col::Magenta, format!("💌 {name} invited you to build at their home! (find {name} to visit)")));
+                self.say1(gid, Line::col(Col::Magenta, format!("💌 {name} shared their home with you: you can build there now! (find {name} to visit)")));
             }
         } else {
             self.say1(id, Line::col(Col::Dim, format!("{guest} can still visit, but can't build at your home any more.")));
@@ -135,7 +135,7 @@ impl Game {
         let user = self.user(id);
         let msg = match self.world.homes.iter().find(|h| h.owner == user) {
             None => "You don't have a home yet. Type claim where you'd like it.".to_string(),
-            Some(h) if h.guests.is_empty() => "Nobody else builds at your home yet. 'invite Lu' to share it.".to_string(),
+            Some(h) if h.guests.is_empty() => "Nobody else builds at your home yet. 'share Lu' to build together.".to_string(),
             Some(h) => format!(
                 "💌 Invited to build at your home: {}",
                 h.guests.iter().map(|g| crate::server::names::full(&self.world.nick(g), g)).collect::<Vec<_>>().join(", ")

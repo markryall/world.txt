@@ -144,9 +144,9 @@
   <form>
     <h1>✨ world.txt ✨</h1>
     <p>a small island · no battles · just vibes</p>
-    <input id="name" placeholder="your name" maxlength="16" autofocus>
-    <input id="pw" type="password" placeholder="password (if the world has one)" style="margin-top:8px">
-    <button>wander in</button>
+    <p id="join-msg"></p>
+    <input id="pw" type="password" placeholder="the world's password">
+    <button id="join-go">wander in</button>
   </form>
 </div>
 <script>
@@ -173,7 +173,7 @@ function paintLine(line) {
   const frag = document.createDocumentFragment();
   for (const s of line) {
     const span = document.createElement('span');
-    span.textContent = s.t;
+    span.textContent = s.t.replace('<world address>', location.origin + location.pathname.replace(/\/$/, ''));
     span.style.color = `var(--${s.c})`;
     if (s.b) span.style.fontWeight = 'bold';
     frag.appendChild(span);
@@ -209,42 +209,54 @@ function status(m) {
   updateRain();
 }
 
-// This device's secret. The first device to use a name claims it, so
-// nobody else can turn up as Poppy. getRandomValues works on plain http too.
-function deviceKey() {
-  try {
-    let k = localStorage.getItem('world.key');
-    if (!k) {
-      k = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
-      localStorage.setItem('world.key', k);
-    }
-    return k;
-  } catch { return null; }
+// ---- signing in ----------------------------------------------------------
+// The world is invite-only. A magic link (#invite=...) is used once and
+// swapped for a device token, kept here so next time just works.
+const stored = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+const params = new URLSearchParams(location.hash.slice(1));
+let invite = params.get('invite');
+if (params.get('pw')) store('world.pw', params.get('pw'));
+
+function showJoin(message, askPassword) {
+  $('#join').style.display = 'flex';
+  $('#join-msg').textContent = message;
+  $('#pw').style.display = askPassword ? '' : 'none';
+  $('#join-go').style.display = askPassword ? '' : 'none';
 }
 
-function connect(name, password) {
+function start() {
+  $('#join').style.display = 'none';
+  connect();
+  $('#cmd').focus();
+}
+
+function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/`);
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', name, password, key: deviceKey() }));
+  ws.onopen = () => ws.send(JSON.stringify({
+    type: 'hello', password: stored('world.pw'), invite, token: invite ? null : stored('world.token'),
+  }));
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.type === 'lines') addLines(m.lines);
     else if (m.type === 'status') status(m);
     else if (m.type === 'hint') hint(m);
     else if (m.type === 'board') board(m);
-    else if (m.type === 'bye') {
-      addLines([[{ t: m.reason, c: 'magenta' }]]);
+    else if (m.type === 'welcome') {
+      if (m.token) store('world.token', m.token);
+      // The invite is used up: tidy it out of the address bar.
+      invite = null;
+      history.replaceState(null, '', location.pathname);
+    } else if (m.type === 'bye') {
       if (m.reason.includes('password')) {
-        try { localStorage.removeItem('world.pw'); } catch {}
-        history.replaceState(null, '', location.pathname);
-        setTimeout(() => location.reload(), 2000);
-      } else if (m.reason.includes('linked to another device')) {
-        // Stay on this message: the kid needs to read the code to a keeper.
-        // Their name is kept, so once a keeper says yes, joining again just works.
-      } else if (m.reason.includes('already here')) {
-        // Back to the name screen to pick another.
-        try { localStorage.removeItem('world.name'); } catch {}
-        setTimeout(() => location.reload(), 3500);
+        store('world.pw', null);
+        showJoin('That password didn\'t work. What is it?', true);
+      } else if (m.reason.includes('invite') || m.reason.includes('signed in')) {
+        if (m.reason.includes('signed in')) store('world.token', null);
+        showJoin(m.reason, false);
+      } else {
+        addLines([[{ t: m.reason, c: 'magenta' }]]);
       }
     }
   };
@@ -371,24 +383,11 @@ function send(text) {
 
 $('#join form').onsubmit = (e) => {
   e.preventDefault();
-  const name = $('#name').value.trim();
-  const pw = $('#pw').value;
-  if (!name) return;
-  try { localStorage.setItem('world.name', name); localStorage.setItem('world.pw', pw); } catch {}
-  $('#join').remove();
-  connect(name, pw || null);
-  $('#cmd').focus();
+  store('world.pw', $('#pw').value || null);
+  start();
 };
-try {
-  $('#name').value = localStorage.getItem('world.name') || '';
-  $('#pw').value = localStorage.getItem('world.pw') || '';
-} catch {}
-// Share a link like https://…/#pw=secret so nobody has to type it.
-const hashPw = new URLSearchParams(location.hash.slice(1)).get('pw');
-if (hashPw) {
-  $('#pw').value = hashPw;
-  $('#pw').style.display = 'none';
-}
+if (invite || stored('world.token')) start();
+else showJoin('world.txt is invite-only. Open the magic link an island keeper sent you! 💌', false);
 
 $('#input').onsubmit = (e) => {
   e.preventDefault();

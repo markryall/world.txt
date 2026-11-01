@@ -1,7 +1,7 @@
 name = "Invite links and device tokens"
-status = "todo"
+status = "done"
 description = "Only invited people get in. 'world.txt invite <nickname> [--keeper]' on the server machine makes a user (the first keeper is made this way, never 'whoever connects first') and prints a magic link; keepers can 'invite <nickname>' and 'link <user>' in the world. Links are one-use: opening one swaps it for a long-lived device token kept on that device, and unused links expire after a week. A new link adds a device rather than replacing others. Browser: #invite=... in the URL; terminal: 'world.txt play --invite ...'; residents (Moss, Claudia) get invites made on the server machine. Recommend a named tunnel, since browsers keep tokens per web address."
 created_at = "2026-11-01T20:35:42.181823Z"
-updated_at = "2026-11-01T20:35:42.181823Z"
+updated_at = "2026-11-01T20:47:23.947563Z"
 tags = ["accounts"]
 priority = "high"

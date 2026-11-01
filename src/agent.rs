@@ -52,6 +52,7 @@ pub struct Options {
     pub daily_usd: f64,
     pub state_dir: PathBuf,
     pub dry_run: bool,
+    pub invite: Option<String>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -89,7 +90,8 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
 
     let ws = crate::bridge::connect_retry(&opts.server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = ToServer::Hello { name: opts.name.clone(), password: opts.password.clone(), bot: true, key: crate::identity::device_key() };
+    let who = opts.name.to_lowercase();
+    let hello = crate::identity::hello(&who, &opts.server, opts.password.clone(), true, opts.invite.clone());
     sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
     log(&opts.name, &format!("🐾 joined {} (budget ${:.2}/day, {MODEL})", opts.server, opts.daily_usd));
 
@@ -135,7 +137,12 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                     Ok(ToClient::Status { place, weather, clock, here, humans, .. }) => {
                         status = Some(Status { place, weather, clock, here, humans });
                     }
-                    Ok(ToClient::Bye { reason }) => { log(&opts.name, &format!("bye: {reason}")); break }
+                    Ok(msg @ ToClient::Bye { .. }) => {
+                        crate::identity::on_sign_in(&who, &opts.server, &msg);
+                        if let ToClient::Bye { reason } = msg { log(&opts.name, &format!("bye: {reason}")); }
+                        break
+                    }
+                    Ok(msg @ ToClient::Welcome { .. }) => crate::identity::on_sign_in(&who, &opts.server, &msg),
                     Ok(msg @ ToClient::Board { .. }) => {
                         for line in crate::protocol::board_lines(&msg).unwrap_or_default() {
                             seen.push_back(line.0.iter().map(|s| s.t.as_str()).collect());

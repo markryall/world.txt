@@ -10,7 +10,6 @@ use ratatui::{
     text::{Line as RLine, Span as RSpan, Text},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
-use std::io::Write;
 use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Default)]
@@ -30,21 +29,16 @@ struct State {
     closed: Option<String>,
 }
 
-pub async fn run(name: Option<String>, server: &str, password: Option<String>) -> anyhow::Result<()> {
-    let name = match name.or_else(|| std::env::var("WORLD_NAME").ok()) {
-        Some(n) => n,
-        None => {
-            print!("✨ What's your name? ");
-            std::io::stdout().flush()?;
-            let mut s = String::new();
-            std::io::stdin().read_line(&mut s)?;
-            s.trim().to_string()
-        }
-    };
+pub async fn run(server: &str, password: Option<String>, invite: Option<String>) -> anyhow::Result<()> {
+    if invite.is_none() && crate::identity::load_token("player", server).is_none() {
+        anyhow::bail!(
+            "world.txt is invite-only 💌 Ask an island keeper for a magic link, then: world.txt play --invite <link or code>"
+        );
+    }
 
     let (ws, _) = tokio_tungstenite::connect_async(server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = serde_json::to_string(&ToServer::Hello { name, password, bot: false, key: crate::identity::device_key() })?;
+    let hello = serde_json::to_string(&crate::identity::hello("player", server, password, false, invite))?;
     sink.send(Message::Text(hello.into())).await?;
 
     let mut terminal = ratatui::init();
@@ -77,7 +71,11 @@ pub async fn run(name: Option<String>, server: &str, password: Option<String>) -
                                     st.scroll = 0;
                                 }
                             }
-                            Ok(ToClient::Bye { reason }) => st.closed = Some(reason),
+                            Ok(msg @ ToClient::Bye { .. }) => {
+                                crate::identity::on_sign_in("player", server, &msg);
+                                if let ToClient::Bye { reason } = msg { st.closed = Some(reason); }
+                            }
+                            Ok(msg @ ToClient::Welcome { .. }) => crate::identity::on_sign_in("player", server, &msg),
                             Err(_) => {}
                         }
                     }
