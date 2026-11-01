@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>world.txt</title>
+<style>
+  :root {
+    --bg: #15121c; --panel: #1d1927; --line: #2c2639; --fg: #e6e1ef;
+    --plain: #e6e1ef; --dim: #8d849e; --white: #ffffff; --blue: #6aa8ff; --deep_blue: #3b5bdb;
+    --cyan: #5fe0e0; --green: #7ed87e; --dark_green: #3f9a4f; --yellow: #ffd866; --sand: #e8cf9a;
+    --magenta: #ff79c6; --pink: #ffa7d6; --red: #ff6b6b; --brown: #c08a5a; --grey: #a0a0a8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); }
+  body { font: 15px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; display: flex; flex-direction: column; height: 100dvh; }
+  #app { flex: 1; display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+  #log { overflow-y: auto; padding: 14px 16px; white-space: pre-wrap; word-wrap: break-word; }
+  #log .ln { min-height: 1.45em; }
+  #side { background: var(--panel); border-left: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  #place { color: var(--magenta); font-weight: bold; }
+  #map { font-size: 16px; line-height: 1.15; white-space: pre; text-align: center; padding: 6px 0; }
+  .meta { color: var(--dim); font-size: 13px; }
+  #pad { display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; }
+  #pad button, .quick button {
+    background: var(--line); color: var(--fg); border: 0; border-radius: 10px; font: inherit;
+    height: 44px; cursor: pointer; touch-action: manipulation;
+  }
+  #pad button:active, .quick button:active { background: var(--magenta); color: var(--bg); }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .quick button { padding: 0 12px; height: 36px; font-size: 13px; }
+  form#input { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); }
+  #cmd { flex: 1; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 16px; outline: none; }
+  #cmd:focus { border-color: var(--magenta); }
+  #join { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #join form { text-align: center; max-width: 360px; width: 100%; }
+  #join h1 { color: var(--magenta); font-weight: normal; letter-spacing: 2px; }
+  #join p { color: var(--dim); }
+  #join input { width: 100%; font: inherit; font-size: 18px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); text-align: center; outline: none; }
+  #join button { margin-top: 12px; width: 100%; font: inherit; font-size: 17px; padding: 12px; border: 0; border-radius: 12px; background: var(--magenta); color: var(--bg); cursor: pointer; }
+  #sound { background: none; border: 0; color: var(--dim); font: inherit; cursor: pointer; padding: 0; }
+  @media (max-width: 720px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    #side { order: -1; border-left: 0; border-bottom: 1px solid var(--line); flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; padding: 8px; gap: 8px 14px; }
+    #map { font-size: 13px; padding: 0; }
+    #pad { grid-template-columns: repeat(3, 42px); gap: 4px; }
+    #pad button { height: 34px; }
+    .info { flex: 1; min-width: 150px; }
+    .quick { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="log" aria-live="polite"></div>
+  <div id="side">
+    <div class="info">
+      <div id="place">…</div>
+      <div class="meta" id="weather"></div>
+      <div class="meta" id="clock"></div>
+      <div class="meta" id="here"></div>
+      <button id="sound" type="button">🔇 sound off</button>
+    </div>
+    <div id="map"></div>
+    <div id="pad">
+      <button data-c="nw">↖</button><button data-c="n">↑</button><button data-c="ne">↗</button>
+      <button data-c="w">←</button><button data-c="look">👀</button><button data-c="e">→</button>
+      <button data-c="sw">↙</button><button data-c="s">↓</button><button data-c="se">↘</button>
+    </div>
+    <div class="quick">
+      <button data-c="who">who</button><button data-c="help">help</button>
+      <button data-c="dig">dig</button><button data-c="plant flowers">🌼</button>
+      <button data-c="plant tree">🌳</button><button data-c="dance">💃</button>
+    </div>
+  </div>
+</div>
+<form id="input" autocomplete="off">
+  <input id="cmd" placeholder="say hi, dig, make a frog that croaks when it rains…" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
+</form>
+<div id="join">
+  <form>
+    <h1>✨ world.txt ✨</h1>
+    <p>a small island · no battles · just vibes</p>
+    <input id="name" placeholder="your name" maxlength="16" autofocus>
+    <button>wander in</button>
+  </form>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const log = $('#log');
+let ws, sky = '', audio, soundOn = false, rain;
+const history = []; let hist = 0;
+
+function addLines(lines) {
+  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  for (const line of lines) {
+    const div = document.createElement('div');
+    div.className = 'ln';
+    div.appendChild(paintLine(line));
+    log.appendChild(div);
+    const tune = line.map((s) => s.t).join('').match(/♪ (.+) ♪/);
+    if (tune) playTune(tune[1]);
+  }
+  while (log.childNodes.length > 1000) log.removeChild(log.firstChild);
+  if (stick) log.scrollTop = log.scrollHeight;
+}
+
+function paintLine(line) {
+  const frag = document.createDocumentFragment();
+  for (const s of line) {
+    const span = document.createElement('span');
+    span.textContent = s.t;
+    span.style.color = `var(--${s.c})`;
+    if (s.b) span.style.fontWeight = 'bold';
+    frag.appendChild(span);
+  }
+  return frag;
+}
+
+function status(m) {
+  $('#place').textContent = m.place;
+  $('#weather').textContent = m.weather;
+  $('#clock').textContent = m.clock;
+  $('#here').textContent = m.here.length ? '☺ ' + m.here.join(', ') : '';
+  const map = $('#map');
+  map.replaceChildren();
+  m.map.forEach((line, i) => {
+    if (i) map.appendChild(document.createTextNode('\n'));
+    map.appendChild(paintLine(line));
+  });
+  sky = m.weather;
+  updateRain();
+}
+
+function connect(name) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/`);
+  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', name }));
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'lines') addLines(m.lines);
+    else if (m.type === 'status') status(m);
+    else if (m.type === 'bye') addLines([[{ t: m.reason, c: 'magenta' }]]);
+  };
+  ws.onclose = () => addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
+}
+
+function send(text) {
+  if (!ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({ type: 'cmd', text }));
+}
+
+$('#join form').onsubmit = (e) => {
+  e.preventDefault();
+  const name = $('#name').value.trim();
+  if (!name) return;
+  try { localStorage.setItem('world.name', name); } catch {}
+  $('#join').remove();
+  connect(name);
+  $('#cmd').focus();
+};
+try { $('#name').value = localStorage.getItem('world.name') || ''; } catch {}
+
+$('#input').onsubmit = (e) => {
+  e.preventDefault();
+  const text = $('#cmd').value;
+  if (!text.trim()) return;
+  history.push(text); hist = history.length;
+  send(text);
+  $('#cmd').value = '';
+};
+$('#cmd').onkeydown = (e) => {
+  if (e.key === 'ArrowUp' && hist > 0) { hist--; $('#cmd').value = history[hist]; e.preventDefault(); }
+  if (e.key === 'ArrowDown') { hist = Math.min(history.length, hist + 1); $('#cmd').value = history[hist] || ''; e.preventDefault(); }
+};
+document.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => send(b.dataset.c));
+
+// ---- sound: hums become notes, rain sounds like rain --------------------
+
+$('#sound').onclick = () => {
+  soundOn = !soundOn;
+  $('#sound').textContent = soundOn ? '🔊 sound on' : '🔇 sound off';
+  if (soundOn && !audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+  if (audio) audio.resume();
+  updateRain();
+};
+
+const SEMI = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+function playTune(text) {
+  if (!soundOn || !audio) return;
+  const notes = [...text.matchAll(/\b([a-gA-G])([#b]?)([2-6]?)\b/g)];
+  let t = audio.currentTime + 0.05;
+  for (const [, l, acc, oct] of notes.slice(0, 32)) {
+    const semi = SEMI[l.toLowerCase()] + (acc === '#' ? 1 : acc === 'b' ? -1 : 0);
+    const midi = 12 * ((+oct || 4) + 1) + semi;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'triangle'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.18, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+    o.connect(g).connect(audio.destination);
+    o.start(t); o.stop(t + 0.5);
+    t += 0.3;
+  }
+}
+
+function updateRain() {
+  if (!audio) return;
+  const level = !soundOn ? 0 : /\brain\b/.test(sky) ? 0.12 : /drizzle/.test(sky) ? 0.05 : 0;
+  if (!rain) {
+    const len = audio.sampleRate * 2, buf = audio.createBuffer(1, len, audio.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = audio.createBufferSource(); src.buffer = buf; src.loop = true;
+    const filter = audio.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1400;
+    const gain = audio.createGain(); gain.gain.value = 0;
+    src.connect(filter).connect(gain).connect(audio.destination);
+    src.start();
+    rain = gain;
+  }
+  rain.gain.setTargetAtTime(level, audio.currentTime, 1.5);
+}
+</script>
+</body>
+</html>

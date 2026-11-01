@@ -1,0 +1,182 @@
+//! Clouds drift across the island on the wind, so it can be raining by
+//! the river and sunny in the meadow. Time runs at one game hour per
+//! real minute, so a whole day passes in 24 minutes.
+
+use super::rng::Rng;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Sky {
+    Clear,
+    Cloudy,
+    Drizzle,
+    Rain,
+}
+
+impl Sky {
+    pub fn label(self) -> &'static str {
+        match self {
+            Sky::Clear => "clear",
+            Sky::Cloudy => "cloudy",
+            Sky::Drizzle => "drizzle",
+            Sky::Rain => "rain",
+        }
+    }
+    pub fn icon(self, phase: Phase) -> &'static str {
+        match (self, phase) {
+            (Sky::Clear, Phase::Night) => "☾",
+            (Sky::Clear, _) => "☀",
+            (Sky::Cloudy, _) => "☁",
+            (Sky::Drizzle, _) => "☂",
+            (Sky::Rain, _) => "☔",
+        }
+    }
+    pub fn wet(self) -> bool {
+        matches!(self, Sky::Drizzle | Sky::Rain)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Phase {
+    Dawn,
+    Day,
+    Dusk,
+    Night,
+}
+
+impl Phase {
+    pub fn label(self) -> &'static str {
+        match self {
+            Phase::Dawn => "dawn",
+            Phase::Day => "day",
+            Phase::Dusk => "dusk",
+            Phase::Night => "night",
+        }
+    }
+}
+
+pub struct Clock;
+
+impl Clock {
+    /// Game time in minutes past midnight (0..1440).
+    pub fn minutes() -> u64 {
+        let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        secs % 1440
+    }
+    pub fn phase() -> Phase {
+        match Self::minutes() / 60 {
+            5..=6 => Phase::Dawn,
+            7..=17 => Phase::Day,
+            18..=20 => Phase::Dusk,
+            _ => Phase::Night,
+        }
+    }
+    pub fn label() -> String {
+        let m = Self::minutes();
+        let (h, mm) = (m / 60, m % 60);
+        let (h12, ampm) = match h {
+            0 => (12, "am"),
+            1..=11 => (h, "am"),
+            12 => (12, "pm"),
+            _ => (h - 12, "pm"),
+        };
+        format!("{h12}:{mm:02}{ampm} · {}", Self::phase().label())
+    }
+}
+
+struct Cloud {
+    x: f64,
+    y: f64,
+    r: f64,
+    strength: f64,
+}
+
+pub struct Weather {
+    clouds: Vec<Cloud>,
+    wind: f64, // direction in radians
+    speed: f64,
+    size: f64,
+    rng: Rng,
+}
+
+impl Weather {
+    pub fn new(size: i64, seed: u64) -> Weather {
+        let mut w = Weather {
+            clouds: Vec::new(),
+            wind: 0.3,
+            speed: 0.25,
+            size: size as f64,
+            rng: Rng::new(seed ^ 0xc10d),
+        };
+        for _ in 0..4 {
+            let c = Cloud {
+                x: w.rng.range(0.0, w.size),
+                y: w.rng.range(0.0, w.size),
+                r: w.rng.range(5.0, 12.0),
+                strength: w.rng.range(0.4, 1.1),
+            };
+            w.clouds.push(c);
+        }
+        w
+    }
+
+    /// Called every tick (a few seconds).
+    pub fn step(&mut self) {
+        self.wind += self.rng.range(-0.05, 0.05);
+        self.speed = (self.speed + self.rng.range(-0.02, 0.02)).clamp(0.08, 0.5);
+        let (dx, dy) = (self.wind.cos() * self.speed, self.wind.sin() * self.speed);
+        for c in &mut self.clouds {
+            c.x += dx;
+            c.y += dy;
+            c.strength = (c.strength + self.rng.range(-0.03, 0.03)).clamp(0.1, 1.2);
+        }
+        let s = self.size;
+        self.clouds
+            .retain(|c| c.x > -c.r && c.y > -c.r && c.x < s + c.r && c.y < s + c.r);
+        if self.clouds.len() < 5 && self.rng.chance(0.08) {
+            // Arrive from upwind.
+            let along = self.rng.range(0.0, s);
+            let r = self.rng.range(5.0, 12.0);
+            let (x, y) = if dx.abs() > dy.abs() {
+                (if dx > 0.0 { -r + 1.0 } else { s + r - 1.0 }, along)
+            } else {
+                (along, if dy > 0.0 { -r + 1.0 } else { s + r - 1.0 })
+            };
+            let strength = self.rng.range(0.3, 1.1);
+            self.clouds.push(Cloud { x, y, r, strength });
+        }
+    }
+
+    pub fn sky_at(&self, x: i64, y: i64) -> Sky {
+        let (px, py) = (x as f64, y as f64);
+        let k = self
+            .clouds
+            .iter()
+            .map(|c| {
+                let d = ((c.x - px).powi(2) + (c.y - py).powi(2)).sqrt();
+                c.strength * (1.0 - d / c.r).max(0.0)
+            })
+            .fold(0.0, f64::max);
+        if k > 0.55 {
+            Sky::Rain
+        } else if k > 0.3 {
+            Sky::Drizzle
+        } else if k > 0.08 {
+            Sky::Cloudy
+        } else {
+            Sky::Clear
+        }
+    }
+
+    pub fn wind_label(&self) -> &'static str {
+        // Wind is named for where it comes from.
+        let from = (self.wind + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU);
+        let names = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"];
+        let i = ((from / std::f64::consts::TAU) * 8.0).round() as usize % 8;
+        names[i]
+    }
+
+    pub fn breezy(&self) -> bool {
+        self.speed > 0.3
+    }
+}
