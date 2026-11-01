@@ -101,6 +101,22 @@ impl Terrain {
         }
     }
 
+    /// Descriptions for this time of year: meadows aren't buzzing in winter.
+    pub fn descriptions_in(self, season: super::weather::Season) -> &'static [&'static str] {
+        use super::weather::Season::*;
+        match (self, season) {
+            (Meadow, Autumn) => &[
+                "A meadow of tall gold grass and seed heads, rattling softly in the wind.",
+                "The last few flowers hold on here, among the golden grasses.",
+            ],
+            (Meadow, Winter) => &[
+                "A quiet meadow, asleep for winter. Brown seed heads poke up through the frost.",
+                "The meadow is resting: flattened grass, bare stems, and a robin hopping about.",
+            ],
+            _ => self.descriptions(),
+        }
+    }
+
     pub fn descriptions(self) -> &'static [&'static str] {
         match self {
             DeepWater => &["Cold deep water heaves gently all around you."],

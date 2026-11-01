@@ -298,7 +298,7 @@ impl World {
 
         out.push(Line::new().t("").b(Col::Magenta, format!("~ {} ~", self.place_title(x, y))));
 
-        let mut text = rng::pick(here.descriptions(), self.seed, x, y).to_string();
+        let mut text = rng::pick(here.descriptions_in(Clock::season()), self.seed, x, y).to_string();
         text.push(' ');
         text.push_str(&atmosphere(here, sky, phase, Clock::season(), self.weather.breezy(), self.seed, x, y));
         out.push(Line::plain(text));

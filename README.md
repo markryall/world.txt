@@ -169,6 +169,21 @@ called "Poppy's Home" (with "Poppy's Garden" around it) unless you `name` it.
 the friends you `share` it with, and keepers can make, place, dig, plant or name
 things there (`unshare`, `guests`). Claiming somewhere else moves your home.
 
+### Seasons, festivals and events
+
+The island's seasons turn every Monday (a whole year in a month): blossom in
+spring, dragonflies in summer, falling leaves and acorns in autumn, frost and
+snow in winter, each with its own finds, descriptions and weather. Every
+Saturday is the season's festival (the Blossom Picnic, Midsummer Beach Night,
+Lantern Night, Snow Lights), with festival-only keepsakes hidden around the
+island that glow once placed. (`WORLD_SEASON=autumn` and `WORLD_FESTIVAL=1`
+force them, for testing or a treat.)
+
+Keepers plan events where they're standing: `event sat 4pm Beach party` (or
+`tomorrow 10:30am`, `noon`...). It goes in the Island Journal, everyone hears a
+reminder ten minutes before and a shout when it starts, `events` lists what's
+coming up, and `go event` walks you there. `cancel event 1` for its host or a keeper.
+
 ### Gathering
 
 Little finds pop up around anyone wandering, shown as pink `•` on the map:

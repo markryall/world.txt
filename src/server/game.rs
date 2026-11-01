@@ -4,6 +4,7 @@
 mod boards;
 mod companions;
 mod craft;
+mod events;
 mod gather;
 mod homes;
 mod music;
@@ -50,6 +51,8 @@ struct Player {
     key_hash: Option<String>,
     /// Who they're walking to, with `join`.
     travel: Option<String>,
+    /// Where they're walking to, with `go event`: (x, y, place name).
+    walk_to: Option<(i64, i64, String)>,
     /// Their animal friend: (animal id, nickname).
     companion: Option<(String, Option<String>)>,
 }
@@ -258,7 +261,7 @@ impl Game {
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         let full = super::names::full(&name, &user);
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, companion });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, companion });
 
         self.send(
             id,
@@ -351,6 +354,12 @@ impl Game {
             "help" | "?" => self.send(id, help()),
             "look" | "l" | "examine" | "x" if rest.is_empty() => self.look(id),
             "look" | "l" | "examine" | "x" => self.cmd_examine(id, rest),
+            "go" | "walk" if rest.trim_start_matches("to ").starts_with("event") => {
+                return self.cmd_go_event(id, rest.trim_start_matches("to ").trim_start_matches("event"));
+            }
+            "event" | "plan" => return self.cmd_event(id, rest),
+            "events" | "calendar" => return self.cmd_events(id),
+            "cancel" => return self.cmd_cancel_event(id, rest),
             "go" | "walk" => match DIRS.iter().find(|d| d.0 == rest || d.1 == rest) {
                 Some(&(_, _, dx, dy)) => return self.walk(id, dx, dy),
                 None => self.say1(id, Line::plain("Go where? Try north, south, east, west, or ne/nw/se/sw.")),
@@ -467,7 +476,7 @@ impl Game {
     fn walk(&mut self, id: u64, dx: i64, dy: i64) -> anyhow::Result<()> {
         let Some(p) = self.players.get(&id) else { return Ok(()) };
         let (ox, oy, name) = (p.x, p.y, p.name.clone());
-        let quiet = p.travel.is_some(); // `join` walks without a look at every step
+        let quiet = p.travel.is_some() || p.walk_to.is_some(); // auto-walking: no look at every step
         let (nx, ny) = (ox + dx, oy + dy);
         let to = self.world.terrain(nx, ny);
         if !in_bounds(nx, ny) || !to.walkable() {
@@ -1434,6 +1443,7 @@ impl Game {
         }
 
         self.nature_tick();
+        self.events_tick();
         self.animals_tick();
 
         // Things doing their things, but only when someone's there to see.
@@ -1654,6 +1664,7 @@ fn help() -> Vec<Line> {
         h("chat hi everyone  (@all)", "everyone in the world hears"),
         h("find Poppy", "which way to walk to them"),
         h("join Poppy / stop", "walk to them automatically"),
+        h("events / go event", "what's coming up on the island, and walk there"),
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune (hum together to jam!)"),
         h("make a music box / teach C E G / play", "a box that remembers your tune"),
@@ -1700,6 +1711,7 @@ fn help() -> Vec<Line> {
         h("promote Lu / demote Lu", "make someone a keeper, or not"),
         h("signout Sam", "sign out all their devices (a lost iPad)"),
         h("users", "everyone, with their devices"),
+        h("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
         Line::new(),
         Line::col(Col::Dim, format!("The island is {SIZE}×{SIZE}. A whole day passes in 24 minutes.")),
     ]

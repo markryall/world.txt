@@ -25,6 +25,17 @@ pub struct ThingRow {
     pub kind: Option<String>,
 }
 
+pub struct EventRow {
+    pub id: i64,
+    pub at: i64,
+    pub name: String,
+    pub x: i64,
+    pub y: i64,
+    pub host: String,
+    pub reminded: bool,
+    pub started: bool,
+}
+
 pub struct NoteRow {
     pub id: i64,
     pub author: String,
@@ -81,6 +92,10 @@ impl Db {
                  used INTEGER NOT NULL DEFAULT 0);
              CREATE TABLE IF NOT EXISTS devices (
                  token_hash TEXT PRIMARY KEY, user TEXT NOT NULL, created INTEGER NOT NULL, last_seen INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS events (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, name TEXT NOT NULL,
+                 x INTEGER NOT NULL, y INTEGER NOT NULL, host TEXT NOT NULL,
+                 reminded INTEGER NOT NULL DEFAULT 0, started INTEGER NOT NULL DEFAULT 0);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -511,6 +526,54 @@ impl Db {
             )?,
             None => self.conn.execute("DELETE FROM companions WHERE owner = ?1", [owner])?,
         };
+        Ok(())
+    }
+
+    // ---- events ----------------------------------------------------------------
+
+    pub fn add_event(&self, at: i64, name: &str, x: i64, y: i64, host: &str) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO events (at, name, x, y, host) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![at, name, x, y, host],
+        )?;
+        Ok(())
+    }
+
+    /// Events from `since` on, soonest first.
+    pub fn upcoming_events(&self, since: i64) -> anyhow::Result<Vec<EventRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, at, name, x, y, host, reminded, started FROM events WHERE at >= ?1 ORDER BY at",
+        )?;
+        let rows = stmt.query_map([since], |r| {
+            Ok(EventRow {
+                id: r.get(0)?,
+                at: r.get(1)?,
+                name: r.get(2)?,
+                x: r.get(3)?,
+                y: r.get(4)?,
+                host: r.get(5)?,
+                reminded: r.get::<_, i64>(6)? != 0,
+                started: r.get::<_, i64>(7)? != 0,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn mark_event(&self, id: i64, reminded: bool, started: bool) -> anyhow::Result<()> {
+        self.conn.execute(
+            "UPDATE events SET reminded = MAX(reminded, ?2), started = MAX(started, ?3) WHERE id = ?1",
+            params![id, reminded as i64, started as i64],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_event(&self, id: i64) -> anyhow::Result<()> {
+        self.conn.execute("DELETE FROM events WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    pub fn forget_events_before(&self, before: i64) -> anyhow::Result<()> {
+        self.conn.execute("DELETE FROM events WHERE at < ?1", [before])?;
         Ok(())
     }
 

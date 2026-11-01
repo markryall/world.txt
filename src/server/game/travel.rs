@@ -56,7 +56,8 @@ impl Game {
     }
 
     pub(super) fn stop_travelling(&mut self, id: u64, say: bool) {
-        let was = self.players.get_mut(&id).and_then(|p| p.travel.take());
+        let place = self.players.get_mut(&id).and_then(|p| p.walk_to.take());
+        let was = self.players.get_mut(&id).and_then(|p| p.travel.take()).map(|_| ()).or(place.map(|_| ()));
         if was.is_some() && say {
             self.say1(id, Line::col(Col::Dim, "You stop and look around."));
             self.look(id);
@@ -65,6 +66,28 @@ impl Game {
 
     /// Everyone on their way somewhere takes one more step.
     pub(super) fn step_travellers(&mut self) {
+        // Walking to a place.
+        let walkers: Vec<(u64, (i64, i64, String))> =
+            self.players.iter().filter_map(|(&id, p)| p.walk_to.clone().map(|w| (id, w))).collect();
+        for (id, (tx, ty, place)) in walkers {
+            let me = (self.players[&id].x, self.players[&id].y);
+            if me != (tx, ty) {
+                let Some((dx, dy)) = self.first_step(me, (tx, ty)) else {
+                    self.say1(id, Line::plain(format!("You can't find a way to {place} over land.")));
+                    self.stop_travelling(id, true);
+                    continue;
+                };
+                // walk() stays quiet while walk_to is set.
+                let _ = self.walk(id, dx, dy);
+            }
+            if (self.players[&id].x, self.players[&id].y) == (tx, ty) {
+                if let Some(p) = self.players.get_mut(&id) {
+                    p.walk_to = None;
+                }
+                self.say1(id, Line::col(Col::Cyan, format!("🎉 You've arrived at {place}!")));
+                self.look(id);
+            }
+        }
         let travellers: Vec<(u64, String)> =
             self.players.iter().filter_map(|(&id, p)| p.travel.clone().map(|t| (id, t))).collect();
         for (id, target_user) in travellers {
