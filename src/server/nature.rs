@@ -101,11 +101,14 @@ pub enum When {
     In(Season),
     /// Only during this season's festival.
     Festival(Season),
+    /// Only on this island (see islands::ISLANDS).
+    On(u8),
 }
 
 impl When {
-    fn ok(self, sky: Sky, phase: Phase, season: Season, festival: bool) -> bool {
+    fn ok(self, sky: Sky, phase: Phase, season: Season, festival: bool, island: u8) -> bool {
         match self {
+            When::On(i) => i == island,
             When::In(s) => s == season,
             When::Festival(s) => festival && s == season,
             When::Any => true,
@@ -203,6 +206,16 @@ pub const SPECIES: &[Species] = &[
     Species { id: "acorn", name: "acorn", kind: Leaf, rarity: Common, when: In(Season::Autumn), ground: WOODS, here: "sits snug in its tiny cap" },
     Species { id: "snowdrop", name: "snowdrop", kind: Flower, rarity: Uncommon, when: In(Season::Winter), ground: &[T::Meadow, T::Grass, T::Forest], here: "nods its white head above the frost" },
     Species { id: "pinecone", name: "pinecone", kind: Leaf, rarity: Common, when: In(Season::Winter), ground: WOODS, here: "lies under the trees, dusted with frost" },
+    // only on the other islands
+    Species { id: "driftwood", name: "piece of driftwood", kind: Shell, rarity: Common, when: On(1), ground: SHORE, here: "lies bleached and smooth on the sand" },
+    Species { id: "sand_dollar", name: "sand dollar", kind: Shell, rarity: Uncommon, when: On(1), ground: SHORE, here: "lies in the sand like a little white coin" },
+    Species { id: "pearl", name: "pearl", kind: Shell, rarity: Rare, when: On(1), ground: SHORE, here: "gleams in an open oyster shell" },
+    Species { id: "puffball", name: "giant puffball", kind: Mushroom, rarity: Uncommon, when: On(2), ground: WOODS, here: "sits like a big white football among the roots" },
+    Species { id: "glow_worm", name: "glow-worm", kind: Bug, rarity: Rare, when: On(2), ground: WOODS, here: "glows green in the deep shade" },
+    Species { id: "fern_curl", name: "curled fern frond", kind: Leaf, rarity: Common, when: On(2), ground: WOODS, here: "is coiled up tight like a green spring" },
+    Species { id: "obsidian", name: "piece of obsidian", kind: Stone, rarity: Uncommon, when: On(3), ground: HIGH, here: "shines black and glassy among the rocks" },
+    Species { id: "fire_opal", name: "fire opal", kind: Stone, rarity: Rare, when: On(3), ground: ROCKY, here: "flickers with orange light" },
+    Species { id: "sun_lizard", name: "sun lizard", kind: Bug, rarity: Uncommon, when: On(3), ground: HIGH, here: "basks on a warm stone" },
     // festival keepsakes: found only on festival days, and they glow once placed
     Species { id: "golden_blossom", name: "golden blossom", kind: Craft, rarity: Rare, when: Festival(Season::Spring), ground: &[T::Meadow, T::Grass, T::Forest], here: "shimmers like a little piece of sunlight" },
     Species { id: "glowing_shell", name: "glowing shell", kind: Craft, rarity: Rare, when: Festival(Season::Summer), ground: SHORE, here: "glows softly, like a tiny moon" },
@@ -239,11 +252,12 @@ pub fn choose(
     phase: Phase,
     season: Season,
     festival: bool,
+    island: u8,
     fishing: bool,
 ) -> Option<&'static Species> {
     let options: Vec<&Species> = SPECIES
         .iter()
-        .filter(|s| (s.kind == Fish) == fishing && s.ground.contains(&ground) && s.when.ok(sky, phase, season, festival))
+        .filter(|s| (s.kind == Fish) == fishing && s.ground.contains(&ground) && s.when.ok(sky, phase, season, festival, island))
         .collect();
     // Festival keepsakes turn up often on the day.
     let weight = |s: &Species| if matches!(s.when, When::Festival(_)) { 12.0 } else { s.rarity.weight() };
@@ -286,11 +300,11 @@ mod tests {
         let mut rng = Rng::new(1);
         for season in [Season::Spring, Season::Summer, Season::Autumn, Season::Winter] {
             for ground in [T::Meadow, T::Grass, T::Forest, T::Sand, T::Hill, T::Stone] {
-                assert!(choose(&mut rng, ground, Sky::Clear, Phase::Day, season, false, false).is_some(), "{ground:?}");
+                assert!(choose(&mut rng, ground, Sky::Clear, Phase::Day, season, false, 0, false).is_some(), "{ground:?}");
             }
         }
-        assert!(choose(&mut rng, T::Pond, Sky::Clear, Phase::Day, Season::Spring, false, true).is_some());
-        assert!(choose(&mut rng, T::Water, Sky::Clear, Phase::Night, Season::Winter, false, true).is_some());
+        assert!(choose(&mut rng, T::Pond, Sky::Clear, Phase::Day, Season::Spring, false, 0, true).is_some());
+        assert!(choose(&mut rng, T::Water, Sky::Clear, Phase::Night, Season::Winter, false, 0, true).is_some());
     }
 
     #[test]
@@ -298,12 +312,20 @@ mod tests {
         let mut rng = Rng::new(3);
         let mut found = std::collections::HashSet::new();
         for _ in 0..400 {
-            if let Some(s) = choose(&mut rng, T::Forest, Sky::Clear, Phase::Day, Season::Autumn, true, false) {
+            if let Some(s) = choose(&mut rng, T::Forest, Sky::Clear, Phase::Day, Season::Autumn, true, 0, false) {
                 found.insert(s.id);
             }
         }
         assert!(found.contains("golden_leaf") && found.contains("paper_lantern"), "{found:?}");
         assert!(!found.contains("snowdrop") && !found.contains("snow_globe"), "{found:?}");
+        assert!(!found.contains("glow_worm"), "Mossy Holm's glow-worms stay on Mossy Holm");
+        let mut holm = std::collections::HashSet::new();
+        for _ in 0..600 {
+            if let Some(s) = choose(&mut rng, T::Forest, Sky::Clear, Phase::Day, Season::Spring, false, 2, false) {
+                holm.insert(s.id);
+            }
+        }
+        assert!(holm.contains("puffball"), "{holm:?}");
     }
 
     #[test]

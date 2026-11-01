@@ -169,6 +169,19 @@ called "Poppy's Home" (with "Poppy's Garden" around it) unless you `name` it.
 the friends you `share` it with, and keepers can make, place, dig, plant or name
 things there (`unshare`, `guests`). Claiming somewhere else moves your home.
 
+### Islands and boats
+
+The world is an archipelago of four islands, each in its own patch of sea:
+**Home Island** (where everyone arrives), **Driftwood Isle** (long beaches, with
+pearls, sand dollars and driftwood), **Mossy Holm** (deep woods, with giant
+puffballs, glow-worms and fern fronds) and **Ember Rock** (warm stone heights,
+with obsidian, fire opals and sun lizards). Each island has a dock (`⚓` on the
+map) with a rowing boat: `go dock` walks you there, `sail` lists where you can
+go, and `sail Driftwood` rows you across. `map` shows the island you're on,
+`find` tells you which island a friend is on, and homes can be claimed on any
+island. Worlds from before the archipelago keep their island as Home Island and
+grow the other three the first time they start.
+
 ### Seasons, festivals and events
 
 The island's seasons turn every Monday (a whole year in a month): blossom in
@@ -189,7 +202,8 @@ coming up, and `go event` walks you there. `cancel event 1` for its host or a ke
 Little finds pop up around anyone wandering, shown as pink `•` on the map:
 flowers in meadows, butterflies on dry days, fireflies and moonflowers at night,
 mushrooms in the woods after rain, shells on the shore, feathers on the hills,
-crystals up on the rocks. There are 40 species, some rare.
+crystals up on the rocks, plus seasonal finds and some that only grow on certain
+islands. There are about 60 species, some rare.
 
 - `gather` (or `pick` / `catch`) takes what's here. Butterflies sometimes flutter
   off to the next spot.

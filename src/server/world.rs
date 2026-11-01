@@ -1,12 +1,13 @@
 //! The island: a grid of tiles plus the things people have made on it.
 
 use super::db::{Db, ThingRow, TileRow};
-use super::rng::{self, fbm};
+use super::rng;
 use super::terrain::Terrain;
 use super::weather::{Clock, Phase, Season, Sky, Weather};
 use crate::protocol::{Col, Line};
 
-pub const SIZE: i64 = 64;
+/// The whole archipelago: four islands, each in a 64x64 patch.
+pub const SIZE: i64 = 2 * super::islands::REGION;
 
 pub struct Tile {
     pub terrain: Terrain,
@@ -59,8 +60,16 @@ pub struct Thing {
 }
 
 impl Thing {
+    /// Noticeboards and the Island Journal (not music boxes or docks).
     pub fn is_board(&self) -> bool {
-        self.kind.is_some()
+        matches!(self.kind.as_deref(), Some("board" | "journal"))
+    }
+    pub fn is_dock(&self) -> bool {
+        self.kind.as_deref() == Some("dock")
+    }
+    /// Things that belong to the island itself, which nobody unmakes or pushes.
+    pub fn is_fixed(&self) -> bool {
+        matches!(self.kind.as_deref(), Some("journal" | "dock"))
     }
 }
 
@@ -110,13 +119,20 @@ impl World {
         let seed = match db.meta("seed") {
             Some(s) => s.parse()?,
             None => {
-                let tiles = generate(seed);
-                db.save_tiles(&tiles)?;
+                db.save_tiles(&super::islands::ISLANDS[0].generate(seed))?;
                 db.set_meta("seed", &seed.to_string())?;
                 println!("🌱 grew a brand-new island from seed {seed}");
                 seed
             }
         };
+        // Worlds from before the archipelago grow the other islands, once.
+        if db.meta("archipelago").is_none() {
+            for island in &super::islands::ISLANDS[1..] {
+                db.save_tiles(&island.generate(seed))?;
+            }
+            db.set_meta("archipelago", "1")?;
+            println!("⛵ three new islands rose out of the sea: Driftwood Isle, Mossy Holm and Ember Rock");
+        }
         let mut tiles: Vec<Tile> = (0..SIZE * SIZE)
             .map(|_| Tile { terrain: Terrain::DeepWater, name: None })
             .collect();
@@ -146,7 +162,9 @@ impl World {
             .map(|(owner, x, y, guests)| Home { owner, x, y, guests })
             .collect();
         let nicks = db.users()?.into_iter().collect();
-        Ok(World { seed, tiles, things, homes, nicks, weather: Weather::new(SIZE, seed), db })
+        let mut world = World { seed, tiles, things, homes, nicks, weather: Weather::new(SIZE, seed), db };
+        world.ensure_docks()?;
+        Ok(world)
     }
 
     pub fn tile(&self, x: i64, y: i64) -> Option<&Tile> {
@@ -245,6 +263,32 @@ impl World {
         Ok(t)
     }
 
+    /// Every island has a little dock with a rowing boat, on the shore facing
+    /// the middle of the archipelago. Put up any that are missing.
+    pub fn ensure_docks(&mut self) -> anyhow::Result<()> {
+        let mid = (SIZE / 2, SIZE / 2);
+        for island in &super::islands::ISLANDS {
+            if self.things.iter().any(|t| t.is_dock() && island.covers(t.x, t.y)) {
+                continue;
+            }
+            let shore = |x: i64, y: i64| {
+                let t = self.terrain(x, y);
+                t.walkable() && !t.is_wet() && DIRS.iter().any(|d| self.terrain(x + d.2, y + d.3).is_wet())
+            };
+            let spot = (island.oy..island.oy + super::islands::REGION)
+                .flat_map(|y| (island.ox..island.ox + super::islands::REGION).map(move |x| (x, y)))
+                .filter(|&(x, y)| shore(x, y))
+                .min_by_key(|&(x, y)| (x - mid.0).pow(2) + (y - mid.1).pow(2));
+            if let Some((x, y)) = spot {
+                self.add_thing(x, y, "a little wooden dock, with a rowing boat tied up".into(), None, Trigger::Always, "the island", Some("dock"))?;
+                if self.tile(x, y).is_some_and(|t| t.name.is_none()) {
+                    self.set_name(x, y, Some(format!("{} Dock", island.name)))?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Bring back the last thing `by` unmade in the past day.
     pub fn undo_remove(&mut self, by: &str) -> anyhow::Result<Option<&Thing>> {
         let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64 - 86_400;
@@ -270,15 +314,18 @@ impl World {
         self.db.move_thing(t.id, x, y)
     }
 
+    /// Where newcomers arrive: the middle of Home Island.
     pub fn spawn_point(&self) -> (i64, i64) {
-        let c = SIZE / 2;
-        let mut best = (c, c);
+        let home = &super::islands::ISLANDS[0];
+        let (cx, cy) = home.centre();
+        let mut best = (cx, cy);
         let mut best_d = i64::MAX;
-        for y in 0..SIZE {
-            for x in 0..SIZE {
+        for y in home.oy..home.oy + super::islands::REGION {
+            for x in home.ox..home.ox + super::islands::REGION {
+                let c = (cx, cy);
                 let t = self.terrain(x, y);
                 if matches!(t, Terrain::Grass | Terrain::Meadow | Terrain::Path) {
-                    let d = (x - c).pow(2) + (y - c).pow(2);
+                    let d = (x - c.0).pow(2) + (y - c.1).pow(2);
                     if d < best_d {
                         best_d = d;
                         best = (x, y);
@@ -353,24 +400,28 @@ impl World {
     /// you, friends, homes, boards and numbered named places.
     pub fn island_map(&self, me: (i64, i64), people: &[(i64, i64)]) -> Vec<Line> {
         const KEYS: &str = "123456789abcdefghijklmnopqrstuvwxyz";
+        let island = super::islands::island_at(me.0, me.1);
+        let region = super::islands::REGION;
         let mut named: Vec<(i64, i64, String)> = Vec::new();
-        for y in 0..SIZE {
-            for x in 0..SIZE {
-                if let Some(n) = self.tile(x, y).and_then(|t| t.name.clone()) {
+        for y in island.oy..island.oy + region {
+            for x in island.ox..island.ox + region {
+                // Docks show as ⚓ rather than a number.
+                let dock = self.things.iter().any(|t| t.is_dock() && (t.x, t.y) == (x, y));
+                if let Some(n) = self.tile(x, y).and_then(|t| t.name.clone()).filter(|_| !dock) {
                     named.push((x, y, n));
                 }
             }
         }
-        for h in &self.homes {
+        for h in self.homes.iter().filter(|h| island.covers(h.x, h.y)) {
             if !named.iter().any(|(x, y, _)| (*x, *y) == (h.x, h.y)) {
                 named.push((h.x, h.y, format!("{}'s Home", self.nick(&h.owner))));
             }
         }
         named.truncate(KEYS.len());
         let cell = |x: i64, y: i64| (x / 2, y / 2);
-        // Crop to the island, with a little sea around it.
-        let land: Vec<(i64, i64)> = (0..SIZE)
-            .flat_map(|y| (0..SIZE).map(move |x| (x, y)))
+        // Crop to this island, with a little sea around it.
+        let land: Vec<(i64, i64)> = (island.oy..island.oy + region)
+            .flat_map(|y| (island.ox..island.ox + region).map(move |x| (x, y)))
             .filter(|&(x, y)| self.terrain(x, y) != Terrain::DeepWater)
             .map(|(x, y)| cell(x, y))
             .collect();
@@ -389,6 +440,8 @@ impl World {
                     line = line.b(Col::Yellow, KEYS.chars().nth(i).unwrap().to_string());
                 } else if self.homes.iter().any(|h| covers((h.x, h.y))) {
                     line = line.b(Col::Magenta, "⌂");
+                } else if self.things.iter().any(|t| t.is_dock() && covers((t.x, t.y))) {
+                    line = line.b(Col::Brown, "⚓");
                 } else if self.things.iter().any(|t| t.is_board() && covers((t.x, t.y))) {
                     line = line.b(Col::Yellow, "▣");
                 } else {
@@ -408,7 +461,7 @@ impl World {
             }
             out.push(line);
         }
-        out.push(Line::new().b(Col::Magenta, "@").t(" you  ").b(Col::White, "☺").t(" friends  ").b(Col::Magenta, "⌂").t(" homes  ").b(Col::Yellow, "▣").t(" boards"));
+        out.push(Line::new().b(Col::Magenta, "@").t(" you  ").b(Col::White, "☺").t(" friends  ").b(Col::Magenta, "⌂").t(" homes  ").b(Col::Yellow, "▣").t(" boards  ").b(Col::Brown, "⚓").t(" dock"));
         for (i, (_, _, n)) in named.iter().enumerate() {
             out.push(Line::new().b(Col::Yellow, format!("{} ", KEYS.chars().nth(i).unwrap())).t(n.clone()));
         }
@@ -564,40 +617,6 @@ fn idx(x: i64, y: i64) -> usize {
     (y * SIZE + x) as usize
 }
 
-/// Grow an island.
-fn generate(seed: u64) -> Vec<TileRow> {
-    let mut rows = Vec::new();
-    let c = (SIZE - 1) as f64 / 2.0;
-    for y in 0..SIZE {
-        for x in 0..SIZE {
-            let (fx, fy) = (x as f64, y as f64);
-            let d = (((fx - c) / c).powi(2) + ((fy - c) / c).powi(2)).sqrt();
-            let e = fbm(seed, fx / 11.0, fy / 11.0) + 0.42 - 1.15 * d * d;
-            let m = fbm(seed ^ 0x5eed, fx / 8.0, fy / 8.0);
-            let terrain = if e < 0.22 {
-                Terrain::DeepWater
-            } else if e < 0.32 {
-                Terrain::Water
-            } else if e < 0.37 {
-                Terrain::Sand
-            } else if e < 0.74 {
-                if m > 0.58 {
-                    Terrain::Forest
-                } else if m < 0.36 {
-                    Terrain::Meadow
-                } else {
-                    Terrain::Grass
-                }
-            } else if e < 0.86 {
-                Terrain::Hill
-            } else {
-                Terrain::Stone
-            };
-            rows.push(TileRow { x, y, terrain: terrain.code().into(), name: None });
-        }
-    }
-    rows
-}
 
 #[cfg(test)]
 mod tests {
@@ -605,20 +624,13 @@ mod tests {
 
     /// `cargo test -- --nocapture print_island` to eyeball the generator.
     #[test]
-    fn print_island() {
-        let rows = generate(7);
-        let mut land = 0;
-        for y in 0..SIZE {
-            let mut s = String::new();
-            for x in 0..SIZE {
-                let t = Terrain::from_code(&rows[idx(x, y)].terrain);
-                if t.walkable() && !t.is_wet() {
-                    land += 1;
-                }
-                s.push_str(t.glyph().0);
-            }
-            println!("{s}");
+    fn every_island_has_plenty_of_land_and_a_sea_around_it() {
+        for island in &super::super::islands::ISLANDS {
+            let rows = island.generate(7);
+            let land = rows.iter().filter(|r| { let t = Terrain::from_code(&r.terrain); t.walkable() && !t.is_wet() }).count();
+            assert!(land > 300, "{} is too small: {land}", island.name);
+            let edge = rows.iter().filter(|r| r.x == island.ox || r.y == island.oy).all(|r| r.terrain == "deep");
+            assert!(edge, "{} touches its neighbours", island.name);
         }
-        assert!(land > 600, "island too small: {land}");
     }
 }

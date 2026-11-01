@@ -8,6 +8,7 @@ mod events;
 mod gather;
 mod homes;
 mod music;
+mod sailing;
 mod travel;
 
 use super::nature::Find;
@@ -15,7 +16,7 @@ use super::rng::Rng;
 use super::terrain::Terrain;
 use super::tutorial::{self, Act};
 use super::weather::{Clock, Phase, Season, Sky};
-use super::world::{DIRS, SIZE, Trigger, World, capitalise, in_bounds, strip_article};
+use super::world::{DIRS, Trigger, World, capitalise, in_bounds, strip_article};
 use super::{ClientTx, Event};
 use crate::protocol::{Col, Line, ToClient};
 use std::collections::HashMap;
@@ -53,6 +54,8 @@ struct Player {
     travel: Option<String>,
     /// Where they're walking to, with `go event`: (x, y, place name).
     walk_to: Option<(i64, i64, String)>,
+    /// Out on the water in a rowing boat.
+    voyage: Option<sailing::Voyage>,
     /// Their animal friend: (animal id, nickname).
     companion: Option<(String, Option<String>)>,
 }
@@ -97,7 +100,10 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, url: Option
                 None => break,
             },
             _ = tick.tick() => game.tick(),
-            _ = stride.tick() => game.step_travellers(),
+            _ = stride.tick() => {
+                game.step_travellers();
+                game.row_boats();
+            }
         }
     }
 }
@@ -165,7 +171,7 @@ impl Game {
         let people: Vec<(i64, i64)> =
             self.players.iter().filter(|(pid, _)| **pid != id).map(|(_, o)| (o.x, o.y)).collect();
         let msg = ToClient::Status {
-            place: self.world.place_title(p.x, p.y),
+            place: format!("{} · {}", self.world.place_title(p.x, p.y), super::islands::island_at(p.x, p.y).name),
             weather: format!(
                 "{} {} · wind from the {}",
                 sky.icon_in(Clock::phase(), Clock::season()),
@@ -261,7 +267,7 @@ impl Game {
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         let full = super::names::full(&name, &user);
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, companion });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion });
 
         self.send(
             id,
@@ -343,6 +349,9 @@ impl Game {
         };
 
         if let Some(&(_, _, dx, dy)) = DIRS.iter().find(|d| d.0 == verb || d.1 == verb) {
+            if self.at_sea(id) {
+                return Ok(());
+            }
             self.stop_travelling(id, false);
             return self.walk(id, dx, dy);
         }
@@ -354,6 +363,9 @@ impl Game {
             "help" | "?" => self.send(id, help()),
             "look" | "l" | "examine" | "x" if rest.is_empty() => self.look(id),
             "look" | "l" | "examine" | "x" => self.cmd_examine(id, rest),
+            "go" | "walk" if rest.trim_start_matches("to the ").trim_start_matches("to ").starts_with("dock") => {
+                return self.cmd_go_dock(id);
+            }
             "go" | "walk" if rest.trim_start_matches("to ").starts_with("event") => {
                 return self.cmd_go_event(id, rest.trim_start_matches("to ").trim_start_matches("event"));
             }
@@ -369,6 +381,7 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "sail" | "row" | "boat" => return self.cmd_sail(id, rest.trim_start_matches("to ")),
             "befriend" | "feed" | "tame" => return self.cmd_befriend(id, rest),
             "petname" => return self.cmd_nickname(id, rest),
             "nickname" | "nick" => return self.cmd_rename(id, rest),
@@ -780,7 +793,12 @@ impl Game {
         } else {
             let dir = DIRS.iter().find(|q| q.2 == dx.signum() && q.3 == dy.signum()).map_or("away", |q| q.1);
             let steps = if d == 1 { "1 step".to_string() } else { format!("{d} steps") };
-            format!("{} is at {place}, about {steps} to the {dir}.", them.name)
+            let (mine, theirs) = (super::islands::island_at(me.x, me.y), super::islands::island_at(them.x, them.y));
+            if mine.id != theirs.id {
+                format!("{} is at {place}, over on {}. Sail there from a dock! ⛵", them.name, theirs.name)
+            } else {
+                format!("{} is at {place}, about {steps} to the {dir}.", them.name)
+            }
         };
         self.say1(id, Line::col(Col::Cyan, format!("🧭 {line}")));
     }
@@ -1329,8 +1347,8 @@ impl Game {
     fn cmd_unmake(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
         let Some((x, y, who)) = self.here(id) else { return Ok(()) };
         match self.world.find_thing(x, y, what) {
-            Some(i) if self.world.things[i].kind.as_deref() == Some(boards::journal_kind()) => {
-                self.say1(id, Line::plain("The Island Journal belongs to everyone. It stays right where it is."));
+            Some(i) if self.world.things[i].is_fixed() => {
+                self.say1(id, Line::plain("That belongs to the whole island. It stays right where it is."));
             }
             Some(i) if !what.is_empty() && !self.may_change(&self.user(id), i) => {
                 self.say1(id, self.not_yours(i));
@@ -1360,8 +1378,8 @@ impl Game {
             self.say1(id, Line::plain("It would sink without a trace."));
             return Ok(());
         }
-        if self.world.things[i].kind.as_deref() == Some(boards::journal_kind()) {
-            self.say1(id, Line::plain("The Island Journal won't budge. It belongs right here."));
+        if self.world.things[i].is_fixed() {
+            self.say1(id, Line::plain("That won't budge. It belongs right here."));
             return Ok(());
         }
         if !self.may_change(&self.user(id), i) {
@@ -1664,6 +1682,7 @@ fn help() -> Vec<Line> {
         h("chat hi everyone  (@all)", "everyone in the world hears"),
         h("find Poppy", "which way to walk to them"),
         h("join Poppy / stop", "walk to them automatically"),
+        h("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
         h("events / go event", "what's coming up on the island, and walk there"),
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune (hum together to jam!)"),
@@ -1713,7 +1732,7 @@ fn help() -> Vec<Line> {
         h("users", "everyone, with their devices"),
         h("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
         Line::new(),
-        Line::col(Col::Dim, format!("The island is {SIZE}×{SIZE}. A whole day passes in 24 minutes.")),
+        Line::col(Col::Dim, "There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
     ]
 }
 

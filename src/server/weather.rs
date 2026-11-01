@@ -200,7 +200,8 @@ impl Weather {
             size: size as f64,
             rng: Rng::new(seed ^ 0xc10d),
         };
-        for _ in 0..4 {
+        let area = (size as f64 / 64.0).powi(2);
+        for _ in 0..(4.0 * area) as usize {
             let c = Cloud {
                 x: w.rng.range(0.0, w.size),
                 y: w.rng.range(0.0, w.size),
@@ -225,7 +226,8 @@ impl Weather {
         let s = self.size;
         self.clouds
             .retain(|c| c.x > -c.r && c.y > -c.r && c.x < s + c.r && c.y < s + c.r);
-        if self.clouds.len() < 5 && self.rng.chance(0.08) {
+        let area = (self.size / 64.0).powi(2);
+        if (self.clouds.len() as f64) < 5.0 * area && self.rng.chance(0.08 * area) {
             // Arrive from upwind.
             let along = self.rng.range(0.0, s);
             let r = self.rng.range(5.0, 12.0);

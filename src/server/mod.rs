@@ -5,6 +5,7 @@ pub mod accounts;
 pub mod backup;
 mod db;
 mod game;
+pub mod islands;
 pub mod names;
 mod nature;
 mod rng;

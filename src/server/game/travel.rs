@@ -44,6 +44,12 @@ impl Game {
             self.say1(id, Line::plain("You're already with yourself. 💅"));
             return Ok(());
         }
+        let (me, them) = (&self.players[&id], &self.players[&tid]);
+        let theirs = crate::server::islands::island_at(them.x, them.y);
+        if crate::server::islands::island_at(me.x, me.y).id != theirs.id {
+            self.say1(id, Line::plain(format!("{target} is over on {}. Row there from a dock first (sail {}) ⛵", theirs.name, theirs.name.split(' ').next().unwrap_or(""))));
+            return Ok(());
+        }
         if let Some(p) = self.players.get_mut(&id) {
             p.travel = Some(target_user);
         }

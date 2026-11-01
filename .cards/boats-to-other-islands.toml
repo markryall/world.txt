@@ -1,7 +1,7 @@
 name = "Boats to other islands"
-status = "todo"
+status = "done"
 description = "Sail to new islands with new species and places to name, so the world grows when the first island is explored."
 created_at = "2026-11-01T14:36:29.495250Z"
-updated_at = "2026-11-01T14:36:29.495250Z"
+updated_at = "2026-11-01T21:12:13.790468Z"
 tags = ["magic"]
 priority = "low"

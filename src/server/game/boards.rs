@@ -361,10 +361,6 @@ fn discovery_text(s: &Species) -> String {
     format!("found {} {}", crate::server::nature::a(s.name), s.kind.icon())
 }
 
-pub fn journal_kind() -> &'static str {
-    JOURNAL_KIND
-}
-
 pub fn board_kind() -> &'static str {
     BOARD_KIND
 }
