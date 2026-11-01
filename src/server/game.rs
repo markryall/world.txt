@@ -262,6 +262,7 @@ impl Game {
             self.say1(id, Line::new().b(Col::Yellow, format!("🐣 Welcome to the island, {name}! Here's how to get started.")));
         }
         self.show_hint(id);
+        self.deliver_mail(id);
         if self.is_keeper(&name) {
             self.tell_keepers_about_knocks();
         }
@@ -646,8 +647,7 @@ impl Game {
             return Ok(());
         }
         let Some(tid) = self.find_player(to) else {
-            self.say1(id, Line::plain(format!("Nobody called {to} is in the world right now. Try 'who'.")));
-            return Ok(());
+            return self.leave_mail(id, to, msg);
         };
         if tid == id {
             self.say1(id, Line::plain("You mutter to yourself. Very wise."));
@@ -667,6 +667,50 @@ impl Game {
             me.reply_to.get_or_insert(target);
         }
         Ok(())
+    }
+
+    /// `@Name` for someone who isn't here: keep it for when they next arrive.
+    fn leave_mail(&mut self, id: u64, to: &str, msg: &str) -> anyhow::Result<()> {
+        let target = clean_name(to);
+        if target.is_empty() || self.world.db.player(&target).is_none() {
+            self.say1(id, Line::plain(format!("There's nobody called {to} on the island. Try 'who'.")));
+            return Ok(());
+        }
+        let Some((_, _, from)) = self.here(id) else { return Ok(()) };
+        let text: String = msg.chars().take(280).collect();
+        self.world.db.send_mail(&target, &from, &text, boards::now())?;
+        if let Some(me) = self.players.get_mut(&id) {
+            me.reply_to = Some(target.clone());
+        }
+        self.say1(id, Line::new().c(Col::Pink, format!("📬 {target} isn't here right now, so your message will be waiting for them: ")).c(Col::White, text));
+        Ok(())
+    }
+
+    /// Hand over anything people said while this player was away.
+    fn deliver_mail(&mut self, id: u64) {
+        let Some(p) = self.players.get(&id) else { return };
+        let Ok(mail) = self.world.db.take_mail(&p.name) else { return };
+        let mail: Vec<_> = mail.into_iter().filter(|(from, _, _)| p.hears(from)).collect();
+        if mail.is_empty() {
+            return;
+        }
+        let mut lines = vec![Line::new().b(Col::Pink, "📬 While you were away:")];
+        let now = boards::now();
+        for (from, text, at) in &mail {
+            let ago = now - at;
+            let when = match ago {
+                ..3600 => format!("{}m ago", (ago / 60).max(1)),
+                3600..86_400 => format!("{}h ago", ago / 3600),
+                _ => format!("{}d ago", ago / 86_400),
+            };
+            lines.push(Line::new().t("  ").b(Col::Pink, from.clone()).c(Col::Dim, format!(" ({when}): ")).c(Col::White, text.clone()));
+        }
+        lines.push(Line::col(Col::Dim, "  (reply to answer the last one)"));
+        let last = mail.last().map(|m| m.0.clone());
+        if let Some(p) = self.players.get_mut(&id) {
+            p.reply_to = last;
+        }
+        self.send(id, lines);
     }
 
     fn cmd_chat(&mut self, id: u64, msg: &str) -> anyhow::Result<()> {
@@ -1380,7 +1424,7 @@ fn help() -> Vec<Line> {
         Line::col(Col::Pink, "chat"),
         h("say hi  (or 'hi)", "talk to people here"),
         h("emote waves  (or :waves)", "do a little something"),
-        h("@Poppy hi  (or tell)", "talk to someone anywhere"),
+        h("@Poppy hi  (or tell)", "talk to someone anywhere (kept for them if they're away)"),
         h("reply thanks!  (or r)", "answer whoever told you"),
         h("chat hi everyone  (@all)", "everyone in the world hears"),
         h("find Poppy", "which way to walk to them"),

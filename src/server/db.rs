@@ -73,6 +73,9 @@ impl Db {
                  owner TEXT PRIMARY KEY, x INTEGER NOT NULL, y INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS home_guests (
                  owner TEXT NOT NULL, guest TEXT NOT NULL, PRIMARY KEY (owner, guest));
+             CREATE TABLE IF NOT EXISTS mail (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 recipient TEXT NOT NULL, sender TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -437,6 +440,31 @@ impl Db {
         self.conn.execute("UPDATE players SET key_hash = ?2 WHERE name = ?1", params![stored, hash])?;
         self.conn.execute("DELETE FROM door_knocks WHERE name = ?1", [&stored])?;
         Ok(Some(stored))
+    }
+
+    // ---- mail ----------------------------------------------------------------
+
+    pub fn send_mail(&self, recipient: &str, sender: &str, text: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO mail (recipient, sender, text, at) VALUES (?1, ?2, ?3, ?4)",
+            params![recipient, sender, text, at],
+        )?;
+        // Keep the newest 50 for anyone, so a mailbox can't be flooded.
+        self.conn.execute(
+            "DELETE FROM mail WHERE recipient = ?1 AND id NOT IN
+             (SELECT id FROM mail WHERE recipient = ?1 ORDER BY id DESC LIMIT 50)",
+            [recipient],
+        )?;
+        Ok(())
+    }
+
+    /// Everything waiting for someone, oldest first, and it's then delivered.
+    pub fn take_mail(&self, recipient: &str) -> anyhow::Result<Vec<(String, String, i64)>> {
+        let mut stmt = self.conn.prepare("SELECT sender, text, at FROM mail WHERE recipient = ?1 ORDER BY id")?;
+        let rows: Vec<(String, String, i64)> =
+            stmt.query_map([recipient], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_, _>>()?;
+        self.conn.execute("DELETE FROM mail WHERE recipient = ?1", [recipient])?;
+        Ok(rows)
     }
 
     // ---- homes ---------------------------------------------------------------
