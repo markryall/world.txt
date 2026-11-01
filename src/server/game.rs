@@ -340,6 +340,15 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "map" | "m" => {
+                if let Some(p) = self.players.get(&id) {
+                    let people: Vec<(i64, i64)> =
+                        self.players.iter().filter(|(pid, _)| **pid != id).map(|(_, o)| (o.x, o.y)).collect();
+                    let mut lines = vec![Line::new().b(Col::Magenta, "🗺  The island")];
+                    lines.extend(self.world.island_map((p.x, p.y), &people));
+                    self.send(id, lines);
+                }
+            }
             "claim" => return self.cmd_claim(id),
             "home" => return self.cmd_home(id),
             "invite" => return self.cmd_invite(id, rest, true),
@@ -1354,6 +1363,7 @@ fn help() -> Vec<Line> {
         h("look / look <thing>", "take it all in"),
         h("tutorial / skip", "first steps again, or hide them"),
         h("who", "who's out in the world"),
+        h("map", "the whole island, with friends and named places"),
         Line::col(Col::Pink, "chat"),
         h("say hi  (or 'hi)", "talk to people here"),
         h("emote waves  (or :waves)", "do a little something"),

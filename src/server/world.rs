@@ -340,6 +340,72 @@ impl World {
         out
     }
 
+    /// The whole island at half scale (each character is a 2x2 patch), with
+    /// you, friends, homes, boards and numbered named places.
+    pub fn island_map(&self, me: (i64, i64), people: &[(i64, i64)]) -> Vec<Line> {
+        const KEYS: &str = "123456789abcdefghijklmnopqrstuvwxyz";
+        let mut named: Vec<(i64, i64, String)> = Vec::new();
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                if let Some(n) = self.tile(x, y).and_then(|t| t.name.clone()) {
+                    named.push((x, y, n));
+                }
+            }
+        }
+        for h in &self.homes {
+            if !named.iter().any(|(x, y, _)| (*x, *y) == (h.x, h.y)) {
+                named.push((h.x, h.y, format!("{}'s Home", h.owner)));
+            }
+        }
+        named.truncate(KEYS.len());
+        let cell = |x: i64, y: i64| (x / 2, y / 2);
+        // Crop to the island, with a little sea around it.
+        let land: Vec<(i64, i64)> = (0..SIZE)
+            .flat_map(|y| (0..SIZE).map(move |x| (x, y)))
+            .filter(|&(x, y)| self.terrain(x, y) != Terrain::DeepWater)
+            .map(|(x, y)| cell(x, y))
+            .collect();
+        let (x0, x1) = (land.iter().map(|c| c.0).min().unwrap_or(0) - 1, land.iter().map(|c| c.0).max().unwrap_or(SIZE / 2) + 1);
+        let (y0, y1) = (land.iter().map(|c| c.1).min().unwrap_or(0) - 1, land.iter().map(|c| c.1).max().unwrap_or(SIZE / 2) + 1);
+        let mut out = Vec::new();
+        for cy in y0.max(0)..=y1.min(SIZE / 2 - 1) {
+            let mut line = Line::new();
+            for cx in x0.max(0)..=x1.min(SIZE / 2 - 1) {
+                let covers = |p: (i64, i64)| cell(p.0, p.1) == (cx, cy);
+                if covers(me) {
+                    line = line.b(Col::Magenta, "@");
+                } else if people.iter().any(|p| covers(*p)) {
+                    line = line.b(Col::White, "☺");
+                } else if let Some(i) = named.iter().position(|(x, y, _)| covers((*x, *y))) {
+                    line = line.b(Col::Yellow, KEYS.chars().nth(i).unwrap().to_string());
+                } else if self.homes.iter().any(|h| covers((h.x, h.y))) {
+                    line = line.b(Col::Magenta, "⌂");
+                } else if self.things.iter().any(|t| t.is_board() && covers((t.x, t.y))) {
+                    line = line.b(Col::Yellow, "▣");
+                } else {
+                    // The most common ground in the patch.
+                    let mut counts: Vec<(Terrain, usize)> = Vec::new();
+                    for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                        let t = self.terrain(cx * 2 + dx, cy * 2 + dy);
+                        match counts.iter_mut().find(|(c, _)| *c == t) {
+                            Some((_, n)) => *n += 1,
+                            None => counts.push((t, 1)),
+                        }
+                    }
+                    let t = counts.iter().max_by_key(|(_, n)| *n).map_or(Terrain::DeepWater, |c| c.0);
+                    let (g, c) = t.glyph();
+                    line = line.c(c, g);
+                }
+            }
+            out.push(line);
+        }
+        out.push(Line::new().b(Col::Magenta, "@").t(" you  ").b(Col::White, "☺").t(" friends  ").b(Col::Magenta, "⌂").t(" homes  ").b(Col::Yellow, "▣").t(" boards"));
+        for (i, (_, _, n)) in named.iter().enumerate() {
+            out.push(Line::new().b(Col::Yellow, format!("{} ", KEYS.chars().nth(i).unwrap())).t(n.clone()));
+        }
+        out
+    }
+
     /// A small coloured map centred on (cx, cy).
     pub fn minimap(&self, cx: i64, cy: i64, people: &[(i64, i64)], finds: &[(i64, i64)]) -> Vec<Line> {
         let (rw, rh) = (7, 4);
