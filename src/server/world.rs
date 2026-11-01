@@ -88,6 +88,8 @@ pub struct World {
     tiles: Vec<Tile>,
     pub things: Vec<Thing>,
     pub homes: Vec<Home>,
+    /// username → nickname, for everyone who's ever visited.
+    pub nicks: std::collections::HashMap<String, String>,
     pub weather: Weather,
     pub db: Db,
 }
@@ -143,7 +145,8 @@ impl World {
             .into_iter()
             .map(|(owner, x, y, guests)| Home { owner, x, y, guests })
             .collect();
-        Ok(World { seed, tiles, things, homes, weather: Weather::new(SIZE, seed), db })
+        let nicks = db.users()?.into_iter().collect();
+        Ok(World { seed, tiles, things, homes, nicks, weather: Weather::new(SIZE, seed), db })
     }
 
     pub fn tile(&self, x: i64, y: i64) -> Option<&Tile> {
@@ -176,6 +179,12 @@ impl World {
         self.db.save_tiles(&[row])
     }
 
+    /// Someone's nickname, from their username (or the text itself, for
+    /// things like "the island").
+    pub fn nick(&self, user: &str) -> String {
+        self.nicks.get(user).cloned().unwrap_or_else(|| user.to_string())
+    }
+
     pub fn home_at(&self, x: i64, y: i64) -> Option<&Home> {
         self.homes.iter().find(|h| h.covers(x, y))
     }
@@ -186,7 +195,7 @@ impl World {
             Some(_) if self.home_at(x, y).is_some() => {
                 let h = self.home_at(x, y).unwrap();
                 let what = if (h.x, h.y) == (x, y) { "Home" } else { "Garden" };
-                format!("{}'s {what}", h.owner)
+                format!("{}'s {what}", self.nick(&h.owner))
             }
             Some(t) => t.terrain.place_name().to_string(),
             None => "The Edge of the World".into(),
@@ -354,7 +363,7 @@ impl World {
         }
         for h in &self.homes {
             if !named.iter().any(|(x, y, _)| (*x, *y) == (h.x, h.y)) {
-                named.push((h.x, h.y, format!("{}'s Home", h.owner)));
+                named.push((h.x, h.y, format!("{}'s Home", self.nick(&h.owner))));
             }
         }
         named.truncate(KEYS.len());

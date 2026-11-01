@@ -94,8 +94,9 @@ pub fn plan(recipe: &Recipe, satchel: &[(String, i64)]) -> Option<Vec<(&'static 
 
 impl Game {
     pub(super) fn cmd_recipes(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(()) };
-        let satchel = self.world.db.satchel(&name)?;
+        let Some((_, _, _name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
+        let satchel = self.world.db.satchel(&user)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "✂️ Things you can craft")];
         for r in RECIPES {
             let Some(s) = nature::by_id(r.makes) else { continue };
@@ -115,6 +116,7 @@ impl Game {
 
     pub(super) fn cmd_craft(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let w = crate::server::world::strip_article(what.trim()).to_lowercase();
         if w.is_empty() {
             return self.cmd_recipes(id);
@@ -127,16 +129,16 @@ impl Game {
             self.say1(id, Line::plain(format!("You don't know how to craft '{w}'. Type recipes to see what you can make.")));
             return Ok(());
         };
-        let satchel = self.world.db.satchel(&name)?;
+        let satchel = self.world.db.satchel(&user)?;
         let Some(used) = plan(recipe, &satchel) else {
             let needs: Vec<String> = recipe.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
             self.say1(id, Line::plain(format!("A {} needs {}. Keep gathering! 🧺", s.name, needs.join(" + "))));
             return Ok(());
         };
         for (sid, n) in &used {
-            self.world.db.satchel_add(&name, sid, -n)?;
+            self.world.db.satchel_add(&user, sid, -n)?;
         }
-        self.world.db.satchel_add(&name, s.id, 1)?;
+        self.world.db.satchel_add(&user, s.id, 1)?;
         self.say1(id, Line::new().c(Col::Yellow, "✂️ You craft ").b(Col::Yellow, nature::a(s.name)).c(Col::Yellow, "! It's in your satchel: place it, or give it to someone."));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("✂️ {name} crafts {}.", nature::a(s.name))));
         Ok(())

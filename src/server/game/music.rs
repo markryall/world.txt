@@ -49,8 +49,9 @@ impl Game {
             self.say1(id, Line::plain("There's no music box here to teach. Try 'make a music box'!"));
             return Ok(());
         };
-        if !self.world.things[i].maker.eq_ignore_ascii_case(&who) && !self.is_keeper(&who) {
-            let maker = self.world.things[i].maker.clone();
+        let user = self.user(id);
+        if self.world.things[i].maker != user && !self.is_keeper(&user) {
+            let maker = self.world.nick(&self.world.things[i].maker);
             self.say1(id, Line::plain(format!("That's {maker}'s music box, so only {maker} can teach it a tune. You can 'play' it though!")));
             return Ok(());
         }

@@ -124,7 +124,7 @@ impl Game {
         for p in self.players.values().filter(|p| (p.x, p.y) == (me.x, me.y)) {
             let Some((a, n)) = &p.companion else { continue };
             let Some(an) = animal(a) else { continue };
-            let line = if p.name == me.name {
+            let line = if p.user == me.user {
                 format!("{} {} is right by your side.", an.icon, capitalise(&label(an, n)))
             } else {
                 format!("{} {}, {}'s {}, is here.", an.icon, n.clone().unwrap_or_else(|| format!("A {}", an.name)), p.name, an.name)
@@ -145,6 +145,7 @@ impl Game {
 
     pub(super) fn cmd_befriend(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let what = crate::server::world::strip_article(what.trim()).to_lowercase();
         let Some(i) = self.wild.iter().position(|w| (w.x, w.y) == (x, y) && (what.is_empty() || w.animal.name.contains(&what))) else {
             self.say1(id, Line::plain("There's no wild animal here to befriend. Keep wandering and they'll turn up! 🦊🐇🦔"));
@@ -159,7 +160,7 @@ impl Game {
         let berries: Vec<(&'static nature::Species, i64)> = self
             .world
             .db
-            .satchel(&name)?
+            .satchel(&user)?
             .into_iter()
             .filter_map(|(sid, n)| nature::by_id(&sid).map(|s| (s, n)))
             .filter(|(s, _)| s.kind == Kind::Berry)
@@ -168,35 +169,36 @@ impl Game {
             self.say1(id, Line::plain(format!("The {} looks hungry. {}s love berries: gather some first! 🫐", a.name, capitalise(a.name))));
             return Ok(());
         };
-        self.world.db.satchel_add(&name, berry.id, -1)?;
+        self.world.db.satchel_add(&user, berry.id, -1)?;
         if !self.rng.chance(0.5) {
             self.say1(id, Line::col(Col::Green, format!("{} The {} gobbles up your {} and watches you carefully. Maybe one more?", a.icon, a.name, berry.name)));
             return Ok(());
         }
         self.wild.remove(i);
-        self.world.db.set_companion(&name, Some(a.id), None)?;
+        self.world.db.set_companion(&user, Some(a.id), None)?;
         if let Some(p) = self.players.get_mut(&id) {
             p.companion = Some((a.id.to_string(), None));
         }
         self.say1(id, Line::new().b(Col::Green, format!("{} The {} eats your {} and decides you're friends! It'll follow you everywhere.", a.icon, a.name, berry.name)));
-        self.say1(id, Line::col(Col::Dim, format!("Give it a name: nickname Rusty · pet · let go")));
+        self.say1(id, Line::col(Col::Dim, "Give it a name: petname Rusty · pet · let go"));
         self.tell_here(x, y, id, Line::col(Col::Green, format!("{} {name} makes friends with a {}!", a.icon, a.name)));
         Ok(())
     }
 
     pub(super) fn cmd_nickname(&mut self, id: u64, new: &str) -> anyhow::Result<()> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(()) };
+        let Some((_, _, _name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let Some((a, _)) = self.players.get(&id).and_then(|p| p.companion.clone()) else {
             self.say1(id, Line::plain("You don't have a companion yet. Befriend an animal with a berry!"));
             return Ok(());
         };
         let nick: String = new.trim().chars().filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-').take(20).collect();
         if nick.trim().is_empty() {
-            self.say1(id, Line::plain("Call them what? e.g. 'nickname Rusty'"));
+            self.say1(id, Line::plain("Call them what? e.g. 'petname Rusty'"));
             return Ok(());
         }
         let nick = capitalise(nick.trim());
-        self.world.db.set_companion(&name, Some(&a), Some(&nick))?;
+        self.world.db.set_companion(&user, Some(&a), Some(&nick))?;
         if let Some(p) = self.players.get_mut(&id) {
             p.companion = Some((a.clone(), Some(nick.clone())));
         }
@@ -227,11 +229,12 @@ impl Game {
 
     pub(super) fn cmd_let_go(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let Some((a, n)) = self.players.get_mut(&id).and_then(|p| p.companion.take()) else {
             self.say1(id, Line::plain("You don't have a companion to let go."));
             return Ok(());
         };
-        self.world.db.set_companion(&name, None, None)?;
+        self.world.db.set_companion(&user, None, None)?;
         let msg = match animal(&a) {
             Some(an) => format!("{} {} nuzzles you goodbye and wanders back to the wild. 💚", an.icon, capitalise(&label(an, &n))),
             None => "Your companion wanders back to the wild. 💚".to_string(),

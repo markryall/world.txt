@@ -13,6 +13,14 @@ open http://localhost:4040         # browser client (works on iPads, plays sound
 Cargo won't put a `.` in a binary name, so `cargo build` makes `target/release/world`
 and `make install` copies it into place as `world.txt`. `cargo run -- serve` works too.
 
+**Everyone has a username and a nickname.** Your username (like
+`sunny-otter-42`) is made up for you the first time you arrive and never changes;
+everything of yours (satchel, journal, home, things, notes, mail) belongs to it.
+Your nickname is what people see, and `nickname Pip` changes it any time. `who`
+shows both, arrivals and renames show both, and `@`, `mute`, `invite`, `kick`
+and friends accept either. For now you still join by typing your nickname, so
+nicknames are unique; invite links (next) will remove that.
+
 **Names belong to the device that first uses them.** Each browser keeps a secret
 key (and this machine's terminal client, residents and bridges share one in
 `~/.config/world.txt/key`); the world stores only a hash. Anyone else trying that
@@ -182,7 +190,7 @@ duckling on the water, a rabbit in the meadow by day, a hedgehog at night, a
 turtle on the shore. Berries (blackberries, wild strawberries, bilberries) are
 gathered like anything else, and `befriend fox` offers one; it may take a couple.
 A companion follows you everywhere, gets up to little things, and shows up in
-`look` and in your comings and goings. `nickname Rusty`, `pet`, and `let go`.
+`look` and in your comings and goings. `petname Rusty`, `pet`, and `let go`.
 One each, remembered between visits.
 
 ### Crafting

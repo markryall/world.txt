@@ -172,21 +172,21 @@ impl Game {
 
     /// Put something in the satchel and the journal. False if there's no room.
     fn collect(&mut self, id: u64, s: &'static Species) -> anyhow::Result<bool> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(false) };
-        let carried: i64 = self.world.db.satchel(&name)?.iter().map(|(_, n)| n).sum();
+        let user = self.user(id);
+        let carried: i64 = self.world.db.satchel(&user)?.iter().map(|(_, n)| n).sum();
         if carried >= SATCHEL_SIZE {
             self.say1(id, Line::plain("🧺 Your satchel is full! Give, place or release something first."));
             return Ok(false);
         }
-        self.world.db.satchel_add(&name, s.id, 1)?;
-        if self.world.db.journal_add(&name, s.id)? {
+        self.world.db.satchel_add(&user, s.id, 1)?;
+        if self.world.db.journal_add(&user, s.id)? {
             self.say1(
                 id,
                 Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, capitalise(s.name)).c(Col::Yellow, s.rarity.label()),
             );
         }
         if !self.players.get(&id).is_some_and(|p| p.bot) {
-            self.note_discovery(&name, s)?;
+            self.note_discovery(&user, s)?;
         }
         Ok(true)
     }
@@ -255,8 +255,8 @@ impl Game {
     }
 
     pub(super) fn cmd_satchel(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(()) };
-        let items = self.world.db.satchel(&name)?;
+        let user = self.user(id);
+        let items = self.world.db.satchel(&user)?;
         let total: i64 = items.iter().map(|(_, n)| n).sum();
         let mut lines = vec![Line::new().b(Col::Magenta, format!("🧺 Your satchel ({total}/{SATCHEL_SIZE})"))];
         if items.is_empty() {
@@ -274,8 +274,8 @@ impl Game {
     }
 
     pub(super) fn cmd_journal(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(()) };
-        let found = self.world.db.journal(&name)?;
+        let user = self.user(id);
+        let found = self.world.db.journal(&user)?;
         let mut lines = vec![Line::new().b(
             Col::Magenta,
             format!(
@@ -323,11 +323,12 @@ impl Game {
 
     pub(super) fn cmd_give(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let Some((what, to)) = rest.rsplit_once(" to ") else {
             self.say1(id, Line::plain("Give what to who? e.g. 'give daisy to Poppy'"));
             return Ok(());
         };
-        let Some(s) = self.carried(&name, what)? else {
+        let Some(s) = self.carried(&user, what)? else {
             self.say1(id, Line::plain(format!("You don't have any {} in your satchel.", what.trim())));
             return Ok(());
         };
@@ -335,9 +336,9 @@ impl Game {
             self.say1(id, Line::plain(format!("Nobody called {} is in the world right now.", to.trim())));
             return Ok(());
         };
-        let (tname, tx, ty, tbot) = {
+        let (tname, tuser, tx, ty, tbot) = {
             let t = &self.players[&tid];
-            (t.name.clone(), t.x, t.y, t.bot)
+            (t.name.clone(), t.user.clone(), t.x, t.y, t.bot)
         };
         if tid == id {
             self.say1(id, Line::plain("You give it to yourself. It's already yours, sweetie."));
@@ -347,15 +348,15 @@ impl Game {
             self.say1(id, Line::plain(format!("{tname} isn't here. Try 'find {tname}' and go to them!")));
             return Ok(());
         }
-        let theirs: i64 = self.world.db.satchel(&tname)?.iter().map(|(_, n)| n).sum();
+        let theirs: i64 = self.world.db.satchel(&tuser)?.iter().map(|(_, n)| n).sum();
         if !tbot && theirs >= SATCHEL_SIZE {
             self.say1(id, Line::plain(format!("{tname}'s satchel is too full to take it.")));
             return Ok(());
         }
-        self.world.db.satchel_add(&name, s.id, -1)?;
+        self.world.db.satchel_add(&user, s.id, -1)?;
         if !tbot {
-            self.world.db.satchel_add(&tname, s.id, 1)?;
-            if self.world.db.journal_add(&tname, s.id)? {
+            self.world.db.satchel_add(&tuser, s.id, 1)?;
+            if self.world.db.journal_add(&tuser, s.id)? {
                 self.say1(tid, Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, capitalise(s.name)).c(Col::Yellow, s.rarity.label()));
             }
         }
@@ -372,7 +373,8 @@ impl Game {
 
     pub(super) fn cmd_place(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
-        let Some(s) = self.carried(&name, what)? else {
+        let user = self.user(id);
+        let Some(s) = self.carried(&user, what)? else {
             self.say1(id, Line::plain("Place what? Try 'satchel' to see what you're carrying."));
             return Ok(());
         };
@@ -388,7 +390,7 @@ impl Game {
             self.say1(id, Line::plain("It's getting crowded here. Try somewhere else?"));
             return Ok(());
         }
-        self.world.db.satchel_add(&name, s.id, -1)?;
+        self.world.db.satchel_add(&user, s.id, -1)?;
         // Crafted things come alive once placed: a wind chime tinkles, a lantern glows.
         let (action, trigger) = if s.kind == Kind::Craft && !s.here.is_empty() {
             let t = match s.when {
@@ -402,7 +404,7 @@ impl Game {
         } else {
             (None, Trigger::Always)
         };
-        self.world.add_thing(x, y, nature::a(s.name), action, trigger, &name, None)?;
+        self.world.add_thing(x, y, nature::a(s.name), action, trigger, &user, None)?;
         self.say1(id, Line::col(Col::Yellow, format!("{} You place {} here, just so.", s.kind.icon(), nature::a(s.name))));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("{} {name} places {} here.", s.kind.icon(), nature::a(s.name))));
         self.status_all();
@@ -411,12 +413,13 @@ impl Game {
 
     pub(super) fn cmd_release(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
-        let found = self.carried(&name, what)?;
+        let user = self.user(id);
+        let found = self.carried(&user, what)?;
         let Some(s) = found.filter(|s| s.kind.alive()) else {
             self.say1(id, Line::plain("Release what? Butterflies, bugs and fish can go free."));
             return Ok(());
         };
-        self.world.db.satchel_add(&name, s.id, -1)?;
+        self.world.db.satchel_add(&user, s.id, -1)?;
         let how = match s.kind {
             Kind::Fish => "plops back into the water and swims away",
             Kind::Bug => "trundles off into the grass",

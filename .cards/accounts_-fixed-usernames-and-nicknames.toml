@@ -1,7 +1,7 @@
 name = "Accounts: fixed usernames and nicknames"
-status = "todo"
+status = "done"
 description = "A users table: each person gets a cute, unique, never-changing username (adjective-animal-number, e.g. sunny-otter-42) plus a nickname they can change any time ('nickname Poppy'). Everything (satchels, journals, homes, things, boards, mail, mutes, companions) is keyed by username. Others see 'Poppy (sunny-otter-42)' in who, on first appearance and in boards; short 'Poppy' in busy chat. '@' works with either (nickname if unambiguous). Existing players are migrated: each gets a generated username, with their old name as nickname."
 created_at = "2026-11-01T20:35:42.177434Z"
-updated_at = "2026-11-01T20:35:42.177434Z"
+updated_at = "2026-11-01T20:42:09.864389Z"
 tags = ["accounts"]
 priority = "high"

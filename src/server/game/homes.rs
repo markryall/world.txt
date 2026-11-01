@@ -16,10 +16,11 @@ impl Game {
     pub(super) fn may_build_here(&self, id: u64) -> bool {
         let Some(p) = self.players.get(&id) else { return false };
         match self.world.home_at(p.x, p.y) {
-            Some(h) if !h.welcomes(&p.name) && !self.is_keeper(&p.name) => {
+            Some(h) if !h.welcomes(&p.user) && !self.is_keeper(&p.user) => {
+                let owner = self.world.nick(&h.owner);
                 self.say1(
                     id,
-                    Line::plain(format!("This is {}'s home, so it's theirs to change. Ask them to invite you! (@{} ...)", h.owner, h.owner)),
+                    Line::plain(format!("This is {owner}'s home, so it's theirs to change. Ask them to invite you! (@{owner} ...)")),
                 );
                 false
             }
@@ -29,6 +30,7 @@ impl Game {
 
     pub(super) fn cmd_claim(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         if self.players.get(&id).is_some_and(|p| p.bot) {
             return Ok(());
         }
@@ -43,19 +45,19 @@ impl Game {
         }
         let gap = 2 * HOME_RADIUS;
         if let Some(h) = self.world.homes.iter().find(|h| {
-            !h.owner.eq_ignore_ascii_case(&name) && (h.x - x).abs() <= gap && (h.y - y).abs() <= gap
+            h.owner != user && (h.x - x).abs() <= gap && (h.y - y).abs() <= gap
         }) {
-            self.say1(id, Line::plain(format!("That's too close to {}'s home. Try a few steps away.", h.owner)));
+            self.say1(id, Line::plain(format!("That's too close to {}'s home. Try a few steps away.", self.world.nick(&h.owner))));
             return Ok(());
         }
-        let moved = self.world.homes.iter().any(|h| h.owner.eq_ignore_ascii_case(&name));
-        self.world.db.set_home(&name, x, y)?;
-        match self.world.homes.iter_mut().find(|h| h.owner.eq_ignore_ascii_case(&name)) {
+        let moved = self.world.homes.iter().any(|h| h.owner == user);
+        self.world.db.set_home(&user, x, y)?;
+        match self.world.homes.iter_mut().find(|h| h.owner == user) {
             Some(h) => {
                 h.x = x;
                 h.y = y;
             }
-            None => self.world.homes.push(Home { owner: name.clone(), x, y, guests: vec![] }),
+            None => self.world.homes.push(Home { owner: user.clone(), x, y, guests: vec![] }),
         }
         let msg = if moved { "🏡 You move your home here." } else { "🏡 This is your home now! The patch around you is yours to decorate." };
         self.say1(id, Line::new().b(Col::Magenta, msg));
@@ -67,7 +69,8 @@ impl Game {
 
     pub(super) fn cmd_home(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
-        let Some((hx, hy)) = self.world.homes.iter().find(|h| h.owner.eq_ignore_ascii_case(&name)).map(|h| (h.x, h.y)) else {
+        let user = self.user(id);
+        let Some((hx, hy)) = self.world.homes.iter().find(|h| h.owner == user).map(|h| (h.x, h.y)) else {
             self.say1(id, Line::plain("You don't have a home yet. Find a spot you love and type claim!"));
             return Ok(());
         };
@@ -92,27 +95,33 @@ impl Game {
 
     pub(super) fn cmd_invite(&mut self, id: u64, who: &str, on: bool) -> anyhow::Result<()> {
         let Some((_, _, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let guest = who.trim();
         if guest.is_empty() {
             self.say1(id, Line::plain(if on { "Invite who? e.g. 'invite Lu'" } else { "Uninvite who?" }));
             return Ok(());
         }
-        let Some(home) = self.world.homes.iter_mut().find(|h| h.owner.eq_ignore_ascii_case(&name)) else {
+        let Some(_home) = self.world.homes.iter_mut().find(|h| h.owner == user) else {
             self.say1(id, Line::plain("You need a home first. Type claim where you'd like it."));
             return Ok(());
         };
-        let guest = crate::server::world::capitalise(&guest.to_lowercase());
+        let Some(guest_user) = self.world.db.resolve_user(guest) else {
+            self.say1(id, Line::plain(format!("There's nobody called {guest} on the island.")));
+            return Ok(());
+        };
+        let guest = crate::server::names::full(&self.world.nick(&guest_user), &guest_user);
+        let Some(home) = self.world.homes.iter_mut().find(|h| h.owner == user) else { return Ok(()) };
         if on {
-            if !home.guests.iter().any(|g| g.eq_ignore_ascii_case(&guest)) {
-                home.guests.push(guest.clone());
+            if !home.guests.contains(&guest_user) {
+                home.guests.push(guest_user.clone());
             }
         } else {
-            home.guests.retain(|g| !g.eq_ignore_ascii_case(&guest));
+            home.guests.retain(|g| *g != guest_user);
         }
-        self.world.db.set_guest(&name, &guest, on)?;
+        self.world.db.set_guest(&user, &guest_user, on)?;
         if on {
             self.say1(id, Line::col(Col::Magenta, format!("💌 {guest} can build at your home now.")));
-            if let Some(gid) = self.find_player(&guest) {
+            if let Some(gid) = self.find_player(&guest_user) {
                 self.say1(gid, Line::col(Col::Magenta, format!("💌 {name} invited you to build at their home! (find {name} to visit)")));
             }
         } else {
@@ -122,11 +131,15 @@ impl Game {
     }
 
     pub(super) fn cmd_guests(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(()) };
-        let msg = match self.world.homes.iter().find(|h| h.owner.eq_ignore_ascii_case(&name)) {
+        let Some((_, _, _name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
+        let msg = match self.world.homes.iter().find(|h| h.owner == user) {
             None => "You don't have a home yet. Type claim where you'd like it.".to_string(),
             Some(h) if h.guests.is_empty() => "Nobody else builds at your home yet. 'invite Lu' to share it.".to_string(),
-            Some(h) => format!("💌 Invited to build at your home: {}", h.guests.join(", ")),
+            Some(h) => format!(
+                "💌 Invited to build at your home: {}",
+                h.guests.iter().map(|g| crate::server::names::full(&self.world.nick(g), g)).collect::<Vec<_>>().join(", ")
+            ),
         };
         self.say1(id, Line::col(Col::Dim, msg));
         Ok(())

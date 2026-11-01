@@ -115,9 +115,9 @@ impl Game {
         let note_id = self.world.db.add_note(board, player, &text, at, &week, Some(s.id))?;
         let line = Line::new()
             .c(Col::Yellow, "📖 ")
-            .b(Col::Yellow, player)
+            .b(Col::Yellow, self.world.nick(player))
             .c(Col::Yellow, format!(" added {} to the Island Journal!", crate::server::nature::a(s.name)));
-        let note = Note { id: note_id, author: player.into(), text, when: when(at) };
+        let note = Note { id: note_id, author: self.world.nick(player), text, when: when(at) };
         for p in self.players.values() {
             let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
             let _ = p.tx.send(self.board_update(board, note.clone()));
@@ -162,7 +162,7 @@ impl Game {
     pub(super) fn board_lines_here(&self, id: u64) -> Vec<Line> {
         let Some(p) = self.players.get(&id) else { return vec![] };
         let Some((board, journal)) = self.board_here(p.x, p.y) else { return vec![] };
-        let seen = self.world.db.membership(&p.name, board).map_or(0, |m| m.1);
+        let seen = self.world.db.membership(&p.user, board).map_or(0, |m| m.1);
         let new = self.world.db.notes_after(board, seen).unwrap_or(0);
         let what = if journal { "📖 The Island Journal" } else { "📌 The noticeboard" };
         let news = match new {
@@ -176,7 +176,8 @@ impl Game {
     // ---- commands ----------------------------------------------------------
 
     pub(super) fn cmd_read(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, _name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let rest = rest.trim().to_lowercase();
         let Some((board, journal)) = self.board_here(x, y) else {
             self.say1(id, Line::plain("There's no noticeboard here. Type boards to see the ones you follow."));
@@ -205,7 +206,7 @@ impl Game {
             return Ok(());
         }
         if mode == BoardMode::Open {
-            self.world.db.set_seen(&name, board, self.world.db.last_note(board)?)?;
+            self.world.db.set_seen(&user, board, self.world.db.last_note(board)?)?;
         }
         let oldest = rows.first().map(|n| n.id).unwrap_or(i64::MAX);
         if let Some(p) = self.players.get_mut(&id) {
@@ -235,7 +236,7 @@ impl Game {
         let notes = rows
             .into_iter()
             .filter(|n| !muted.contains(&n.author.to_lowercase()))
-            .map(|n| Note { id: n.id, author: n.author, text: n.text, when: when(n.at) })
+            .map(|n| Note { id: n.id, author: self.world.nick(&n.author), text: n.text, when: when(n.at) })
             .collect();
         let msg = ToClient::Board { board, title: self.board_title(board), mode, notes, more, page, weeks };
         if let Some(p) = self.players.get(&id) {
@@ -246,6 +247,7 @@ impl Game {
 
     pub(super) fn cmd_post(&mut self, id: u64, text: &str) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let Some((board, journal)) = self.board_here(x, y) else {
             self.say1(id, Line::plain("You need to be at a noticeboard to post. Make one with 'make a noticeboard'!"));
             return Ok(());
@@ -257,9 +259,9 @@ impl Game {
         }
         let at = now();
         let note_id = self.world.db.add_note(board, &name, &text, at, &week_key(at), None)?;
-        let was_following = self.world.db.membership(&name, board).is_some_and(|m| m.0);
-        self.world.db.set_following(&name, board, true)?;
-        self.world.db.set_seen(&name, board, note_id)?;
+        let was_following = self.world.db.membership(&user, board).is_some_and(|m| m.0);
+        self.world.db.set_following(&user, board, true)?;
+        self.world.db.set_seen(&user, board, note_id)?;
 
         let what = if journal { "the Island Journal" } else { "the noticeboard" };
         let place = self.world.place_title(x, y);
@@ -267,7 +269,7 @@ impl Game {
         let update = self.board_update(board, note);
         let followers = self.world.db.followers(board)?;
         for (&pid, p) in &self.players {
-            if pid != id && !p.hears(&name) {
+            if pid != id && !p.hears(&user) {
                 continue;
             }
             let here = (p.x, p.y) == (x, y);
@@ -275,7 +277,7 @@ impl Game {
                 Line::new().c(Col::Yellow, format!("📌 You post on {what}: ")).c(Col::White, text.clone())
             } else if here {
                 Line::new().c(Col::Yellow, "📌 ").b(Col::Yellow, &name).c(Col::Yellow, format!(" posts on {what}: ")).c(Col::White, text.clone())
-            } else if followers.contains(&p.name) {
+            } else if followers.contains(&p.user) {
                 Line::new().c(Col::Yellow, "📌 ").b(Col::Yellow, &name).c(Col::Yellow, format!(" posted at {place}: ")).c(Col::White, text.clone())
             } else {
                 continue;
@@ -290,12 +292,13 @@ impl Game {
     }
 
     pub(super) fn cmd_follow(&mut self, id: u64, follow: bool) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, _name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
         let Some((board, _)) = self.board_here(x, y) else {
             self.say1(id, Line::plain("Stand at a noticeboard to follow or unfollow it."));
             return Ok(());
         };
-        self.world.db.set_following(&name, board, follow)?;
+        self.world.db.set_following(&user, board, follow)?;
         let msg = if follow {
             "📌 Following. You'll hear about new notes here wherever you are."
         } else {
@@ -306,8 +309,9 @@ impl Game {
     }
 
     pub(super) fn cmd_boards(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(()) };
-        let followed = self.world.db.followed(&name)?;
+        let Some((_, _, _name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
+        let followed = self.world.db.followed(&user)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "📌 Boards you follow")];
         if followed.is_empty() {
             lines.push(Line::col(Col::Dim, "  None yet. Post on a board to follow it."));

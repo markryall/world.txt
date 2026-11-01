@@ -27,7 +27,10 @@ const TICK: Duration = Duration::from_secs(3);
 const SHOUT_RANGE: i64 = 10;
 
 struct Player {
+    /// Nickname: what everyone sees, and it can change.
     name: String,
+    /// Username: fixed forever, and what everything of theirs is stored under.
+    user: String,
     x: i64,
     y: i64,
     tx: ClientTx,
@@ -192,24 +195,31 @@ impl Game {
     // ---- arriving and leaving -----------------------------------------
 
     fn join(&mut self, id: u64, raw: String, bot: bool, key: Option<String>, tx: ClientTx) {
-        let name = clean_name(&raw);
-        if name.is_empty() {
+        let typed = clean_name(&raw);
+        if typed.is_empty() {
             let _ = tx.send(ToClient::Bye { reason: "Names need a letter or two, darling.".into() });
             return;
         }
-        if self.players.values().any(|p| p.name.eq_ignore_ascii_case(&name)) {
-            let _ = tx.send(ToClient::Bye { reason: format!("Someone called {name} is already here.") });
-            return;
+        // Their account, by nickname or username. A name nobody has used starts a new one.
+        let existing = self.world.db.resolve_user(&typed);
+        let name = existing.as_deref().map_or(typed.clone(), |u| self.world.nick(u));
+        if let Some(u) = &existing {
+            if self.players.values().any(|p| &p.user == u) {
+                let _ = tx.send(ToClient::Bye { reason: format!("Someone called {name} is already here.") });
+                return;
+            }
         }
-        let claim = match super::names::check(self.world.db.name_key(&name).as_deref(), key.as_deref()) {
+        let stored_key = existing.as_deref().and_then(|u| self.world.db.name_key(u));
+        let claim = match super::names::check(stored_key.as_deref(), key.as_deref()) {
             super::names::NameCheck::Taken(tried) => {
+                let user = existing.clone().unwrap_or_default();
                 let reason = match tried {
                     Some(hash) => {
                         let fresh = super::names::knock_code(self.rng.next());
-                        match self.world.db.add_knock(&name, &hash, &fresh) {
+                        match self.world.db.add_knock(&user, &hash, &fresh) {
                             Ok(code) => {
                                 self.tell_keepers_about_knocks();
-                                println!("🔐 {name} knocked from a new device (ask them for their code, then: welcome {name} <code>)");
+                                println!("🔐 {name} ({user}) knocked from a new device (ask them for their code, then: welcome {user} <code>)");
                                 format!(
                                     "🔐 {name} is linked to another device. To use this one, ask an island keeper \
                                      to let you in and tell them this code: {code} \
@@ -217,7 +227,7 @@ impl Game {
                                 )
                             }
                             Err(e) => {
-                                eprintln!("remembering a knock for {name}: {e}");
+                                eprintln!("remembering a knock for {user}: {e}");
                                 format!("🔐 The name {name} is linked to another device. Try a different name!")
                             }
                         }
@@ -232,8 +242,9 @@ impl Game {
         };
         let key_hash = key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(super::names::hash);
         let now = boards::now();
-        if !self.is_keeper(&name) {
-            if let Some(until) = self.world.db.banned_until(&name, key_hash.as_deref(), now) {
+        let ban_name = existing.clone().unwrap_or_default();
+        if !existing.as_deref().is_some_and(|u| self.is_keeper(u)) {
+            if let Some(until) = self.world.db.banned_until(&ban_name, key_hash.as_deref(), now) {
                 let mins = ((until - now) / 60).max(1);
                 let _ = tx.send(ToClient::Bye {
                     reason: format!("🌙 A keeper has asked you to take a break. You can come back in about {mins} minutes."),
@@ -241,22 +252,39 @@ impl Game {
                 return;
             }
         }
-        let saved = self.world.db.player(&name);
-        let first_time = saved.is_none() && !bot;
+        let saved = existing.as_deref().and_then(|u| self.world.db.player(u));
+        let first_time = existing.is_none() && !bot;
         let tutorial = if bot { tutorial::DONE } else { saved.map_or(0, |s| s.2) };
         let (x, y) = saved
             .map(|s| (s.0, s.1))
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
+        let user = match existing {
+            Some(u) => u,
+            None => {
+                let u = loop {
+                    let u = super::names::username(self.rng.next());
+                    if self.world.db.resolve_user(&u).is_none() {
+                        break u;
+                    }
+                };
+                if let Err(e) = self.world.db.create_user(&u, &name, x, y) {
+                    eprintln!("creating {u}: {e}");
+                }
+                self.world.nicks.insert(u.clone(), name.clone());
+                u
+            }
+        };
         let sky = self.world.weather.sky_at(x, y);
-        let companion = self.world.db.companion(&name);
-        let muted = self.world.db.mutes(&name).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
+        let companion = self.world.db.companion(&user);
+        let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         if let Some(hash) = claim {
-            if let Err(e) = self.world.db.claim_name(&name, &hash, x, y) {
-                eprintln!("claiming {name}: {e}");
+            if let Err(e) = self.world.db.claim_name(&user, &hash, x, y) {
+                eprintln!("claiming {user}: {e}");
             }
         }
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, companion });
+        let full = super::names::full(&name, &user);
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, companion });
 
         self.send(
             id,
@@ -270,10 +298,11 @@ impl Game {
         self.status(id);
         if first_time {
             self.say1(id, Line::new().b(Col::Yellow, format!("🐣 Welcome to the island, {name}! Here's how to get started.")));
+            self.say1(id, Line::col(Col::Dim, format!("Your username is {user}: it's yours forever. Your nickname ({name}) can change any time: nickname Pip")));
         }
         self.show_hint(id);
         self.deliver_mail(id);
-        if self.is_keeper(&name) {
+        if self.is_keeper(&user) {
             self.tell_keepers_about_knocks();
         }
         for (&pid, p) in &self.players {
@@ -281,9 +310,9 @@ impl Game {
                 let line = if p.x == x && p.y == y {
                     Line::new().b(Col::Cyan, &name).c(Col::Cyan, " appears, blinking, as if from a dream.")
                 } else if first_time {
-                    Line::col(Col::Dim, format!("🐣 {name} has arrived on the island for the first time!"))
+                    Line::col(Col::Dim, format!("🐣 {full} has arrived on the island for the first time!"))
                 } else {
-                    Line::col(Col::Dim, format!("✧ {name} has wandered into the world."))
+                    Line::col(Col::Dim, format!("✧ {full} has wandered into the world."))
                 };
                 let _ = p.tx.send(ToClient::Lines { lines: vec![line] });
             }
@@ -295,8 +324,8 @@ impl Game {
         let Some(p) = self.players.remove(&id) else { return };
         if p.bot {
             // Residents keep no position or progress.
-        } else if let Err(e) = self.world.db.save_player(&p.name, p.x, p.y, p.tutorial) {
-            eprintln!("saving {}: {e}", p.name);
+        } else if let Err(e) = self.world.db.save_player(&p.user, p.x, p.y, p.tutorial) {
+            eprintln!("saving {}: {e}", p.user);
         }
         for o in self.players.values() {
             let line = if o.x == p.x && o.y == p.y {
@@ -358,7 +387,8 @@ impl Game {
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
             "befriend" | "feed" | "tame" => return self.cmd_befriend(id, rest),
-            "nickname" | "petname" => return self.cmd_nickname(id, rest),
+            "petname" => return self.cmd_nickname(id, rest),
+            "nickname" | "nick" => return self.cmd_rename(id, rest),
             "pet" | "pat" | "cuddle" => return self.cmd_pet(id),
             "dismiss" => return self.cmd_let_go(id),
             "let" if rest.trim_start().starts_with("go") => return self.cmd_let_go(id),
@@ -507,9 +537,9 @@ impl Game {
             return Ok(());
         }
         let Some(p) = self.players.get(&id) else { return Ok(()) };
-        let (x, y, name) = (p.x, p.y, p.name.clone());
+        let (x, y, name, user) = (p.x, p.y, p.name.clone(), p.user.clone());
         self.say1(id, Line::new().c(Col::Dim, "You say, ").c(Col::White, format!("\"{msg}\"")));
-        self.tell_here_from(x, y, id, &name, Line::new().b(Col::Cyan, &name).c(Col::Dim, " says, ").c(Col::White, format!("\"{msg}\"")));
+        self.tell_here_from(x, y, id, &user, Line::new().b(Col::Cyan, &name).c(Col::Dim, " says, ").c(Col::White, format!("\"{msg}\"")));
         self.react_to_words(x, y);
         Ok(())
     }
@@ -520,10 +550,10 @@ impl Game {
             return Ok(());
         }
         let Some(p) = self.players.get(&id) else { return Ok(()) };
-        let (x, y, name) = (p.x, p.y, p.name.clone());
+        let (x, y, name, user) = (p.x, p.y, p.name.clone(), p.user.clone());
         let line = Line::new().b(Col::Cyan, &name).c(Col::Cyan, format!(" {msg}"));
         self.say1(id, line.clone());
-        self.tell_here_from(x, y, id, &name, line);
+        self.tell_here_from(x, y, id, &user, line);
         Ok(())
     }
 
@@ -535,7 +565,7 @@ impl Game {
         let Some(me) = self.players.get(&id) else { return Ok(()) };
         self.say1(id, Line::new().c(Col::Dim, "You shout, ").b(Col::White, format!("\"{msg}!\"")));
         for (&pid, p) in &self.players {
-            if pid == id || !p.hears(&me.name) {
+            if pid == id || !p.hears(&me.user) {
                 continue;
             }
             let (dx, dy) = (me.x - p.x, me.y - p.y);
@@ -620,8 +650,8 @@ impl Game {
     fn save_progress(&self, id: u64) {
         let Some(p) = self.players.get(&id) else { return };
         if !p.bot {
-            if let Err(e) = self.world.db.save_player(&p.name, p.x, p.y, p.tutorial) {
-                eprintln!("saving {}: {e}", p.name);
+            if let Err(e) = self.world.db.save_player(&p.user, p.x, p.y, p.tutorial) {
+                eprintln!("saving {}: {e}", p.user);
             }
         }
     }
@@ -655,7 +685,7 @@ impl Game {
         if n.is_empty() {
             return None;
         }
-        let exact = self.players.iter().find(|(_, p)| p.name.to_lowercase() == n);
+        let exact = self.players.iter().find(|(_, p)| p.name.to_lowercase() == n || p.user == n);
         let prefix = || self.players.iter().find(|(_, p)| p.name.to_lowercase().starts_with(&n));
         exact.or_else(prefix).map(|(&pid, _)| pid)
     }
@@ -672,34 +702,34 @@ impl Game {
             self.say1(id, Line::plain("You mutter to yourself. Very wise."));
             return Ok(());
         }
-        let from = self.players[&id].name.clone();
-        let target = self.players[&tid].name.clone();
+        let (from, from_user) = (self.players[&id].name.clone(), self.players[&id].user.clone());
+        let (target, target_user) = (self.players[&tid].name.clone(), self.players[&tid].user.clone());
         self.say1(id, Line::new().c(Col::Pink, format!("✉ You say to {target}: ")).c(Col::White, msg));
-        if !self.players[&tid].hears(&from) {
+        if !self.players[&tid].hears(&from_user) {
             return Ok(()); // muted: quietly not delivered
         }
         self.say1(tid, Line::new().b(Col::Pink, format!("✉ {from}")).c(Col::Pink, " says to you: ").c(Col::White, msg));
         if let Some(t) = self.players.get_mut(&tid) {
-            t.reply_to = Some(from);
+            t.reply_to = Some(from_user);
         }
         if let Some(me) = self.players.get_mut(&id) {
-            me.reply_to.get_or_insert(target);
+            me.reply_to.get_or_insert(target_user);
         }
         Ok(())
     }
 
     /// `@Name` for someone who isn't here: keep it for when they next arrive.
     fn leave_mail(&mut self, id: u64, to: &str, msg: &str) -> anyhow::Result<()> {
-        let target = clean_name(to);
-        if target.is_empty() || self.world.db.player(&target).is_none() {
+        let Some(target_user) = self.world.db.resolve_user(to) else {
             self.say1(id, Line::plain(format!("There's nobody called {to} on the island. Try 'who'.")));
             return Ok(());
-        }
-        let Some((_, _, from)) = self.here(id) else { return Ok(()) };
+        };
+        let target = self.world.nick(&target_user);
+        let from = self.user(id);
         let text: String = msg.chars().take(280).collect();
-        self.world.db.send_mail(&target, &from, &text, boards::now())?;
+        self.world.db.send_mail(&target_user, &from, &text, boards::now())?;
         if let Some(me) = self.players.get_mut(&id) {
-            me.reply_to = Some(target.clone());
+            me.reply_to = Some(target_user.clone());
         }
         self.say1(id, Line::new().c(Col::Pink, format!("📬 {target} isn't here right now, so your message will be waiting for them: ")).c(Col::White, text));
         Ok(())
@@ -708,7 +738,7 @@ impl Game {
     /// Hand over anything people said while this player was away.
     fn deliver_mail(&mut self, id: u64) {
         let Some(p) = self.players.get(&id) else { return };
-        let Ok(mail) = self.world.db.take_mail(&p.name) else { return };
+        let Ok(mail) = self.world.db.take_mail(&p.user) else { return };
         let mail: Vec<_> = mail.into_iter().filter(|(from, _, _)| p.hears(from)).collect();
         if mail.is_empty() {
             return;
@@ -722,7 +752,7 @@ impl Game {
                 3600..86_400 => format!("{}h ago", ago / 3600),
                 _ => format!("{}d ago", ago / 86_400),
             };
-            lines.push(Line::new().t("  ").b(Col::Pink, from.clone()).c(Col::Dim, format!(" ({when}): ")).c(Col::White, text.clone()));
+            lines.push(Line::new().t("  ").b(Col::Pink, self.world.nick(from)).c(Col::Dim, format!(" ({when}): ")).c(Col::White, text.clone()));
         }
         lines.push(Line::col(Col::Dim, "  (reply to answer the last one)"));
         let last = mail.last().map(|m| m.0.clone());
@@ -737,9 +767,9 @@ impl Game {
             self.say1(id, Line::plain("Chat what? Everyone in the world will hear it."));
             return Ok(());
         }
-        let from = self.players[&id].name.clone();
+        let (from, from_user) = (self.players[&id].name.clone(), self.players[&id].user.clone());
         let line = Line::new().c(Col::Green, "💬 ").b(Col::Green, &from).c(Col::Green, ": ").c(Col::White, msg);
-        for p in self.players.values().filter(|p| p.hears(&from)) {
+        for p in self.players.values().filter(|p| p.hears(&from_user)) {
             let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
         }
         Ok(())
@@ -773,7 +803,8 @@ impl Game {
                 Line::new()
                     .c(Col::Cyan, if p.bot { "  🐾 " } else { "  ☺ " })
                     .b(Col::Cyan, &p.name)
-                    .c(Col::Dim, format!("  ({})", self.world.place_title(p.x, p.y)))
+                    .c(Col::Dim, format!(" {}", p.user))
+                    .c(Col::Dim, format!("  · {}", self.world.place_title(p.x, p.y)))
                     .c(Col::Dim, if p.bot { "  island resident" } else { "" }),
             );
         }
@@ -798,7 +829,7 @@ impl Game {
                 if let Some(a) = &t.action {
                     lines.push(Line::plain(format!("It {a} {when}.")));
                 }
-                lines.push(Line::col(Col::Dim, format!("Made by {}.", t.maker)));
+                lines.push(Line::col(Col::Dim, format!("Made by {}.", self.world.nick(&t.maker))));
                 self.send(id, lines);
             }
             None => self.say1(id, Line::plain(format!("You don't see any {what} here."))),
@@ -959,7 +990,7 @@ impl Game {
         }
         let (name, action, trigger) = parse_make(text);
         if music::is_music_box(&name) {
-            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &who, Some(music::music_kind()))?;
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(music::music_kind()))?;
             self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach C E G E C"));
             self.tell_here(x, y, id, Line::col(Col::Pink, format!("🎶 {who} makes {name}.")));
             self.status_all();
@@ -970,36 +1001,71 @@ impl Game {
                 self.say1(id, Line::plain("There's already a board here. Try 'post hello!'"));
                 return Ok(());
             }
-            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &who, Some(boards::board_kind()))?;
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(boards::board_kind()))?;
             self.say1(id, Line::new().c(Col::Yellow, "📌 You put up ").b(Col::Yellow, &name).c(Col::Yellow, ". Anyone passing can read it and post notes."));
             self.say1(id, Line::col(Col::Dim, "Try: post hello everyone! · read · follow"));
             self.tell_here(x, y, id, Line::col(Col::Yellow, format!("📌 {who} puts up {name}.")));
             self.status_all();
             return Ok(());
         }
-        self.world.add_thing(x, y, name.clone(), action, trigger, &who, None)?;
+        self.world.add_thing(x, y, name.clone(), action, trigger, &self.user(id), None)?;
         self.say1(id, Line::new().c(Col::Yellow, "✨ You make ").b(Col::Yellow, &name).c(Col::Yellow, "."));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("✨ {who} makes {name}.")));
         self.status_all();
         Ok(())
     }
 
-    fn is_keeper(&self, name: &str) -> bool {
-        self.keepers.iter().any(|k| k.trim().eq_ignore_ascii_case(name))
+    /// Keepers can be listed by username or nickname.
+    fn is_keeper(&self, user: &str) -> bool {
+        let nick = self.world.nick(user);
+        self.keepers.iter().any(|k| k.trim().eq_ignore_ascii_case(user) || k.trim().eq_ignore_ascii_case(&nick))
+    }
+
+    /// `nickname Pip`: change what someone's called. Their username never changes.
+    fn cmd_rename(&mut self, id: u64, new: &str) -> anyhow::Result<()> {
+        let Some(p) = self.players.get(&id) else { return Ok(()) };
+        let (old, user) = (p.name.clone(), p.user.clone());
+        let nick = clean_name(new);
+        if nick.is_empty() {
+            self.say1(id, Line::plain(format!("You're {old}, and your username is {user}. Change your nickname with: nickname Pip")));
+            return Ok(());
+        }
+        // Until invites arrive, people still join by nickname, so they must be unique.
+        if self.world.db.resolve_user(&nick).is_some_and(|u| u != user) {
+            self.say1(id, Line::plain(format!("Someone's already called {nick}. Try another?")));
+            return Ok(());
+        }
+        self.world.db.set_nickname(&user, &nick)?;
+        self.world.nicks.insert(user.clone(), nick.clone());
+        if let Some(p) = self.players.get_mut(&id) {
+            p.name = nick.clone();
+        }
+        let (x, y) = (self.players[&id].x, self.players[&id].y);
+        self.say1(id, Line::col(Col::Cyan, format!("✨ You're {nick} now. (Your username is still {user}.)")));
+        self.tell_here(x, y, id, Line::col(Col::Cyan, format!("✨ {old} is now called {nick} ({user}).")));
+        self.status_all();
+        Ok(())
+    }
+
+    /// Someone's username, from their connection.
+    fn user(&self, id: u64) -> String {
+        self.players.get(&id).map(|p| p.user.clone()).unwrap_or_default()
     }
 
     /// Only whoever made something (or an island keeper) may unmake or push it.
     fn may_change(&self, who: &str, i: usize) -> bool {
+        // `who` is a username.
         self.world.things[i].maker.eq_ignore_ascii_case(who) || self.is_keeper(who)
     }
 
     fn not_yours(&self, i: usize) -> Line {
         let t = &self.world.things[i];
         let what = crate::server::world::strip_article(&t.name).to_string();
-        if self.players.values().any(|p| p.name == t.maker) || self.world.db.player(&t.maker).is_some() {
-            Line::plain(format!("That's {}'s {what}. Only {} can unmake or move it. (Ask them: @{} ...)", t.maker, t.maker, t.maker))
+        let maker = self.world.nick(&t.maker);
+        if self.world.nicks.contains_key(&t.maker) {
+            Line::plain(format!("That's {maker}'s {what}. Only {maker} can unmake or move it. (Ask them: @{maker} ...)"))
         } else {
-            Line::plain(format!("That {what} belongs to {}. It stays as it is.", t.maker))
+            Line::plain(format!("That {what} belongs to {maker}. It stays as it is."))
         }
     }
 
@@ -1010,23 +1076,24 @@ impl Game {
             return;
         }
         let mut lines = Vec::new();
-        for (name, devices, ago) in knocks {
+        for (user, devices, ago) in knocks {
+            let name = super::names::full(&self.world.nick(&user), &user);
             let when = if ago < 60 { "just now".to_string() } else if ago < 3600 { format!("{}m ago", ago / 60) } else { format!("{}h ago", ago / 3600) };
             let who = if devices == 1 { "Someone wants".to_string() } else { format!("{devices} devices want") };
             lines.push(
                 Line::new()
                     .c(Col::Yellow, format!("🔐 {who} to come in as {name} ({when}). Ask {name} for the code on their screen, then type: "))
-                    .b(Col::Yellow, format!("welcome {name} <code>")),
+                    .b(Col::Yellow, format!("welcome {user} <code>")),
             );
         }
-        for p in self.players.values().filter(|p| self.is_keeper(&p.name)) {
+        for p in self.players.values().filter(|p| self.is_keeper(&p.user)) {
             let _ = p.tx.send(ToClient::Lines { lines: lines.clone() });
         }
     }
 
     fn cmd_welcome(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
-        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
-        if !self.is_keeper(&who) {
+        if !self.players.contains_key(&id) { return Ok(()) }
+        if !self.is_keeper(&self.user(id)) {
             self.say1(id, Line::plain("Only island keepers can let a new device in."));
             return Ok(());
         }
@@ -1035,7 +1102,8 @@ impl Game {
             self.say1(id, Line::plain("Ask them for the code on their screen, then: welcome Poppy FROG-42"));
             return Ok(());
         };
-        match self.world.db.welcome(name, code)? {
+        let user = self.world.db.resolve_user(name).unwrap_or_else(|| name.to_string());
+        match self.world.db.welcome(&user, code)? {
             Some(n) => self.say1(id, Line::col(Col::Green, format!("✅ {n}'s new device can come in now. (Any other device for {n} won't work any more.)"))),
             None => self.say1(id, Line::plain(format!("That code doesn't match anyone knocking as {name}. Check the code on their screen?"))),
         }
@@ -1043,35 +1111,37 @@ impl Game {
     }
 
     fn cmd_mute(&mut self, id: u64, name: &str, on: bool) -> anyhow::Result<()> {
-        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        if !self.players.contains_key(&id) { return Ok(()) }
         let name = name.trim();
         if name.is_empty() {
             self.say1(id, Line::plain(if on { "Mute who? e.g. 'mute Sam'" } else { "Unmute who?" }));
             return Ok(());
         }
-        // Use the name as the world knows it, online or not.
+        // Find them online or not, by nickname or username.
         let known = self
             .find_player(name)
-            .map(|pid| self.players[&pid].name.clone())
-            .or_else(|| self.world.db.player(&clean_name(name)).map(|_| clean_name(name)));
-        let Some(target) = known else {
+            .map(|pid| self.players[&pid].user.clone())
+            .or_else(|| self.world.db.resolve_user(name));
+        let Some(target_user) = known else {
             self.say1(id, Line::plain(format!("There's nobody called {name} on the island.")));
             return Ok(());
         };
-        if target.eq_ignore_ascii_case(&who) {
+        let target = super::names::full(&self.world.nick(&target_user), &target_user);
+        let who = self.user(id);
+        if target_user == who {
             self.say1(id, Line::plain("You can't mute yourself, silly."));
             return Ok(());
         }
-        self.world.db.set_mute(&who, &target, on)?;
+        self.world.db.set_mute(&who, &target_user, on)?;
         if let Some(p) = self.players.get_mut(&id) {
             if on {
-                p.muted.insert(target.to_lowercase());
+                p.muted.insert(target_user.to_lowercase());
             } else {
-                p.muted.remove(&target.to_lowercase());
+                p.muted.remove(&target_user.to_lowercase());
             }
         }
         let msg = if on {
-            format!("🔇 You won't hear from {target} any more. They aren't told. (unmute {target} to undo)")
+            format!("🔇 You won't hear from {target} any more. They aren't told. (unmute {target_user} to undo)")
         } else {
             format!("🔈 You'll hear from {target} again.")
         };
@@ -1080,8 +1150,14 @@ impl Game {
     }
 
     fn cmd_mutes(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
-        let mutes = self.world.db.mutes(&who)?;
+        let Some((_, _, _who)) = self.here(id) else { return Ok(()) };
+        let mutes: Vec<String> = self
+            .world
+            .db
+            .mutes(&self.user(id))?
+            .into_iter()
+            .map(|u| super::names::full(&self.world.nick(&u), &u))
+            .collect();
         let msg = if mutes.is_empty() {
             "You haven't muted anyone.".to_string()
         } else {
@@ -1093,7 +1169,7 @@ impl Game {
 
     fn cmd_kick(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
         let Some((_, _, who)) = self.here(id) else { return Ok(()) };
-        if !self.is_keeper(&who) {
+        if !self.is_keeper(&self.user(id)) {
             self.say1(id, Line::plain("Only island keepers can ask someone to take a break. You can 'mute' them though."));
             return Ok(());
         }
@@ -1104,15 +1180,22 @@ impl Game {
         };
         let minutes: i64 = words.next().and_then(|m| m.parse().ok()).unwrap_or(30).clamp(1, 7 * 24 * 60);
         let target = self.find_player(name);
-        let (tname, thash) = match target {
-            Some(pid) => (self.players[&pid].name.clone(), self.players[&pid].key_hash.clone()),
-            None => (clean_name(name), None),
+        let (tuser, thash) = match target {
+            Some(pid) => (self.players[&pid].user.clone(), self.players[&pid].key_hash.clone()),
+            None => match self.world.db.resolve_user(name) {
+                Some(u) => (u, None),
+                None => {
+                    self.say1(id, Line::plain(format!("There's nobody called {name} on the island.")));
+                    return Ok(());
+                }
+            },
         };
-        if self.is_keeper(&tname) {
+        let tname = super::names::full(&self.world.nick(&tuser), &tuser);
+        if self.is_keeper(&tuser) {
             self.say1(id, Line::plain("Keepers can't kick other keepers."));
             return Ok(());
         }
-        self.world.db.add_ban(&tname, thash.as_deref(), boards::now() + minutes * 60)?;
+        self.world.db.add_ban(&tuser, thash.as_deref(), boards::now() + minutes * 60)?;
         if let Some(pid) = target {
             if let Some(p) = self.players.get(&pid) {
                 let _ = p.tx.send(ToClient::Bye {
@@ -1121,18 +1204,19 @@ impl Game {
             }
         }
         let gone = if target.is_some() { "has been sent off" } else { "isn't here, but" };
-        self.say1(id, Line::col(Col::Yellow, format!("👢 {tname} {gone} for {minutes} minutes (name and device). 'unkick {tname}' to let them back early.")));
+        self.say1(id, Line::col(Col::Yellow, format!("👢 {tname} {gone} for {minutes} minutes (name and device). 'unkick {tuser}' to let them back early.")));
         println!("👢 {who} kicked {tname} for {minutes} minutes");
         Ok(())
     }
 
     fn cmd_unkick(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
-        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
-        if !self.is_keeper(&who) {
+        if !self.players.contains_key(&id) { return Ok(()) }
+        if !self.is_keeper(&self.user(id)) {
             self.say1(id, Line::plain("Only island keepers can do that."));
             return Ok(());
         }
-        let msg = if self.world.db.lift_ban(name.trim())? {
+        let user = self.world.db.resolve_user(name).unwrap_or_else(|| name.trim().to_string());
+        let msg = if self.world.db.lift_ban(&user)? {
             format!("🌤 {} can come back whenever they like.", name.trim())
         } else {
             format!("{} wasn't on a break.", name.trim())
@@ -1142,12 +1226,13 @@ impl Game {
     }
 
     fn cmd_unlink(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
-        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
-        if !self.is_keeper(&who) {
+        if !self.players.contains_key(&id) { return Ok(()) }
+        if !self.is_keeper(&self.user(id)) {
             self.say1(id, Line::plain("Only island keepers can release a name."));
             return Ok(());
         }
-        let msg = if self.world.db.release_name(name.trim())? {
+        let user = self.world.db.resolve_user(name).unwrap_or_else(|| name.trim().to_string());
+        let msg = if self.world.db.release_name(&user)? {
             format!("🔓 {} is free: the next device to use that name will claim it.", name.trim())
         } else {
             format!("Nobody had claimed '{}', so there was nothing to release.", name.trim())
@@ -1157,8 +1242,9 @@ impl Game {
     }
 
     fn cmd_undo(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
-        let restored = self.world.undo_remove(&who)?.map(|t| (t.x, t.y, t.name.clone()));
+        if !self.players.contains_key(&id) { return Ok(()) }
+        let me = self.user(id);
+        let restored = self.world.undo_remove(&me)?.map(|t| (t.x, t.y, t.name.clone()));
         match restored {
             Some((x, y, name)) => {
                 let place = self.world.place_title(x, y);
@@ -1177,11 +1263,11 @@ impl Game {
             Some(i) if self.world.things[i].kind.as_deref() == Some(boards::journal_kind()) => {
                 self.say1(id, Line::plain("The Island Journal belongs to everyone. It stays right where it is."));
             }
-            Some(i) if !what.is_empty() && !self.may_change(&who, i) => {
+            Some(i) if !what.is_empty() && !self.may_change(&self.user(id), i) => {
                 self.say1(id, self.not_yours(i));
             }
             Some(i) if !what.is_empty() => {
-                let t = self.world.remove_thing(i, &who)?;
+                let t = self.world.remove_thing(i, &self.user(id))?;
                 self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
                 self.say1(id, Line::col(Col::Dim, "(changed your mind? type undo)"));
                 self.tell_here(x, y, id, Line::col(Col::Dim, format!("{who} unmakes {}.", t.name)));
@@ -1209,7 +1295,7 @@ impl Game {
             self.say1(id, Line::plain("The Island Journal won't budge. It belongs right here."));
             return Ok(());
         }
-        if !self.may_change(&who, i) {
+        if !self.may_change(&self.user(id), i) {
             self.say1(id, self.not_yours(i));
             return Ok(());
         }
@@ -1460,6 +1546,7 @@ fn help() -> Vec<Line> {
         h("hum C E G", "a little tune (hum together to jam!)"),
         h("make a music box / teach C E G / play", "a box that remembers your tune"),
         h("sit / rest / dance / wave", "vibes"),
+        h("nickname Pip", "change what you're called (your username stays)"),
         h("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
         Line::col(Col::Pink, "shape the land"),
         h("dig / fill", "ponds, earth, sandbanks"),
@@ -1474,7 +1561,7 @@ fn help() -> Vec<Line> {
         h("place daisy / release moth", "decorate, or set something free"),
         Line::col(Col::Pink, "companions"),
         h("befriend fox", "offer a wild animal a berry (it may take a few)"),
-        h("nickname Rusty / pet / let go", "your friend follows you everywhere"),
+        h("petname Rusty / pet / let go", "your friend follows you everywhere"),
         Line::col(Col::Pink, "crafting"),
         h("recipes", "what you can make from what you've gathered"),
         h("craft wind chime", "make it (then place it, or give it away)"),

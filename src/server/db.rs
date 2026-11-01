@@ -90,10 +90,44 @@ impl Db {
         );
         let _ = conn.execute("ALTER TABLE things ADD COLUMN kind TEXT", []);
         let _ = conn.execute("ALTER TABLE players ADD COLUMN key_hash TEXT", []);
+        // Accounts: players.name is now a fixed username; the nickname is for show.
+        let _ = conn.execute("ALTER TABLE players ADD COLUMN nickname TEXT", []);
         // Unmade things are tucked away rather than deleted, so they can come back.
         let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_by TEXT", []);
         let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_at INTEGER", []);
         Ok(Db { conn })
+    }
+
+    /// Find someone by username or nickname (the username wins if both match).
+    pub fn resolve_user(&self, name: &str) -> Option<String> {
+        self.conn
+            .query_row(
+                "SELECT name FROM players WHERE name = ?1 COLLATE NOCASE OR nickname = ?1 COLLATE NOCASE
+                 ORDER BY (name = ?1 COLLATE NOCASE) DESC LIMIT 1",
+                [name.trim()],
+                |r| r.get(0),
+            )
+            .ok()
+    }
+
+    /// Everyone's (username, nickname).
+    pub fn users(&self) -> anyhow::Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT name, COALESCE(nickname, name) FROM players")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn create_user(&self, user: &str, nickname: &str, x: i64, y: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO players (name, nickname, x, y, tutorial) VALUES (?1, ?2, ?3, ?4, 0)",
+            params![user, nickname, x, y],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_nickname(&self, user: &str, nickname: &str) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE players SET nickname = ?2 WHERE name = ?1", params![user, nickname])?;
+        Ok(())
     }
 
     pub fn meta(&self, key: &str) -> Option<String> {

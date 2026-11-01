@@ -39,15 +39,16 @@ impl Game {
             return Ok(());
         };
         let target = self.players[&tid].name.clone();
+        let target_user = self.players[&tid].user.clone();
         if tid == id {
             self.say1(id, Line::plain("You're already with yourself. 💅"));
             return Ok(());
         }
         if let Some(p) = self.players.get_mut(&id) {
-            p.travel = Some(target.clone());
+            p.travel = Some(target_user);
         }
         self.say1(id, Line::col(Col::Cyan, format!("🚶 You set off to find {target}. (type stop to stop)")));
-        if self.players[&tid].hears(&name) {
+        if self.players[&tid].hears(&self.user(id)) {
             self.say1(tid, Line::col(Col::Cyan, format!("🚶 {name} is coming to find you!")));
         }
         self.step_travellers();
@@ -66,8 +67,9 @@ impl Game {
     pub(super) fn step_travellers(&mut self) {
         let travellers: Vec<(u64, String)> =
             self.players.iter().filter_map(|(&id, p)| p.travel.clone().map(|t| (id, t))).collect();
-        for (id, target) in travellers {
-            let Some(tid) = self.find_player(&target).filter(|t| self.players[t].name == target) else {
+        for (id, target_user) in travellers {
+            let target = self.world.nick(&target_user);
+            let Some(tid) = self.find_player(&target_user).filter(|t| self.players[t].user == target_user) else {
                 self.say1(id, Line::plain(format!("{target} has drifted off to sleep, so you stop.")));
                 self.stop_travelling(id, true);
                 continue;
@@ -89,7 +91,7 @@ impl Game {
                 let name = self.players[&id].name.clone();
                 self.say1(id, Line::col(Col::Cyan, format!("🎉 You find {target}!")));
                 self.look(id);
-                if self.players[&tid].hears(&name) {
+                if self.players[&tid].hears(&self.user(id)) {
                     self.say1(tid, Line::col(Col::Cyan, format!("🎉 {name} found you!")));
                 }
             }
