@@ -231,8 +231,10 @@ impl Game {
         } else {
             vec![]
         };
+        let muted = self.players.get(&id).map(|p| p.muted.clone()).unwrap_or_default();
         let notes = rows
             .into_iter()
+            .filter(|n| !muted.contains(&n.author.to_lowercase()))
             .map(|n| Note { id: n.id, author: n.author, text: n.text, when: when(n.at) })
             .collect();
         let msg = ToClient::Board { board, title: self.board_title(board), mode, notes, more, page, weeks };
@@ -265,6 +267,9 @@ impl Game {
         let update = self.board_update(board, note);
         let followers = self.world.db.followers(board)?;
         for (&pid, p) in &self.players {
+            if pid != id && !p.hears(&name) {
+                continue;
+            }
             let here = (p.x, p.y) == (x, y);
             let line = if pid == id {
                 Line::new().c(Col::Yellow, format!("📌 You post on {what}: ")).c(Col::White, text.clone())

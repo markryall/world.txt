@@ -65,6 +65,10 @@ impl Db {
              CREATE TABLE IF NOT EXISTS door_knocks (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  name TEXT NOT NULL, key_hash TEXT NOT NULL, code TEXT NOT NULL, at INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS mutes (
+                 player TEXT NOT NULL, muted TEXT NOT NULL, PRIMARY KEY (player, muted));
+             CREATE TABLE IF NOT EXISTS bans (
+                 name TEXT NOT NULL, key_hash TEXT, until INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -429,6 +433,53 @@ impl Db {
         self.conn.execute("UPDATE players SET key_hash = ?2 WHERE name = ?1", params![stored, hash])?;
         self.conn.execute("DELETE FROM door_knocks WHERE name = ?1", [&stored])?;
         Ok(Some(stored))
+    }
+
+    // ---- mutes and kicks ----------------------------------------------------
+
+    pub fn mutes(&self, player: &str) -> anyhow::Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT muted FROM mutes WHERE player = ?1 ORDER BY muted")?;
+        let rows = stmt.query_map([player], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn set_mute(&self, player: &str, muted: &str, on: bool) -> anyhow::Result<()> {
+        if on {
+            self.conn.execute("INSERT OR IGNORE INTO mutes (player, muted) VALUES (?1, ?2)", params![player, muted])?;
+        } else {
+            self.conn.execute(
+                "DELETE FROM mutes WHERE player = ?1 AND muted = ?2 COLLATE NOCASE",
+                params![player, muted],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn add_ban(&self, name: &str, key_hash: Option<&str>, until: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO bans (name, key_hash, until) VALUES (?1, ?2, ?3)",
+            params![name, key_hash, until],
+        )?;
+        Ok(())
+    }
+
+    /// When a ban on this name or device ends, if one is still going.
+    pub fn banned_until(&self, name: &str, key_hash: Option<&str>, now: i64) -> Option<i64> {
+        self.conn
+            .query_row(
+                "SELECT MAX(until) FROM bans
+                 WHERE until > ?3 AND (name = ?1 COLLATE NOCASE OR (?2 IS NOT NULL AND key_hash = ?2))",
+                params![name, key_hash, now],
+                |r| r.get::<_, Option<i64>>(0),
+            )
+            .ok()
+            .flatten()
+    }
+
+    /// Lift any ban on a name (and the devices banned along with it).
+    pub fn lift_ban(&self, name: &str) -> anyhow::Result<bool> {
+        let n = self.conn.execute("DELETE FROM bans WHERE name = ?1 COLLATE NOCASE", [name])?;
+        Ok(n > 0)
     }
 
     /// Free a name so the next device to use it claims it. True if it was claimed.

@@ -40,6 +40,12 @@ than deleting it, so `undo` brings back the last thing you unmade (within a day)
 noticeboards with all their notes. Island keepers can tidy up anyone's things:
 `world.txt serve --keeper Mark` (or `WORLD_KEEPERS=Mark,Lu`).
 
+**Keeping it kind.** `mute Sam` means you stop hearing Sam's talk, emotes,
+shouts, private messages, chat and board notes. It's remembered, and Sam isn't
+told (`unmute Sam`, `mutes`). Keepers can `kick Sam` (30 minutes, or
+`kick Sam 60`): Sam is sent off for a break and can't come back as that name
+or from that device until it ends, or a keeper types `unkick Sam`.
+
 One port serves both doors: websocket upgrades go to the game, and plain HTTP
 gets the browser page (`web/index.html`, compiled into the binary).
 

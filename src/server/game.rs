@@ -36,6 +36,16 @@ struct Player {
     fishing: Option<u8>,
     /// Which board they're reading, for `read more`.
     reading: Option<boards::Reading>,
+    /// Lowercased names this player doesn't want to hear from.
+    muted: std::collections::HashSet<String>,
+    /// Hash of the device key they joined with, so a kick covers the device too.
+    key_hash: Option<String>,
+}
+
+impl Player {
+    fn hears(&self, from: &str) -> bool {
+        !self.muted.contains(&from.to_lowercase())
+    }
 }
 
 struct Game {
@@ -97,6 +107,15 @@ impl Game {
 
     fn say1(&self, id: u64, line: Line) {
         self.send(id, vec![line]);
+    }
+
+    /// Something `from` said or did, to everyone at (x, y) who hasn't muted them.
+    fn tell_here_from(&self, x: i64, y: i64, except: u64, from: &str, line: Line) {
+        for (&pid, p) in &self.players {
+            if pid != except && p.x == x && p.y == y && p.hears(from) {
+                let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
+            }
+        }
     }
 
     /// Everyone standing at (x, y) except `except`.
@@ -195,6 +214,17 @@ impl Game {
             super::names::NameCheck::Claim(hash) => Some(hash),
             super::names::NameCheck::Welcome => None,
         };
+        let key_hash = key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(super::names::hash);
+        let now = boards::now();
+        if !self.is_keeper(&name) {
+            if let Some(until) = self.world.db.banned_until(&name, key_hash.as_deref(), now) {
+                let mins = ((until - now) / 60).max(1);
+                let _ = tx.send(ToClient::Bye {
+                    reason: format!("🌙 A keeper has asked you to take a break. You can come back in about {mins} minutes."),
+                });
+                return;
+            }
+        }
         let saved = self.world.db.player(&name);
         let first_time = saved.is_none() && !bot;
         let tutorial = if bot { tutorial::DONE } else { saved.map_or(0, |s| s.2) };
@@ -203,12 +233,13 @@ impl Game {
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
+        let muted = self.world.db.mutes(&name).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         if let Some(hash) = claim {
             if let Err(e) = self.world.db.claim_name(&name, &hash, x, y) {
                 eprintln!("claiming {name}: {e}");
             }
         }
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None });
+        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash });
 
         self.send(
             id,
@@ -360,6 +391,11 @@ impl Game {
             "undo" => return self.cmd_undo(id),
             "welcome" | "letin" => return self.cmd_welcome(id, rest),
             "unlink" => return self.cmd_unlink(id, rest),
+            "mute" | "block" => return self.cmd_mute(id, rest, true),
+            "unmute" | "unblock" => return self.cmd_mute(id, rest, false),
+            "mutes" => return self.cmd_mutes(id),
+            "kick" => return self.cmd_kick(id, rest),
+            "unkick" => return self.cmd_unkick(id, rest),
             "push" | "carry" | "move" => return self.cmd_push(id, rest),
             "quit" | "exit" | "bye" => {
                 if let Some(p) = self.players.get(&id) {
@@ -420,7 +456,7 @@ impl Game {
         let Some(p) = self.players.get(&id) else { return Ok(()) };
         let (x, y, name) = (p.x, p.y, p.name.clone());
         self.say1(id, Line::new().c(Col::Dim, "You say, ").c(Col::White, format!("\"{msg}\"")));
-        self.tell_here(x, y, id, Line::new().b(Col::Cyan, &name).c(Col::Dim, " says, ").c(Col::White, format!("\"{msg}\"")));
+        self.tell_here_from(x, y, id, &name, Line::new().b(Col::Cyan, &name).c(Col::Dim, " says, ").c(Col::White, format!("\"{msg}\"")));
         self.react_to_words(x, y);
         Ok(())
     }
@@ -431,10 +467,10 @@ impl Game {
             return Ok(());
         }
         let Some(p) = self.players.get(&id) else { return Ok(()) };
-        let (x, y) = (p.x, p.y);
-        let line = Line::new().b(Col::Cyan, &p.name).c(Col::Cyan, format!(" {msg}"));
+        let (x, y, name) = (p.x, p.y, p.name.clone());
+        let line = Line::new().b(Col::Cyan, &name).c(Col::Cyan, format!(" {msg}"));
         self.say1(id, line.clone());
-        self.tell_here(x, y, id, line);
+        self.tell_here_from(x, y, id, &name, line);
         Ok(())
     }
 
@@ -446,7 +482,7 @@ impl Game {
         let Some(me) = self.players.get(&id) else { return Ok(()) };
         self.say1(id, Line::new().c(Col::Dim, "You shout, ").b(Col::White, format!("\"{msg}!\"")));
         for (&pid, p) in &self.players {
-            if pid == id {
+            if pid == id || !p.hears(&me.name) {
                 continue;
             }
             let (dx, dy) = (me.x - p.x, me.y - p.y);
@@ -486,10 +522,10 @@ impl Game {
             _ => "hums",
         };
         self.say1(id, Line::new().c(Col::Dim, format!("You {verb} ")).c(Col::Pink, &tune));
-        self.tell_here(x, y, id, Line::new().b(Col::Cyan, &name).c(Col::Dim, format!(" {verbs} ")).c(Col::Pink, &tune));
+        self.tell_here_from(x, y, id, &name, Line::new().b(Col::Cyan, &name).c(Col::Dim, format!(" {verbs} ")).c(Col::Pink, &tune));
         for (&pid, o) in &self.players {
             let d = (o.x - x).abs().max((o.y - y).abs());
-            if pid != id && (1..=2).contains(&d) {
+            if pid != id && (1..=2).contains(&d) && o.hears(&name) {
                 let _ = o.tx.send(ToClient::Lines {
                     lines: vec![Line::col(Col::Pink, format!("♪ You hear someone {verbs} nearby."))],
                 });
@@ -586,6 +622,9 @@ impl Game {
         let from = self.players[&id].name.clone();
         let target = self.players[&tid].name.clone();
         self.say1(id, Line::new().c(Col::Pink, format!("✉ You say to {target}: ")).c(Col::White, msg));
+        if !self.players[&tid].hears(&from) {
+            return Ok(()); // muted: quietly not delivered
+        }
         self.say1(tid, Line::new().b(Col::Pink, format!("✉ {from}")).c(Col::Pink, " says to you: ").c(Col::White, msg));
         if let Some(t) = self.players.get_mut(&tid) {
             t.reply_to = Some(from);
@@ -603,7 +642,7 @@ impl Game {
         }
         let from = self.players[&id].name.clone();
         let line = Line::new().c(Col::Green, "💬 ").b(Col::Green, &from).c(Col::Green, ": ").c(Col::White, msg);
-        for p in self.players.values() {
+        for p in self.players.values().filter(|p| p.hears(&from)) {
             let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
         }
         Ok(())
@@ -896,6 +935,105 @@ impl Game {
             Some(n) => self.say1(id, Line::col(Col::Green, format!("✅ {n}'s new device can come in now. (Any other device for {n} won't work any more.)"))),
             None => self.say1(id, Line::plain(format!("That code doesn't match anyone knocking as {name}. Check the code on their screen?"))),
         }
+        Ok(())
+    }
+
+    fn cmd_mute(&mut self, id: u64, name: &str, on: bool) -> anyhow::Result<()> {
+        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        let name = name.trim();
+        if name.is_empty() {
+            self.say1(id, Line::plain(if on { "Mute who? e.g. 'mute Sam'" } else { "Unmute who?" }));
+            return Ok(());
+        }
+        // Use the name as the world knows it, online or not.
+        let known = self
+            .find_player(name)
+            .map(|pid| self.players[&pid].name.clone())
+            .or_else(|| self.world.db.player(&clean_name(name)).map(|_| clean_name(name)));
+        let Some(target) = known else {
+            self.say1(id, Line::plain(format!("There's nobody called {name} on the island.")));
+            return Ok(());
+        };
+        if target.eq_ignore_ascii_case(&who) {
+            self.say1(id, Line::plain("You can't mute yourself, silly."));
+            return Ok(());
+        }
+        self.world.db.set_mute(&who, &target, on)?;
+        if let Some(p) = self.players.get_mut(&id) {
+            if on {
+                p.muted.insert(target.to_lowercase());
+            } else {
+                p.muted.remove(&target.to_lowercase());
+            }
+        }
+        let msg = if on {
+            format!("🔇 You won't hear from {target} any more. They aren't told. (unmute {target} to undo)")
+        } else {
+            format!("🔈 You'll hear from {target} again.")
+        };
+        self.say1(id, Line::col(Col::Dim, msg));
+        Ok(())
+    }
+
+    fn cmd_mutes(&mut self, id: u64) -> anyhow::Result<()> {
+        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        let mutes = self.world.db.mutes(&who)?;
+        let msg = if mutes.is_empty() {
+            "You haven't muted anyone.".to_string()
+        } else {
+            format!("🔇 Muted: {}", mutes.join(", "))
+        };
+        self.say1(id, Line::col(Col::Dim, msg));
+        Ok(())
+    }
+
+    fn cmd_kick(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        if !self.is_keeper(&who) {
+            self.say1(id, Line::plain("Only island keepers can ask someone to take a break. You can 'mute' them though."));
+            return Ok(());
+        }
+        let mut words = rest.split_whitespace();
+        let Some(name) = words.next() else {
+            self.say1(id, Line::plain("Kick who? e.g. 'kick Sam' or 'kick Sam 60' (minutes)"));
+            return Ok(());
+        };
+        let minutes: i64 = words.next().and_then(|m| m.parse().ok()).unwrap_or(30).clamp(1, 7 * 24 * 60);
+        let target = self.find_player(name);
+        let (tname, thash) = match target {
+            Some(pid) => (self.players[&pid].name.clone(), self.players[&pid].key_hash.clone()),
+            None => (clean_name(name), None),
+        };
+        if self.is_keeper(&tname) {
+            self.say1(id, Line::plain("Keepers can't kick other keepers."));
+            return Ok(());
+        }
+        self.world.db.add_ban(&tname, thash.as_deref(), boards::now() + minutes * 60)?;
+        if let Some(pid) = target {
+            if let Some(p) = self.players.get(&pid) {
+                let _ = p.tx.send(ToClient::Bye {
+                    reason: format!("🌙 A keeper has asked you to take a break. You can come back in about {minutes} minutes."),
+                });
+            }
+        }
+        let gone = if target.is_some() { "has been sent off" } else { "isn't here, but" };
+        self.say1(id, Line::col(Col::Yellow, format!("👢 {tname} {gone} for {minutes} minutes (name and device). 'unkick {tname}' to let them back early.")));
+        println!("👢 {who} kicked {tname} for {minutes} minutes");
+        Ok(())
+    }
+
+    fn cmd_unkick(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        if !self.is_keeper(&who) {
+            self.say1(id, Line::plain("Only island keepers can do that."));
+            return Ok(());
+        }
+        let msg = if self.world.db.lift_ban(name.trim())? {
+            format!("🌤 {} can come back whenever they like.", name.trim())
+        } else {
+            format!("{} wasn't on a break.", name.trim())
+        };
+        self.say1(id, Line::col(Col::Green, msg));
         Ok(())
     }
 
@@ -1214,6 +1352,7 @@ fn help() -> Vec<Line> {
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune"),
         h("sit / rest / dance / wave", "vibes"),
+        h("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
         Line::col(Col::Pink, "shape the land"),
         h("dig / fill", "ponds, earth, sandbanks"),
         h("plant tree|flowers|grass", "make things grow"),
@@ -1239,6 +1378,7 @@ fn help() -> Vec<Line> {
         Line::col(Col::Pink, "island keepers"),
         h("welcome Poppy FROG-42", "let Poppy in from a new device (the code is on her screen)"),
         h("unlink Poppy", "free a name for whoever uses it next"),
+        h("kick Sam [minutes] / unkick Sam", "send someone off for a break (30 min)"),
         Line::new(),
         Line::col(Col::Dim, format!("The island is {SIZE}×{SIZE}. A whole day passes in 24 minutes.")),
     ]
