@@ -25,7 +25,7 @@ pub fn paths(dir: &Path, name: &str) -> (PathBuf, PathBuf) {
     (dir.join(format!("{n}.log")), dir.join(format!("{n}.sock")))
 }
 
-pub async fn run(name: String, server: &str, password: Option<String>, dir: PathBuf, invite: Option<String>) -> anyhow::Result<()> {
+pub async fn run(name: String, server: &str, dir: PathBuf, invite: Option<String>) -> anyhow::Result<()> {
     std::fs::create_dir_all(&dir)?;
     let (log_path, sock_path) = paths(&dir, &name);
     let _ = std::fs::remove_file(&sock_path);
@@ -39,7 +39,7 @@ pub async fn run(name: String, server: &str, password: Option<String>, dir: Path
     let ws = connect_retry(server).await?;
     let (mut sink, mut source) = ws.split();
     let who = name.to_lowercase();
-    let hello = crate::identity::hello(&who, server, password, true, invite);
+    let hello = crate::identity::hello(&who, server, true, invite);
     sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
 
     let listener = UnixListener::bind(&sock_path)?;

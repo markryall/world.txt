@@ -69,8 +69,6 @@ struct Game {
     finds: Vec<Find>,
     /// The Island Journal's thing id.
     journal_board: Option<i64>,
-    /// Names that may tidy up anyone's things.
-    keepers: Vec<String>,
     /// The world's public address, for invite links.
     url: Option<String>,
     /// Animals out in the wild, waiting to be befriended.
@@ -79,9 +77,9 @@ struct Game {
     last_hum: HashMap<(i64, i64), (String, std::time::Instant)>,
 }
 
-pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Vec<String>, url: Option<String>) {
+pub async fn run(world: World, mut events: UnboundedReceiver<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers, last_hum: HashMap::new(), wild: Vec::new(), url };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url };
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -276,9 +274,6 @@ impl Game {
         }
         self.show_hint(id);
         self.deliver_mail(id);
-        if self.is_keeper(&user) {
-            self.tell_keepers_about_knocks();
-        }
         for (&pid, p) in &self.players {
             if pid != id {
                 let line = if p.x == x && p.y == y {
@@ -442,8 +437,6 @@ impl Game {
             "recipes" => return self.cmd_recipes(id),
             "unmake" | "destroy" | "remove" => return self.cmd_unmake(id, rest),
             "undo" => return self.cmd_undo(id),
-            "welcome" | "letin" => return self.cmd_welcome(id, rest),
-            "unlink" => return self.cmd_unlink(id, rest),
             "mute" | "block" => return self.cmd_mute(id, rest, true),
             "unmute" | "unblock" => return self.cmd_mute(id, rest, false),
             "mutes" => return self.cmd_mutes(id),
@@ -997,11 +990,8 @@ impl Game {
         Ok(())
     }
 
-    /// Keepers can be listed by username or nickname.
     fn is_keeper(&self, user: &str) -> bool {
-        let nick = self.world.nick(user);
         self.world.db.is_keeper(user)
-            || self.keepers.iter().any(|k| k.trim().eq_ignore_ascii_case(user) || k.trim().eq_ignore_ascii_case(&nick))
     }
 
     fn link_line(&self, who: &str, user: &str, token: &str) -> Vec<Line> {
@@ -1097,47 +1087,6 @@ impl Game {
         } else {
             Line::plain(format!("That {what} belongs to {maker}. It stays as it is."))
         }
-    }
-
-    /// Remind online keepers about devices waiting to be let in.
-    fn tell_keepers_about_knocks(&self) {
-        let Ok(knocks) = self.world.db.knocks() else { return };
-        if knocks.is_empty() {
-            return;
-        }
-        let mut lines = Vec::new();
-        for (user, devices, ago) in knocks {
-            let name = super::names::full(&self.world.nick(&user), &user);
-            let when = if ago < 60 { "just now".to_string() } else if ago < 3600 { format!("{}m ago", ago / 60) } else { format!("{}h ago", ago / 3600) };
-            let who = if devices == 1 { "Someone wants".to_string() } else { format!("{devices} devices want") };
-            lines.push(
-                Line::new()
-                    .c(Col::Yellow, format!("🔐 {who} to come in as {name} ({when}). Ask {name} for the code on their screen, then type: "))
-                    .b(Col::Yellow, format!("welcome {user} <code>")),
-            );
-        }
-        for p in self.players.values().filter(|p| self.is_keeper(&p.user)) {
-            let _ = p.tx.send(ToClient::Lines { lines: lines.clone() });
-        }
-    }
-
-    fn cmd_welcome(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
-        if !self.players.contains_key(&id) { return Ok(()) }
-        if !self.is_keeper(&self.user(id)) {
-            self.say1(id, Line::plain("Only island keepers can let a new device in."));
-            return Ok(());
-        }
-        let mut words = rest.split_whitespace();
-        let (Some(name), Some(code)) = (words.next(), words.next()) else {
-            self.say1(id, Line::plain("Ask them for the code on their screen, then: welcome Poppy FROG-42"));
-            return Ok(());
-        };
-        let user = self.world.db.resolve_user(name).unwrap_or_else(|| name.to_string());
-        match self.world.db.welcome(&user, code)? {
-            Some(n) => self.say1(id, Line::col(Col::Green, format!("✅ {n}'s new device can come in now. (Any other device for {n} won't work any more.)"))),
-            None => self.say1(id, Line::plain(format!("That code doesn't match anyone knocking as {name}. Check the code on their screen?"))),
-        }
-        Ok(())
     }
 
     fn cmd_mute(&mut self, id: u64, name: &str, on: bool) -> anyhow::Result<()> {
@@ -1344,22 +1293,6 @@ impl Game {
             );
         }
         self.send(id, lines);
-        Ok(())
-    }
-
-    fn cmd_unlink(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
-        if !self.players.contains_key(&id) { return Ok(()) }
-        if !self.is_keeper(&self.user(id)) {
-            self.say1(id, Line::plain("Only island keepers can release a name."));
-            return Ok(());
-        }
-        let user = self.world.db.resolve_user(name).unwrap_or_else(|| name.trim().to_string());
-        let msg = if self.world.db.release_name(&user)? {
-            format!("🔓 {} is free: the next device to use that name will claim it.", name.trim())
-        } else {
-            format!("Nobody had claimed '{}', so there was nothing to release.", name.trim())
-        };
-        self.say1(id, Line::col(Col::Green, msg));
         Ok(())
     }
 
@@ -1705,8 +1638,6 @@ fn help() -> Vec<Line> {
         Line::col(Col::Pink, "island keepers"),
         h("invite Poppy", "make an account for someone new, and get their magic link"),
         h("link Poppy", "a new magic link for someone's new device"),
-        h("welcome Poppy FROG-42", "let Poppy in from a new device (the code is on her screen)"),
-        h("unlink Poppy", "free a name for whoever uses it next"),
         h("kick Sam [minutes] / unkick Sam", "send someone off for a break (30 min)"),
         h("ban Sam / unban Sam", "close the island to someone"),
         h("promote Lu / demote Lu", "make someone a keeper, or not"),

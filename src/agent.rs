@@ -48,7 +48,6 @@ pub struct Options {
     pub name: String,
     pub persona: PathBuf,
     pub server: String,
-    pub password: Option<String>,
     pub daily_usd: f64,
     pub state_dir: PathBuf,
     pub dry_run: bool,
@@ -91,7 +90,7 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
     let ws = crate::bridge::connect_retry(&opts.server).await?;
     let (mut sink, mut source) = ws.split();
     let who = opts.name.to_lowercase();
-    let hello = crate::identity::hello(&who, &opts.server, opts.password.clone(), true, opts.invite.clone());
+    let hello = crate::identity::hello(&who, &opts.server, true, opts.invite.clone());
     sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
     log(&opts.name, &format!("🐾 joined {} (budget ${:.2}/day, {MODEL})", opts.server, opts.daily_usd));
 

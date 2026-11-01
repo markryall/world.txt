@@ -26,12 +26,6 @@ enum Cmd {
         /// Seed for a brand-new world's landscape.
         #[arg(long, default_value_t = 7)]
         seed: u64,
-        /// Ask everyone for this password before they can join.
-        #[arg(long, env = "WORLD_PASSWORD")]
-        password: Option<String>,
-        /// Island keepers (comma-separated names) can tidy up anyone's things.
-        #[arg(long, env = "WORLD_KEEPERS", value_delimiter = ',')]
-        keeper: Vec<String>,
         /// Daily copies to keep (0 turns backups off).
         #[arg(long, default_value_t = 14)]
         keep_backups: usize,
@@ -57,9 +51,6 @@ enum Cmd {
         /// ws://host:port, or wss://... through a tunnel.
         #[arg(long, env = "WORLD_SERVER", default_value = "ws://127.0.0.1:4040")]
         server: String,
-        /// The world's password, if it has one.
-        #[arg(long, env = "WORLD_PASSWORD")]
-        password: Option<String>,
         /// An invite (the part after #invite= in a magic link), the first time.
         #[arg(long)]
         invite: Option<String>,
@@ -73,8 +64,6 @@ enum Cmd {
         persona: Option<std::path::PathBuf>,
         #[arg(long, env = "WORLD_SERVER", default_value = "ws://127.0.0.1:4040")]
         server: String,
-        #[arg(long, env = "WORLD_PASSWORD")]
-        password: Option<String>,
         /// Most it may spend in a day, in US dollars (estimated from API usage).
         #[arg(long, env = "WORLD_AGENT_DAILY_USD", default_value_t = 0.50)]
         daily_usd: f64,
@@ -93,8 +82,6 @@ enum Cmd {
         name: String,
         #[arg(long, env = "WORLD_SERVER", default_value = "ws://127.0.0.1:4040")]
         server: String,
-        #[arg(long, env = "WORLD_PASSWORD")]
-        password: Option<String>,
         /// Where the log and socket live.
         #[arg(long, default_value = "tmp/bridge")]
         dir: std::path::PathBuf,
@@ -131,20 +118,6 @@ enum Cmd {
         #[arg(long, default_value = "world.db")]
         db: String,
     },
-    /// Free a name so a new device can claim it (e.g. a kid on a new iPad).
-    Release {
-        name: String,
-        #[arg(long, default_value = "world.db")]
-        db: String,
-    },
-    /// Let a kid's new device into their name, using the code it was shown.
-    Welcome {
-        name: String,
-        /// The code on their screen, e.g. FROG-42.
-        code: String,
-        #[arg(long, default_value = "world.db")]
-        db: String,
-    },
     /// Send one command through a running bridge and print what comes back.
     Send {
         name: String,
@@ -159,8 +132,8 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     match Cli::parse().cmd {
-        Cmd::Serve { addr, db, seed, password, keeper, keep_backups, backup_dir, url } => {
-            server::run(&addr, &db, seed, password, keeper, keep_backups, backup_dir, url).await
+        Cmd::Serve { addr, db, seed, keep_backups, backup_dir, url } => {
+            server::run(&addr, &db, seed, keep_backups, backup_dir, url).await
         }
         Cmd::Backup { db, keep_backups, backup_dir } => {
             let made = server::backup::backup(&db, backup_dir.as_deref(), keep_backups, true)?;
@@ -169,17 +142,15 @@ async fn main() -> anyhow::Result<()> {
             }
             Ok(())
         }
-        Cmd::Play { server, password, invite } => client::run(&server, password, invite).await,
-        Cmd::Agent { name, persona, server, password, daily_usd, state_dir, dry_run, invite } => {
+        Cmd::Play { server, invite } => client::run(&server, invite).await,
+        Cmd::Agent { name, persona, server, daily_usd, state_dir, dry_run, invite } => {
             let persona = persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());
-            agent::run(agent::Options { name, persona, server, password, daily_usd, state_dir, dry_run, invite }).await
+            agent::run(agent::Options { name, persona, server, daily_usd, state_dir, dry_run, invite }).await
         }
-        Cmd::Bridge { name, server, password, dir, invite } => bridge::run(name, &server, password, dir, invite).await,
+        Cmd::Bridge { name, server, dir, invite } => bridge::run(name, &server, dir, invite).await,
         Cmd::Invite { nickname, keeper, url, db } => server::invite(&db, &nickname, keeper, url.as_deref()),
         Cmd::Link { name, url, db } => server::link(&db, &name, url.as_deref()),
         Cmd::Promote { name, db } => server::promote(&db, &name),
         Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
-        Cmd::Release { name, db } => server::release(&db, &name),
-        Cmd::Welcome { name, code, db } => server::welcome(&db, &name, &code),
     }
 }

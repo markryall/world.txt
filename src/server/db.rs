@@ -62,9 +62,7 @@ impl Db {
                  following INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0,
                  PRIMARY KEY (player, board));
              DROP TABLE IF EXISTS knocks;
-             CREATE TABLE IF NOT EXISTS door_knocks (
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 name TEXT NOT NULL, key_hash TEXT NOT NULL, code TEXT NOT NULL, at INTEGER NOT NULL);
+             DROP TABLE IF EXISTS door_knocks;
              CREATE TABLE IF NOT EXISTS mutes (
                  player TEXT NOT NULL, muted TEXT NOT NULL, PRIMARY KEY (player, muted));
              CREATE TABLE IF NOT EXISTS bans (
@@ -496,79 +494,6 @@ impl Db {
     }
 
     /// Where a returning player was, and how far through first steps.
-    /// The hash of the key that owns a name, if it's been claimed.
-    pub fn name_key(&self, name: &str) -> Option<String> {
-        self.conn
-            .query_row("SELECT key_hash FROM players WHERE name = ?1", [name], |r| r.get(0))
-            .ok()
-            .flatten()
-    }
-
-    pub fn claim_name(&self, name: &str, key_hash: &str, x: i64, y: i64) -> anyhow::Result<()> {
-        self.conn.execute(
-            "INSERT INTO players (name, x, y, tutorial, key_hash) VALUES (?1, ?2, ?3, 0, ?4)
-             ON CONFLICT(name) DO UPDATE SET key_hash = excluded.key_hash",
-            params![name, x, y, key_hash],
-        )?;
-        Ok(())
-    }
-
-    /// Someone tried a claimed name from a new device: remember the knock and
-    /// its code. The same device knocking again within a day keeps its code.
-    pub fn add_knock(&self, name: &str, key_hash: &str, new_code: &str) -> anyhow::Result<String> {
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
-        let existing: Option<String> = self
-            .conn
-            .query_row(
-                "SELECT code FROM door_knocks WHERE name = ?1 AND key_hash = ?2 AND at > ?3 - 86400",
-                params![name, key_hash, now],
-                |r| r.get(0),
-            )
-            .ok();
-        if let Some(code) = existing {
-            self.conn.execute(
-                "UPDATE door_knocks SET at = ?3 WHERE name = ?1 AND key_hash = ?2",
-                params![name, key_hash, now],
-            )?;
-            return Ok(code);
-        }
-        self.conn.execute(
-            "INSERT INTO door_knocks (name, key_hash, code, at) VALUES (?1, ?2, ?3, ?4)",
-            params![name, key_hash, new_code, now],
-        )?;
-        Ok(new_code.to_string())
-    }
-
-    /// Names with recent knocks (within a day): (name, devices knocking, seconds since the latest).
-    pub fn knocks(&self) -> anyhow::Result<Vec<(String, i64, i64)>> {
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
-        let mut stmt = self.conn.prepare(
-            "SELECT name, COUNT(*), ?1 - MAX(at) FROM door_knocks WHERE at > ?1 - 86400
-             GROUP BY name ORDER BY MAX(at)",
-        )?;
-        let rows = stmt.query_map([now], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
-        Ok(rows.collect::<Result<_, _>>()?)
-    }
-
-    /// Let the device that was shown this code use the name from now on (any
-    /// other device stops working). Returns the name as stored, if the code matched.
-    pub fn welcome(&self, name: &str, code: &str) -> anyhow::Result<Option<String>> {
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
-        let knock: Option<(String, String)> = self
-            .conn
-            .query_row(
-                "SELECT name, key_hash FROM door_knocks
-                 WHERE name = ?1 COLLATE NOCASE AND code = ?2 COLLATE NOCASE AND at > ?3 - 86400",
-                params![name, code.trim(), now],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .ok();
-        let Some((stored, hash)) = knock else { return Ok(None) };
-        self.conn.execute("UPDATE players SET key_hash = ?2 WHERE name = ?1", params![stored, hash])?;
-        self.conn.execute("DELETE FROM door_knocks WHERE name = ?1", [&stored])?;
-        Ok(Some(stored))
-    }
-
     // ---- companions ---------------------------------------------------------
 
     pub fn companion(&self, owner: &str) -> Option<(String, Option<String>)> {
@@ -692,15 +617,6 @@ impl Db {
     /// Lift any ban on a name (and the devices banned along with it).
     pub fn lift_ban(&self, name: &str) -> anyhow::Result<bool> {
         let n = self.conn.execute("DELETE FROM bans WHERE name = ?1 COLLATE NOCASE", [name])?;
-        Ok(n > 0)
-    }
-
-    /// Free a name so the next device to use it claims it. True if it was claimed.
-    pub fn release_name(&self, name: &str) -> anyhow::Result<bool> {
-        let n = self.conn.execute(
-            "UPDATE players SET key_hash = NULL WHERE name = ?1 COLLATE NOCASE AND key_hash IS NOT NULL",
-            [name],
-        )?;
         Ok(n > 0)
     }
 

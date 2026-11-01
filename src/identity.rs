@@ -46,11 +46,11 @@ pub fn forget_token(who: &str, server: &str) {
 
 /// The hello for `who` on `server`: the invite if there is one, otherwise
 /// this device's saved token.
-pub fn hello(who: &str, server: &str, password: Option<String>, bot: bool, invite: Option<String>) -> crate::protocol::ToServer {
+pub fn hello(who: &str, server: &str, bot: bool, invite: Option<String>) -> crate::protocol::ToServer {
     // Accept a whole magic link as well as just its code.
     let invite = invite.map(|i| i.rsplit("invite=").next().unwrap_or(&i).split('&').next().unwrap_or("").trim().to_string());
     let token = if invite.is_some() { None } else { load_token(who, server) };
-    crate::protocol::ToServer::Hello { name: who.to_string(), password, bot, key: None, invite, token }
+    crate::protocol::ToServer::Hello { name: who.to_string(), bot, invite, token }
 }
 
 /// What to do with what the world said about signing in.

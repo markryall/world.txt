@@ -15,7 +15,6 @@ mod world;
 
 use crate::protocol::{ToClient, ToServer};
 use futures_util::{SinkExt, StreamExt};
-use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
@@ -32,43 +31,32 @@ pub async fn run(
     addr: &str,
     db_path: &str,
     seed: u64,
-    password: Option<String>,
-    keepers: Vec<String>,
     keep_backups: usize,
     backup_dir: Option<std::path::PathBuf>,
     url: Option<String>,
 ) -> anyhow::Result<()> {
-    let password: Arc<Option<String>> = Arc::new(password.filter(|p| !p.is_empty()));
     let db = db::Db::open(db_path)?;
     let world = world::World::load_or_create(db, seed)?;
     let (events_tx, events_rx) = mpsc::unbounded_channel();
-    if !keepers.is_empty() {
-        println!("🗝  island keepers: {}", keepers.join(", "));
-    }
-    if world.db.keeper_count() == 0 && keepers.is_empty() {
+    if world.db.keeper_count() == 0 {
         println!("🗝  No island keepers yet. Make yourself one: world.txt invite <YourName> --keeper --db {db_path}");
     }
-    tokio::spawn(game::run(world, events_rx, keepers, url));
+    tokio::spawn(game::run(world, events_rx, url));
     if keep_backups > 0 {
         tokio::spawn(backup::run_daily(db_path.to_string(), backup_dir, keep_backups));
     }
 
     let listener = TcpListener::bind(addr).await?;
     println!("🌍 world.txt is open: browser http://{addr}  ·  terminal ws://{addr}  (db: {db_path})");
-    if password.is_some() {
-        println!("🔐 password required");
-    } else {
-        println!("🔓 no password: anyone who can reach this port can join");
-    }
+    println!("💌 invite-only: world.txt invite <Name> makes an account and its magic link");
     let mut next_id = 1u64;
     loop {
         let (stream, peer) = listener.accept().await?;
         let id = next_id;
         next_id += 1;
         let events = events_tx.clone();
-        let password = password.clone();
         tokio::spawn(async move {
-            if let Err(e) = connection(id, stream, events, &password).await {
+            if let Err(e) = connection(id, stream, events).await {
                 eprintln!("connection {peer}: {e}");
             }
         });
@@ -79,7 +67,6 @@ async fn connection(
     id: u64,
     stream: TcpStream,
     events: UnboundedSender<Event>,
-    password: &Option<String>,
 ) -> anyhow::Result<()> {
     if !is_websocket(&stream).await? {
         return serve_page(stream).await;
@@ -110,13 +97,6 @@ async fn connection(
             continue;
         };
         match parsed {
-            ToServer::Hello { password: given, .. } if !joined && !password_ok(password, &given) => {
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                let _ = tx.send(ToClient::Bye {
-                    reason: "🔐 That's not the password, sweetie.".into(),
-                });
-                break;
-            }
             ToServer::Hello { bot, invite, token, .. } if !joined => {
                 joined = true;
                 events.send(Event::Join { id, bot, invite, token, tx: tx.clone() })?;
@@ -133,13 +113,6 @@ async fn connection(
     drop(tx);
     let _ = writer.await;
     Ok(())
-}
-
-fn password_ok(expected: &Option<String>, given: &Option<String>) -> bool {
-    match expected {
-        None => true,
-        Some(p) => given.as_deref().map(str::trim) == Some(p.as_str()),
-    }
 }
 
 /// One port, two doors: websocket upgrades go to the game, anything else
@@ -178,34 +151,6 @@ async fn serve_page(mut stream: TcpStream) -> anyhow::Result<()> {
     );
     stream.write_all(resp.as_bytes()).await?;
     stream.shutdown().await?;
-    Ok(())
-}
-
-/// `world.txt release <Name>`: let a new device claim a name.
-pub fn release(db_path: &str, name: &str) -> anyhow::Result<()> {
-    let db = db::Db::open(db_path)?;
-    if db.release_name(name)? {
-        println!("🔓 {name} is free: the next device to use that name will claim it.");
-    } else {
-        println!("Nobody had claimed {name} (in {db_path}), so there was nothing to release.");
-    }
-    Ok(())
-}
-
-/// `world.txt welcome <Name> <code>`: let the device showing that code in.
-pub fn welcome(db_path: &str, name: &str, code: &str) -> anyhow::Result<()> {
-    let db = db::Db::open(db_path)?;
-    match db.welcome(name, code)? {
-        Some(n) => println!("✅ {n}'s new device can come in now. (Any other device for {n} won't work any more.)"),
-        None => {
-            println!("That code doesn't match anyone knocking as {name} in the last day.");
-            let knocks = db.knocks()?;
-            if !knocks.is_empty() {
-                let names: Vec<String> = knocks.into_iter().map(|(n, _, _)| n).collect();
-                println!("Waiting to be let in: {}", names.join(", "));
-            }
-        }
-    }
     Ok(())
 }
 

@@ -141,14 +141,9 @@ pub enum ToServer {
         /// Not used to sign in any more (invites and device tokens do that).
         #[serde(default)]
         name: String,
-        #[serde(default)]
-        password: Option<String>,
         /// True for AI residents, so the world can tell them from people.
         #[serde(default)]
         bot: bool,
-        /// Old per-device key; ignored now.
-        #[serde(default)]
-        key: Option<String>,
         /// A one-use invite from a magic link.
         #[serde(default)]
         invite: Option<String>,

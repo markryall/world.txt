@@ -29,7 +29,7 @@ struct State {
     closed: Option<String>,
 }
 
-pub async fn run(server: &str, password: Option<String>, invite: Option<String>) -> anyhow::Result<()> {
+pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
     if invite.is_none() && crate::identity::load_token("player", server).is_none() {
         anyhow::bail!(
             "world.txt is invite-only 💌 Ask an island keeper for a magic link, then: world.txt play --invite <link or code>"
@@ -38,7 +38,7 @@ pub async fn run(server: &str, password: Option<String>, invite: Option<String>)
 
     let (ws, _) = tokio_tungstenite::connect_async(server).await?;
     let (mut sink, mut source) = ws.split();
-    let hello = serde_json::to_string(&crate::identity::hello("player", server, password, false, invite))?;
+    let hello = serde_json::to_string(&crate::identity::hello("player", server, false, invite))?;
     sink.send(Message::Text(hello.into())).await?;
 
     let mut terminal = ratatui::init();

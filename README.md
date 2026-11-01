@@ -36,42 +36,20 @@ and `make install` copies it into place as `world.txt`. `cargo run -- serve` wor
 `sunny-otter-42`) is made up for you the first time you arrive and never changes;
 everything of yours (satchel, journal, home, things, notes, mail) belongs to it.
 Your nickname is what people see, and `nickname Pip` changes it any time. `who`
-shows both, arrivals and renames show both, and `@`, `mute`, `invite`, `kick`
-and friends accept either. For now you still join by typing your nickname, so
-nicknames are unique; invite links (next) will remove that.
-
-**Names belong to the device that first uses them.** Each browser keeps a secret
-key (and this machine's terminal client, residents and bridges share one in
-`~/.config/world.txt/key`); the world stores only a hash. Anyone else trying that
-name is turned away.
-
-Browsers keep that key **per web address**, so a new quick-tunnel link, switching
-between your home address and the tunnel, or Safari clearing old site data can
-leave a kid with a fresh key. **Stick to one address** (a named tunnel, or the same
-home address every time) to avoid it. When it happens anyway, the kid's screen shows a short code
-(like `FROG-42`) to read out to an island keeper, and the world remembers the knock:
-
-- Keepers online (or the next to arrive) are told someone wants to come in as
-  Poppy, but never see the code. Ask Poppy for the code on her screen, then type
-  `welcome Poppy FROG-42`. Only the device showing that code gets the name (any
-  other device stops working), and Poppy just joins again. If a stranger tried the
-  name too, their code won't match.
-- On the server's machine: `world.txt welcome Poppy FROG-42`. The server's own log
-  also notes each knock.
-- `unlink Poppy` (keepers, in the world) or `world.txt release Poppy` frees a name
-  for whichever device uses it next.
+shows both, arrivals and renames show both, and `@`, `mute`, `kick`, `link` and
+friends accept either.
 
 **Things belong to whoever made them.** Only the maker can `unmake` or `push`
 something; everyone else is told whose it is. Unmaking tucks a thing away rather
 than deleting it, so `undo` brings back the last thing you unmade (within a day),
-noticeboards with all their notes. Island keepers can tidy up anyone's things:
-`world.txt serve --keeper Mark` (or `WORLD_KEEPERS=Mark,Lu`).
+noticeboards with all their notes. Island keepers can tidy up anyone's things.
 
 **Keeping it kind.** `mute Sam` means you stop hearing Sam's talk, emotes,
 shouts, private messages, chat and board notes. It's remembered, and Sam isn't
 told (`unmute Sam`, `mutes`). Keepers can `kick Sam` (30 minutes, or
-`kick Sam 60`): Sam is sent off for a break and can't come back as that name
-or from that device until it ends, or a keeper types `unkick Sam`.
+`kick Sam 60`): Sam is sent off for a break and can't come back until it ends,
+or a keeper types `unkick Sam`. Since only invited people get in, a kick or ban
+can't be dodged with a new name.
 
 One port serves both doors: websocket upgrades go to the game, and plain HTTP
 gets the browser page (`web/index.html`, compiled into the binary).
@@ -83,8 +61,8 @@ lets people outside your network join without opening any ports on your router.
 Your machine makes an outgoing connection to Cloudflare, and Cloudflare serves the
 world over https and wss. Websockets work through it with no extra setup.
 
-**Always set a password before opening a tunnel.** Without one, anyone who finds
-the link can join, pick any name, and unmake things.
+The world is invite-only, so the tunnel's address on its own doesn't let anyone
+in: only the magic links you hand out do.
 
 ```
 brew install cloudflared
@@ -95,12 +73,14 @@ brew install cloudflared
 Good for an evening with friends.
 
 ```
-WORLD_PASSWORD=froggy world.txt serve
+world.txt serve
 cloudflared tunnel --url http://localhost:4040
 ```
 
 `cloudflared` prints a link like `https://some-random-words.trycloudflare.com`.
-Stopping it ends the tunnel, and the next run gets a new link.
+Stopping it ends the tunnel, and the next run gets a new link, which means
+everyone's browser needs a fresh magic link too (browsers keep the device token
+per address). For anything regular, use a named tunnel.
 
 ### Named tunnel (your own domain, same link every time)
 
@@ -116,16 +96,17 @@ cloudflared tunnel route dns world world.example.com  # points the hostname at i
 Then, whenever you want the world open:
 
 ```
-WORLD_PASSWORD=froggy world.txt serve
+world.txt serve --url https://world.example.com
 cloudflared tunnel run --url http://localhost:4040 world
 ```
 
 ### Inviting people
 
-- **Browser** (iPads too): send them `https://world.example.com/#pw=froggy`. The
-  password is filled in for them, and the part after `#` never leaves their browser.
-- **Terminal:** `world.txt play Sam --server wss://world.example.com --password froggy`,
-  or set `WORLD_SERVER` and `WORLD_PASSWORD` once and just run `world.txt play Sam`.
+- Make their account and link: `invite Sam` in the world (keepers), or
+  `world.txt invite Sam --url https://world.example.com` on the server's machine.
+- **Browser** (iPads too): send them the link. Opening it signs that device in.
+- **Terminal:** `world.txt play --server wss://world.example.com --invite <link>`
+  the first time (set `WORLD_SERVER` to skip `--server`), then just `world.txt play`.
 
 ### Keeping it up
 
@@ -292,7 +273,7 @@ that's guidance, not a lock. So:
   permissions bypassed. Anything beyond game commands then still asks you first.
   The skill refuses to start otherwise.
 - Prefer it on your home network or Tailscale. A public tunnel means anyone with
-  the link and password can talk to that session.
+  a magic link can talk to that session.
 - For extra isolation, run the session in a container that holds only this repo
   and can reach nothing but the world. For example, Claude Code's
   [devcontainer](https://code.claude.com/docs/en/devcontainer) setup, with the

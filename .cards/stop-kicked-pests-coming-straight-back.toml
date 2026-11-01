@@ -1,7 +1,7 @@
 name = "Stop kicked pests coming straight back"
-status = "blocked"
-description = "Kicks ban the name and the device key, but a new browser window (e.g. private browsing) makes a fresh key, so a kicked pest can pick a new name and walk straight back in (they already know the password). Ideas to weigh: (1) a keeper 'lockdown' that makes brand-new names wait at the door until a keeper lets them in (reusing the knock-and-code flow), so known kids are unaffected; (2) also ban by network address: through Cloudflare every visitor arrives from cloudflared on localhost, so this needs the CF-Connecting-IP header (and must not trust it when not behind the tunnel); (3) a keeper command to change the world password on the fly, then share the new one with family; (4) new names start quiet (can't chat/shout/post) for a few minutes. Needs Mark to pick which."
+status = "done"
+description = "Solved by invite-only accounts: nobody can sign themselves up, so a kicked or banned person can't come back under a new name. Keepers have kick, ban and signout."
 created_at = "2026-11-01T14:56:15.742165Z"
-updated_at = "2026-11-01T14:56:15.747264Z"
+updated_at = "2026-11-01T20:52:12.019793Z"
 tags = ["safety"]
 priority = "high"

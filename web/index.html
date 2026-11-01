@@ -145,8 +145,6 @@
     <h1>✨ world.txt ✨</h1>
     <p>a small island · no battles · just vibes</p>
     <p id="join-msg"></p>
-    <input id="pw" type="password" placeholder="the world's password">
-    <button id="join-go">wander in</button>
   </form>
 </div>
 <script>
@@ -216,13 +214,10 @@ const stored = (k) => { try { return localStorage.getItem(k); } catch { return n
 const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
 const params = new URLSearchParams(location.hash.slice(1));
 let invite = params.get('invite');
-if (params.get('pw')) store('world.pw', params.get('pw'));
 
-function showJoin(message, askPassword) {
+function showJoin(message) {
   $('#join').style.display = 'flex';
   $('#join-msg').textContent = message;
-  $('#pw').style.display = askPassword ? '' : 'none';
-  $('#join-go').style.display = askPassword ? '' : 'none';
 }
 
 function start() {
@@ -235,7 +230,7 @@ function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}/`);
   ws.onopen = () => ws.send(JSON.stringify({
-    type: 'hello', password: stored('world.pw'), invite, token: invite ? null : stored('world.token'),
+    type: 'hello', invite, token: invite ? null : stored('world.token'),
   }));
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
@@ -249,12 +244,9 @@ function connect() {
       invite = null;
       history.replaceState(null, '', location.pathname);
     } else if (m.type === 'bye') {
-      if (m.reason.includes('password')) {
-        store('world.pw', null);
-        showJoin('That password didn\'t work. What is it?', true);
-      } else if (m.reason.includes('invite') || m.reason.includes('signed in')) {
+      if (m.reason.includes('invite') || m.reason.includes('signed in')) {
         if (m.reason.includes('signed in')) store('world.token', null);
-        showJoin(m.reason, false);
+        showJoin(m.reason);
       } else {
         addLines([[{ t: m.reason, c: 'magenta' }]]);
       }
@@ -381,13 +373,8 @@ function send(text) {
   ws.send(JSON.stringify({ type: 'cmd', text }));
 }
 
-$('#join form').onsubmit = (e) => {
-  e.preventDefault();
-  store('world.pw', $('#pw').value || null);
-  start();
-};
 if (invite || stored('world.token')) start();
-else showJoin('world.txt is invite-only. Open the magic link an island keeper sent you! 💌', false);
+else showJoin('world.txt is invite-only. Open the magic link an island keeper sent you! 💌');
 
 $('#input').onsubmit = (e) => {
   e.preventDefault();
