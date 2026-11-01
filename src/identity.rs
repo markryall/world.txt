@@ -50,7 +50,7 @@ pub fn hello(who: &str, server: &str, bot: bool, invite: Option<String>) -> crat
     // Accept a whole magic link as well as just its code.
     let invite = invite.map(|i| i.rsplit("invite=").next().unwrap_or(&i).split('&').next().unwrap_or("").trim().to_string());
     let token = if invite.is_some() { None } else { load_token(who, server) };
-    crate::protocol::ToServer::Hello { name: who.to_string(), bot, invite, token }
+    crate::protocol::ToServer::Hello { name: who.to_string(), bot, invite, token, passport: None }
 }
 
 /// What to do with what the world said about signing in.

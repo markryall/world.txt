@@ -94,7 +94,7 @@ pub async fn run(name: String, server: &str, dir: PathBuf, invite: Option<String
                         }
                         let _ = log.flush();
                     }
-                    Ok(ToClient::Hint { .. }) | Err(_) => {}
+                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. }) | Err(_) => {}
                 }
             }
             Some(cmd) = cmd_rx.recv() => {

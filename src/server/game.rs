@@ -11,6 +11,7 @@ mod homes;
 mod music;
 mod sailing;
 mod travel;
+mod visitors;
 
 use super::nature::Find;
 use super::rng::Rng;
@@ -80,6 +81,8 @@ struct Game {
     journal_board: Option<i64>,
     /// The world's public address, for invite links.
     url: Option<String>,
+    /// Visitors from other worlds waiting at the dock to be let in.
+    waiting: HashMap<u64, (super::federation::Passport, ClientTx)>,
     /// Animals out in the wild, waiting to be befriended.
     wild: Vec<companions::Wild>,
     /// Who last hummed where, for noticing a jam.
@@ -88,7 +91,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new() };
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -113,6 +116,7 @@ impl Game {
     fn handle(&mut self, ev: Event) {
         match ev {
             Event::Join { id, bot, invite, token, tx } => self.join(id, bot, invite, token, tx),
+            Event::Visit { id, passport, tx } => self.visit(id, passport, tx),
             Event::Leave { id } => self.leave(id),
             Event::Cmd { id, text } => {
                 let before = self.snapshot(id);
@@ -237,13 +241,22 @@ impl Game {
             bye("💌 world.txt is invite-only. Open the invite link an island keeper sent you!");
             return;
         };
+        let key_hash = token.as_deref().or(new_token.as_deref()).map(super::names::hash);
+        self.enter(id, user, bot, new_token, key_hash, tx);
+    }
+
+    /// Someone signed in (or a visitor let in) arrives on the island.
+    fn enter(&mut self, id: u64, user: String, bot: bool, new_token: Option<String>, key_hash: Option<String>, tx: ClientTx) {
+        let bye = |reason: &str| {
+            let _ = tx.send(ToClient::Bye { reason: reason.to_string() });
+        };
+        let now = super::accounts::now();
         let name = self.world.db.nickname(&user).unwrap_or_else(|| user.clone());
         self.world.nicks.insert(user.clone(), name.clone());
         if self.players.values().any(|p| p.user == user) {
             bye(&format!("{name} is already here (on another device?)."));
             return;
         }
-        let key_hash = token.as_deref().or(new_token.as_deref()).map(super::names::hash);
         if !self.is_keeper(&user) {
             if let Some(until) = self.world.db.banned_until(&user, key_hash.as_deref(), now) {
                 if until - now > 365 * 86_400 {
@@ -285,6 +298,9 @@ impl Game {
             self.say1(id, Line::col(Col::Dim, format!("Your username is {user}: it's yours forever. Your nickname ({name}) can change any time: nickname Pip")));
         }
         self.show_hint(id);
+        if self.is_keeper(&user) {
+            self.tell_keepers_about_visitors();
+        }
         if let Some(f) = Clock::festival() {
             self.say1(id, Line::new().b(Col::Yellow, format!("{} {}", f.icon, f.greeting)));
         }
@@ -305,6 +321,9 @@ impl Game {
     }
 
     fn leave(&mut self, id: u64) {
+        if self.waiting.remove(&id).is_some() {
+            return; // a visitor who gave up waiting
+        }
         let Some(p) = self.players.remove(&id) else { return };
         if p.bot {
             // Residents keep no position or progress.
@@ -471,7 +490,11 @@ impl Game {
             "kick" => return self.cmd_kick(id, rest),
             "ban" => return self.cmd_ban(id, rest),
             "unban" => return self.cmd_unkick(id, rest),
+            "promote" if rest.contains('@') => self.say1(id, Line::plain("Visitors from other worlds can't be keepers here.")),
             "promote" => return self.cmd_promote(id, rest, true),
+            "admit" => return self.cmd_admit(id, rest),
+            "turn" if rest.trim_start().starts_with("away") => return self.cmd_turn_away(id, rest),
+            "visitors" | "guests-from-afar" => return self.cmd_visitors(id),
             "demote" => return self.cmd_promote(id, rest, false),
             "signout" | "sign-out" => return self.cmd_signout(id, rest),
             "users" | "accounts" => return self.cmd_users(id),
@@ -1684,6 +1707,7 @@ fn help() -> Vec<Line> {
         h("find Poppy", "which way to walk to them"),
         h("join Poppy / stop", "walk to them automatically"),
         h("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
+        h("sail to other.world", "visit another world (their keepers let you in)"),
         h("events / go event", "what's coming up on the island, and walk there"),
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune (hum together to jam!)"),
@@ -1731,6 +1755,7 @@ fn help() -> Vec<Line> {
         h("promote Lu / demote Lu", "make someone a keeper, or not"),
         h("signout Sam", "sign out all their devices (a lost iPad)"),
         h("users", "everyone, with their devices"),
+        h("visitors / admit / turn away", "people sailing in from other worlds"),
         h("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
         Line::new(),
         Line::col(Col::Dim, "There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),

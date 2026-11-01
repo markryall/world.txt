@@ -35,6 +35,9 @@ impl Game {
             self.say1(id, Line::plain(format!("You need a boat! Boats are tied up at the docks. {hint}")));
             return Ok(());
         }
+        if self.sail_between_worlds(id, rest)? {
+            return Ok(());
+        }
         let Some(dest) = islands::by_name(rest).filter(|d| d.id != here.id) else {
             let mut lines = vec![Line::new().b(Col::Blue, "⛵ Where would you like to row to?")];
             for i in ISLANDS.iter().filter(|i| i.id != here.id) {

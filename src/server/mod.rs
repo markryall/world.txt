@@ -26,6 +26,8 @@ pub type ClientTx = UnboundedSender<ToClient>;
 
 pub enum Event {
     Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, tx: ClientTx },
+    /// Someone from another world, with a checked passport.
+    Visit { id: u64, passport: federation::Passport, tx: ClientTx },
     Cmd { id: u64, text: String },
     Leave { id: u64 },
 }
@@ -108,6 +110,23 @@ async fn connection(
             continue;
         };
         match parsed {
+            ToServer::Hello { passport: Some(p), .. } if !joined => {
+                // Check it here, so the game never waits on another world.
+                let checked = match info.as_ref() {
+                    Some(me) => federation::verify(&p, &me.url, accounts::now()).await,
+                    None => Err(anyhow::anyhow!("this world doesn't take visitors")),
+                };
+                match checked {
+                    Ok(passport) => {
+                        joined = true;
+                        events.send(Event::Visit { id, passport, tx: tx.clone() })?;
+                    }
+                    Err(e) => {
+                        let _ = tx.send(ToClient::Bye { reason: format!("🛂 Sorry: {e}.") });
+                        break;
+                    }
+                }
+            }
             ToServer::Hello { bot, invite, token, .. } if !joined => {
                 joined = true;
                 events.send(Event::Join { id, bot, invite, token, tx: tx.clone() })?;

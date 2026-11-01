@@ -65,6 +65,9 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                                 st.here = here;
                             }
                             Ok(ToClient::Hint { text, .. }) => st.hint = text,
+                            Ok(ToClient::Travel { url }) => st.log.push(crate::protocol::Line::new()
+                                .c(crate::protocol::Col::Blue, "⛵ Visiting other worlds happens in a browser: open ")
+                                .b(crate::protocol::Col::Yellow, url)),
                             Ok(msg @ ToClient::Board { .. }) => {
                                 if let Some(lines) = crate::protocol::board_lines(&msg) {
                                     st.log.extend(lines);

@@ -130,6 +130,10 @@ pub enum ToClient {
         user: String,
         nickname: String,
     },
+    /// Go to another world (or back home): the browser should open this.
+    Travel {
+        url: String,
+    },
     /// Connection refused (e.g. name taken).
     Bye { reason: String },
 }
@@ -150,6 +154,9 @@ pub enum ToServer {
         /// This device's token, from an earlier invite.
         #[serde(default)]
         token: Option<String>,
+        /// A passport from another world, for visiting.
+        #[serde(default)]
+        passport: Option<String>,
     },
     Cmd { text: String },
 }

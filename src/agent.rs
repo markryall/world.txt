@@ -148,7 +148,7 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                         }
                         while seen.len() > CONTEXT_LINES { seen.pop_front(); }
                     }
-                    Ok(ToClient::Hint { .. }) | Err(_) => {}
+                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. }) | Err(_) => {}
                 }
                 continue;
             }

@@ -96,6 +96,10 @@ impl Db {
                  id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, name TEXT NOT NULL,
                  x INTEGER NOT NULL, y INTEGER NOT NULL, host TEXT NOT NULL,
                  reminded INTEGER NOT NULL DEFAULT 0, started INTEGER NOT NULL DEFAULT 0);
+             CREATE TABLE IF NOT EXISTS visitors (
+                 name TEXT PRIMARY KEY, home TEXT NOT NULL, status TEXT NOT NULL, at INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS used_passports (
+                 nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -527,6 +531,44 @@ impl Db {
             None => self.conn.execute("DELETE FROM companions WHERE owner = ?1", [owner])?,
         };
         Ok(())
+    }
+
+    // ---- visitors from other worlds ---------------------------------------------
+
+    /// Note a passport as used. False if it already was.
+    pub fn use_passport(&self, nonce: &str, expires: i64, now: i64) -> anyhow::Result<bool> {
+        self.conn.execute("DELETE FROM used_passports WHERE expires < ?1", [now])?;
+        Ok(self.conn.execute("INSERT OR IGNORE INTO used_passports (nonce, expires) VALUES (?1, ?2)", params![nonce, expires])? > 0)
+    }
+
+    /// "waiting", "admitted" or "turned away", if they've been here before.
+    pub fn visitor_status(&self, name: &str) -> Option<String> {
+        self.conn.query_row("SELECT status FROM visitors WHERE name = ?1", [name], |r| r.get(0)).ok()
+    }
+
+    pub fn set_visitor(&self, name: &str, home: &str, status: &str, now: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO visitors (name, home, status, at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(name) DO UPDATE SET status = excluded.status, at = excluded.at",
+            params![name, home, status, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn visitor_home(&self, name: &str) -> Option<String> {
+        self.conn.query_row("SELECT home FROM visitors WHERE name = ?1", [name], |r| r.get(0)).ok()
+    }
+
+    /// Visitors, most recent first: (name, home, status).
+    pub fn visitors(&self) -> anyhow::Result<Vec<(String, String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT name, home, status FROM visitors ORDER BY at DESC LIMIT 30")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn is_trusted(&self, home: &str) -> bool {
+        let _ = home;
+        false
     }
 
     // ---- events ----------------------------------------------------------------
