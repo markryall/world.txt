@@ -1,7 +1,7 @@
 name = "Visit other worlds (federation)"
-status = "inprogress"
+status = "done"
 description = "Split into: 'World identity' (keys and the public info page), 'Passports and visiting' (signed passports, the waiting room, admit), and 'Trusted worlds'. See those cards."
 created_at = "2026-11-01T20:57:52.985484Z"
-updated_at = "2026-11-01T21:15:42.277361Z"
+updated_at = "2026-11-01T21:24:11.106272Z"
 tags = ["federation"]
 priority = "low"

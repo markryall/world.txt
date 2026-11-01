@@ -170,6 +170,54 @@ impl Game {
         Ok(())
     }
 
+    pub(super) fn cmd_trust(&mut self, id: u64, address: &str, trust: bool) -> anyhow::Result<()> {
+        let me = self.user(id);
+        if !self.is_keeper(&me) {
+            self.say1(id, Line::plain("Only island keepers can choose which worlds to trust."));
+            return Ok(());
+        }
+        let address = address.trim();
+        if address.is_empty() {
+            self.say1(id, Line::plain(if trust { "Trust which world? e.g. 'trust ryall.island'" } else { "Stop trusting which world?" }));
+            return Ok(());
+        }
+        let host = federation::host(address);
+        let changed = self.world.db.set_trusted(address, &me, trust, accounts::now())?;
+        let msg = match (trust, changed) {
+            (true, true) => format!("🤝 People from {host} can come straight in now, no waiting at the dock."),
+            (true, false) => format!("{host} is already trusted."),
+            (false, true) => format!("Visitors from {host} will wait at the dock to be let in again."),
+            (false, false) => format!("{host} wasn't trusted anyway."),
+        };
+        self.say1(id, Line::col(Col::Green, msg));
+        // Anyone from there already waiting can come in now.
+        if trust {
+            let waiting: Vec<u64> = self.waiting.iter().filter(|(_, (p, _))| federation::host(&p.home) == host).map(|(&w, _)| w).collect();
+            for w in waiting {
+                if let Some((p, tx)) = self.waiting.remove(&w) {
+                    self.admit_now(w, &p, tx);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn cmd_worlds(&mut self, id: u64) -> anyhow::Result<()> {
+        let mut lines = vec![Line::new().b(Col::Magenta, "🤝 Trusted worlds")];
+        let trusted = self.world.db.trusted_worlds()?;
+        if trusted.is_empty() {
+            lines.push(Line::col(Col::Dim, "  None yet: everyone from other worlds waits at the dock for a keeper."));
+        }
+        for (host, by) in trusted {
+            lines.push(Line::new().t("  ").b(Col::Cyan, host).c(Col::Dim, format!("  (trusted by {})", self.world.nick(&by))));
+        }
+        if let Some(me) = &self.url {
+            lines.push(Line::col(Col::Dim, format!("  This world is {}: friends sail here with 'sail to {}'.", federation::host(me), federation::host(me))));
+        }
+        self.send(id, lines);
+        Ok(())
+    }
+
     /// At a dock: `sail to other.world` (another world) or `sail home` (a visitor going back).
     /// Returns false if `dest` isn't about other worlds at all.
     pub(super) fn sail_between_worlds(&mut self, id: u64, dest: &str) -> anyhow::Result<bool> {

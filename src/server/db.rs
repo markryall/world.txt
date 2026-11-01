@@ -98,6 +98,8 @@ impl Db {
                  reminded INTEGER NOT NULL DEFAULT 0, started INTEGER NOT NULL DEFAULT 0);
              CREATE TABLE IF NOT EXISTS visitors (
                  name TEXT PRIMARY KEY, home TEXT NOT NULL, status TEXT NOT NULL, at INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS trusted_worlds (
+                 host TEXT PRIMARY KEY, by TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS used_passports (
                  nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
@@ -566,9 +568,32 @@ impl Db {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// Is this world (by its host, e.g. "ryall.island") trusted to come straight in?
     pub fn is_trusted(&self, home: &str) -> bool {
-        let _ = home;
-        false
+        let host = super::federation::host(home);
+        self.conn
+            .query_row("SELECT EXISTS (SELECT 1 FROM trusted_worlds WHERE host = ?1)", [host], |r| r.get(0))
+            .unwrap_or(false)
+    }
+
+    pub fn set_trusted(&self, home: &str, by: &str, trusted: bool, now: i64) -> anyhow::Result<bool> {
+        let host = super::federation::host(home);
+        let n = if trusted {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO trusted_worlds (host, by, at) VALUES (?1, ?2, ?3)",
+                params![host, by, now],
+            )?
+        } else {
+            self.conn.execute("DELETE FROM trusted_worlds WHERE host = ?1", [host])?
+        };
+        Ok(n > 0)
+    }
+
+    /// Trusted worlds: (host, who trusted it).
+    pub fn trusted_worlds(&self) -> anyhow::Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT host, by FROM trusted_worlds ORDER BY host")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     // ---- events ----------------------------------------------------------------

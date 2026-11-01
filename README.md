@@ -199,6 +199,9 @@ Worlds can visit each other. Each world has a signing key, and (with
   `sail home` takes you back.
 - Keepers see who's waiting when they arrive, and `visitors` lists everyone
   who's sailed in. Bans, mutes and kicks work on visitors too.
+- Keepers can `trust their.address` so a friendly world's people come straight
+  in without waiting (anyone already waiting from there is let in at once),
+  `untrust` it again, and see the list with `worlds`.
 
 Visiting happens in the browser (the terminal client points you there). A world
 without `--url` can't send or receive visitors.

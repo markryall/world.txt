@@ -1,7 +1,7 @@
 name = "Trusted worlds"
-status = "todo"
+status = "done"
 description = "Keepers can 'trust other.address' so its people are admitted without waiting, 'untrust' it, and list them with 'worlds'."
 created_at = "2026-11-01T21:15:42.294099Z"
-updated_at = "2026-11-01T21:15:42.294099Z"
+updated_at = "2026-11-01T21:24:11.101717Z"
 tags = ["federation"]
 priority = "low"
