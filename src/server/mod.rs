@@ -31,12 +31,16 @@ pub async fn run(
     db_path: &str,
     seed: u64,
     password: Option<String>,
+    keepers: Vec<String>,
 ) -> anyhow::Result<()> {
     let password: Arc<Option<String>> = Arc::new(password.filter(|p| !p.is_empty()));
     let db = db::Db::open(db_path)?;
     let world = world::World::load_or_create(db, seed)?;
     let (events_tx, events_rx) = mpsc::unbounded_channel();
-    tokio::spawn(game::run(world, events_rx));
+    if !keepers.is_empty() {
+        println!("🗝  island keepers: {}", keepers.join(", "));
+    }
+    tokio::spawn(game::run(world, events_rx, keepers));
 
     let listener = TcpListener::bind(addr).await?;
     println!("🌍 world.txt is open: browser http://{addr}  ·  terminal ws://{addr}  (db: {db_path})");

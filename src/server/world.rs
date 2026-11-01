@@ -196,10 +196,28 @@ impl World {
             .position(|t| t.x == x && t.y == y && t.name.to_lowercase().contains(w))
     }
 
-    pub fn remove_thing(&mut self, i: usize) -> anyhow::Result<Thing> {
+    pub fn remove_thing(&mut self, i: usize, by: &str) -> anyhow::Result<Thing> {
         let t = self.things.remove(i);
-        self.db.remove_thing(t.id)?;
+        self.db.remove_thing(t.id, by)?;
         Ok(t)
+    }
+
+    /// Bring back the last thing `by` unmade in the past day.
+    pub fn undo_remove(&mut self, by: &str) -> anyhow::Result<Option<&Thing>> {
+        let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64 - 86_400;
+        let Some(r) = self.db.last_removed(by, since) else { return Ok(None) };
+        self.db.restore_thing(r.id)?;
+        self.things.push(Thing {
+            id: r.id,
+            x: r.x,
+            y: r.y,
+            name: r.name,
+            action: r.action,
+            trigger: Trigger::from_code(r.trigger.as_deref().unwrap_or("always")),
+            maker: r.maker,
+            kind: r.kind,
+        });
+        Ok(self.things.last())
     }
 
     pub fn move_thing(&mut self, i: usize, x: i64, y: i64) -> anyhow::Result<()> {

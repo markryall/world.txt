@@ -73,6 +73,9 @@ impl Db {
         );
         let _ = conn.execute("ALTER TABLE things ADD COLUMN kind TEXT", []);
         let _ = conn.execute("ALTER TABLE players ADD COLUMN key_hash TEXT", []);
+        // Unmade things are tucked away rather than deleted, so they can come back.
+        let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_by TEXT", []);
+        let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_at INTEGER", []);
         Ok(Db { conn })
     }
 
@@ -117,7 +120,7 @@ impl Db {
     pub fn things(&self) -> anyhow::Result<Vec<ThingRow>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, x, y, name, action, trigger, maker, kind FROM things")?;
+            .prepare("SELECT id, x, y, name, action, trigger, maker, kind FROM things WHERE removed_at IS NULL")?;
         let rows = stmt.query_map([], |r| {
             Ok(ThingRow {
                 id: r.get(0)?,
@@ -147,8 +150,41 @@ impl Db {
         Ok(())
     }
 
-    pub fn remove_thing(&self, id: i64) -> anyhow::Result<()> {
-        self.conn.execute("DELETE FROM things WHERE id = ?1", [id])?;
+    pub fn remove_thing(&self, id: i64, by: &str) -> anyhow::Result<()> {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+        self.conn.execute(
+            "UPDATE things SET removed_by = ?2, removed_at = ?3 WHERE id = ?1",
+            params![id, by, now],
+        )?;
+        Ok(())
+    }
+
+    /// The last thing someone unmade since a moment, for `undo`.
+    pub fn last_removed(&self, by: &str, since: i64) -> Option<ThingRow> {
+        self.conn
+            .query_row(
+                "SELECT id, x, y, name, action, trigger, maker, kind FROM things
+                 WHERE removed_by = ?1 AND removed_at >= ?2 ORDER BY removed_at DESC, id DESC LIMIT 1",
+                params![by, since],
+                |r| {
+                    Ok(ThingRow {
+                        id: r.get(0)?,
+                        x: r.get(1)?,
+                        y: r.get(2)?,
+                        name: r.get(3)?,
+                        action: r.get(4)?,
+                        trigger: r.get(5)?,
+                        maker: r.get(6)?,
+                        kind: r.get(7)?,
+                    })
+                },
+            )
+            .ok()
+    }
+
+    pub fn restore_thing(&self, id: i64) -> anyhow::Result<()> {
+        self.conn
+            .execute("UPDATE things SET removed_by = NULL, removed_at = NULL WHERE id = ?1", [id])?;
         Ok(())
     }
 

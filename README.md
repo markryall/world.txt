@@ -20,6 +20,12 @@ name is turned away. When a kid moves to a new device, free their name with
 `world.txt release Poppy` (it works while the server is running), and the next
 device to use it claims it.
 
+**Things belong to whoever made them.** Only the maker can `unmake` or `push`
+something; everyone else is told whose it is. Unmaking tucks a thing away rather
+than deleting it, so `undo` brings back the last thing you unmade (within a day),
+noticeboards with all their notes. Island keepers can tidy up anyone's things:
+`world.txt serve --keeper Mark` (or `WORLD_KEEPERS=Mark,Lu`).
+
 One port serves both doors: websocket upgrades go to the game, and plain HTTP
 gets the browser page (`web/index.html`, compiled into the binary).
 

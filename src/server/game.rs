@@ -47,11 +47,13 @@ struct Game {
     finds: Vec<Find>,
     /// The Island Journal's thing id.
     journal_board: Option<i64>,
+    /// Names that may tidy up anyone's things.
+    keepers: Vec<String>,
 }
 
-pub async fn run(world: World, mut events: UnboundedReceiver<Event>) {
+pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Vec<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers };
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -336,6 +338,7 @@ impl Game {
             "name" | "call-this" => return self.cmd_name(id, rest),
             "make" | "build" | "create" | "craft" => return self.cmd_make(id, rest),
             "unmake" | "destroy" | "remove" => return self.cmd_unmake(id, rest),
+            "undo" => return self.cmd_undo(id),
             "push" | "carry" | "move" => return self.cmd_push(id, rest),
             "quit" | "exit" | "bye" => {
                 if let Some(p) = self.players.get(&id) {
@@ -817,15 +820,53 @@ impl Game {
         Ok(())
     }
 
+    fn is_keeper(&self, name: &str) -> bool {
+        self.keepers.iter().any(|k| k.trim().eq_ignore_ascii_case(name))
+    }
+
+    /// Only whoever made something (or an island keeper) may unmake or push it.
+    fn may_change(&self, who: &str, i: usize) -> bool {
+        self.world.things[i].maker.eq_ignore_ascii_case(who) || self.is_keeper(who)
+    }
+
+    fn not_yours(&self, i: usize) -> Line {
+        let t = &self.world.things[i];
+        let what = crate::server::world::strip_article(&t.name).to_string();
+        if self.players.values().any(|p| p.name == t.maker) || self.world.db.player(&t.maker).is_some() {
+            Line::plain(format!("That's {}'s {what}. Only {} can unmake or move it. (Ask them: @{} ...)", t.maker, t.maker, t.maker))
+        } else {
+            Line::plain(format!("That {what} belongs to {}. It stays as it is.", t.maker))
+        }
+    }
+
+    fn cmd_undo(&mut self, id: u64) -> anyhow::Result<()> {
+        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        let restored = self.world.undo_remove(&who)?.map(|t| (t.x, t.y, t.name.clone()));
+        match restored {
+            Some((x, y, name)) => {
+                let place = self.world.place_title(x, y);
+                self.say1(id, Line::col(Col::Yellow, format!("✨ {} is back at {place}.", capitalise(&name))));
+                self.tell_here(x, y, id, Line::col(Col::Yellow, format!("✨ {} reappears, just where it was.", capitalise(&name))));
+                self.status_all();
+            }
+            None => self.say1(id, Line::plain("There's nothing of yours to bring back from the last day.")),
+        }
+        Ok(())
+    }
+
     fn cmd_unmake(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
         let Some((x, y, who)) = self.here(id) else { return Ok(()) };
         match self.world.find_thing(x, y, what) {
             Some(i) if self.world.things[i].kind.as_deref() == Some(boards::journal_kind()) => {
                 self.say1(id, Line::plain("The Island Journal belongs to everyone. It stays right where it is."));
             }
+            Some(i) if !what.is_empty() && !self.may_change(&who, i) => {
+                self.say1(id, self.not_yours(i));
+            }
             Some(i) if !what.is_empty() => {
-                let t = self.world.remove_thing(i)?;
+                let t = self.world.remove_thing(i, &who)?;
                 self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
+                self.say1(id, Line::col(Col::Dim, "(changed your mind? type undo)"));
                 self.tell_here(x, y, id, Line::col(Col::Dim, format!("{who} unmakes {}.", t.name)));
                 self.status_all();
             }
@@ -849,6 +890,10 @@ impl Game {
         }
         if self.world.things[i].kind.as_deref() == Some(boards::journal_kind()) {
             self.say1(id, Line::plain("The Island Journal won't budge. It belongs right here."));
+            return Ok(());
+        }
+        if !self.may_change(&who, i) {
+            self.say1(id, self.not_yours(i));
             return Ok(());
         }
         let name = self.world.things[i].name.clone();
@@ -1115,7 +1160,7 @@ fn help() -> Vec<Line> {
         h("make a frog that croaks when it rains", ""),
         Line::col(Col::Dim, "    also: at night, during the day, when it's sunny, when someone arrives"),
         h("push bench north", "move something"),
-        h("unmake bench", "make it go away"),
+        h("unmake bench / undo", "take away something you made, or bring it back"),
         Line::new(),
         Line::col(Col::Dim, format!("The island is {SIZE}×{SIZE}. A whole day passes in 24 minutes.")),
     ]

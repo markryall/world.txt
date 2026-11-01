@@ -29,6 +29,9 @@ enum Cmd {
         /// Ask everyone for this password before they can join.
         #[arg(long, env = "WORLD_PASSWORD")]
         password: Option<String>,
+        /// Island keepers (comma-separated names) can tidy up anyone's things.
+        #[arg(long, env = "WORLD_KEEPERS", value_delimiter = ',')]
+        keeper: Vec<String>,
     },
     /// Wander in.
     Play {
@@ -93,7 +96,7 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     match Cli::parse().cmd {
-        Cmd::Serve { addr, db, seed, password } => server::run(&addr, &db, seed, password).await,
+        Cmd::Serve { addr, db, seed, password, keeper } => server::run(&addr, &db, seed, password, keeper).await,
         Cmd::Play { name, server, password } => client::run(name, &server, password).await,
         Cmd::Agent { name, persona, server, password, daily_usd, state_dir, dry_run } => {
             let persona = persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());
