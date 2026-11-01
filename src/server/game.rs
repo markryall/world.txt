@@ -167,13 +167,22 @@ impl Game {
             return;
         }
         let claim = match super::names::check(self.world.db.name_key(&name).as_deref(), key.as_deref()) {
-            super::names::NameCheck::Taken => {
-                let _ = tx.send(ToClient::Bye {
-                    reason: format!(
-                        "🔐 The name {name} belongs to someone else's device. Try a different name! \
-                         (If it's really yours, ask the island's keeper to release it.)"
-                    ),
-                });
+            super::names::NameCheck::Taken(tried) => {
+                let reason = match tried {
+                    Some(hash) => {
+                        if let Err(e) = self.world.db.add_knock(&name, &hash) {
+                            eprintln!("remembering a knock for {name}: {e}");
+                        }
+                        self.tell_keepers_about_knocks();
+                        println!("🔐 {name} knocked from a new device (a keeper can type: welcome {name})");
+                        format!(
+                            "🔐 {name} is linked to another device. I've asked the island keepers to let this one in: \
+                             once they say yes, just join again. (Or pick a different name.)"
+                        )
+                    }
+                    None => format!("🔐 The name {name} is linked to another device. Try a different name!"),
+                };
+                let _ = tx.send(ToClient::Bye { reason });
                 return;
             }
             super::names::NameCheck::Claim(hash) => Some(hash),
@@ -208,6 +217,9 @@ impl Game {
             self.say1(id, Line::new().b(Col::Yellow, format!("🐣 Welcome to the island, {name}! Here's how to get started.")));
         }
         self.show_hint(id);
+        if self.is_keeper(&name) {
+            self.tell_keepers_about_knocks();
+        }
         for (&pid, p) in &self.players {
             if pid != id {
                 let line = if p.x == x && p.y == y {
@@ -339,6 +351,8 @@ impl Game {
             "make" | "build" | "create" | "craft" => return self.cmd_make(id, rest),
             "unmake" | "destroy" | "remove" => return self.cmd_unmake(id, rest),
             "undo" => return self.cmd_undo(id),
+            "welcome" | "letin" => return self.cmd_welcome(id, rest),
+            "unlink" => return self.cmd_unlink(id, rest),
             "push" | "carry" | "move" => return self.cmd_push(id, rest),
             "quit" | "exit" | "bye" => {
                 if let Some(p) = self.players.get(&id) {
@@ -839,6 +853,54 @@ impl Game {
         }
     }
 
+    /// Remind online keepers about devices waiting to be let in.
+    fn tell_keepers_about_knocks(&self) {
+        let Ok(knocks) = self.world.db.knocks() else { return };
+        if knocks.is_empty() {
+            return;
+        }
+        let mut lines = Vec::new();
+        for (name, ago) in knocks {
+            let when = if ago < 60 { "just now".to_string() } else if ago < 3600 { format!("{}m ago", ago / 60) } else { format!("{}h ago", ago / 3600) };
+            lines.push(
+                Line::new()
+                    .c(Col::Yellow, format!("🔐 Someone wants to come in as {name} from a new device ({when}). If that's really {name}, type: "))
+                    .b(Col::Yellow, format!("welcome {name}")),
+            );
+        }
+        for p in self.players.values().filter(|p| self.is_keeper(&p.name)) {
+            let _ = p.tx.send(ToClient::Lines { lines: lines.clone() });
+        }
+    }
+
+    fn cmd_welcome(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        if !self.is_keeper(&who) {
+            self.say1(id, Line::plain("Only island keepers can let a new device in."));
+            return Ok(());
+        }
+        match self.world.db.welcome(name.trim())? {
+            Some(n) => self.say1(id, Line::col(Col::Green, format!("✅ {n}'s new device can come in now. (Their old one won't work any more.)"))),
+            None => self.say1(id, Line::plain(format!("Nobody's knocking as '{}' right now.", name.trim()))),
+        }
+        Ok(())
+    }
+
+    fn cmd_unlink(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some((_, _, who)) = self.here(id) else { return Ok(()) };
+        if !self.is_keeper(&who) {
+            self.say1(id, Line::plain("Only island keepers can release a name."));
+            return Ok(());
+        }
+        let msg = if self.world.db.release_name(name.trim())? {
+            format!("🔓 {} is free: the next device to use that name will claim it.", name.trim())
+        } else {
+            format!("Nobody had claimed '{}', so there was nothing to release.", name.trim())
+        };
+        self.say1(id, Line::col(Col::Green, msg));
+        Ok(())
+    }
+
     fn cmd_undo(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((_, _, who)) = self.here(id) else { return Ok(()) };
         let restored = self.world.undo_remove(&who)?.map(|t| (t.x, t.y, t.name.clone()));
@@ -1161,6 +1223,9 @@ fn help() -> Vec<Line> {
         Line::col(Col::Dim, "    also: at night, during the day, when it's sunny, when someone arrives"),
         h("push bench north", "move something"),
         h("unmake bench / undo", "take away something you made, or bring it back"),
+        Line::col(Col::Pink, "island keepers"),
+        h("welcome Poppy", "let Poppy in from a new device"),
+        h("unlink Poppy", "free a name for whoever uses it next"),
         Line::new(),
         Line::col(Col::Dim, format!("The island is {SIZE}×{SIZE}. A whole day passes in 24 minutes.")),
     ]

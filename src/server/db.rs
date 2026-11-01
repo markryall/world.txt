@@ -61,6 +61,8 @@ impl Db {
                  player TEXT NOT NULL, board INTEGER NOT NULL,
                  following INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0,
                  PRIMARY KEY (player, board));
+             CREATE TABLE IF NOT EXISTS knocks (
+                 name TEXT PRIMARY KEY, key_hash TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -369,6 +371,45 @@ impl Db {
             params![name, x, y, key_hash],
         )?;
         Ok(())
+    }
+
+    /// Someone tried a claimed name from a new device: remember it for a keeper.
+    pub fn add_knock(&self, name: &str, key_hash: &str) -> anyhow::Result<()> {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+        self.conn.execute(
+            "INSERT INTO knocks (name, key_hash, at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(name) DO UPDATE SET key_hash = excluded.key_hash, at = excluded.at",
+            params![name, key_hash, now],
+        )?;
+        Ok(())
+    }
+
+    /// Recent knocks (within a day), oldest first: (name, seconds ago).
+    pub fn knocks(&self) -> anyhow::Result<Vec<(String, i64)>> {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT name, ?1 - at FROM knocks WHERE at > ?1 - 86400 ORDER BY at")?;
+        let rows = stmt.query_map([now], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Let the device that knocked for this name use it from now on (the old
+    /// device stops working). Returns the name as it's stored, if there was a knock.
+    pub fn welcome(&self, name: &str) -> anyhow::Result<Option<String>> {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+        let knock: Option<(String, String)> = self
+            .conn
+            .query_row(
+                "SELECT name, key_hash FROM knocks WHERE name = ?1 COLLATE NOCASE AND at > ?2 - 86400",
+                params![name, now],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .ok();
+        let Some((stored, hash)) = knock else { return Ok(None) };
+        self.conn.execute("UPDATE players SET key_hash = ?2 WHERE name = ?1", params![stored, hash])?;
+        self.conn.execute("DELETE FROM knocks WHERE name = ?1", [&stored])?;
+        Ok(Some(stored))
     }
 
     /// Free a name so the next device to use it claims it. True if it was claimed.

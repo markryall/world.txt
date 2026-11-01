@@ -238,7 +238,10 @@ function connect(name, password) {
         try { localStorage.removeItem('world.pw'); } catch {}
         history.replaceState(null, '', location.pathname);
         setTimeout(() => location.reload(), 2000);
-      } else if (m.reason.includes('belongs to') || m.reason.includes('already here')) {
+      } else if (m.reason.includes('linked to another device')) {
+        // Keep the name: once a keeper says yes, joining again just works.
+        setTimeout(() => location.reload(), 6000);
+      } else if (m.reason.includes('already here')) {
         // Back to the name screen to pick another.
         try { localStorage.removeItem('world.name'); } catch {}
         setTimeout(() => location.reload(), 3500);

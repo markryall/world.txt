@@ -16,9 +16,22 @@ and `make install` copies it into place as `world.txt`. `cargo run -- serve` wor
 **Names belong to the device that first uses them.** Each browser keeps a secret
 key (and this machine's terminal client, residents and bridges share one in
 `~/.config/world.txt/key`); the world stores only a hash. Anyone else trying that
-name is turned away. When a kid moves to a new device, free their name with
-`world.txt release Poppy` (it works while the server is running), and the next
-device to use it claims it.
+name is turned away.
+
+Browsers keep that key **per web address**, so a new quick-tunnel link, switching
+between your home address and the tunnel, or Safari clearing old site data can
+leave a kid with a fresh key. **Stick to one address** (a named tunnel, or the same
+home address every time) to avoid it. When it happens anyway, the kid is told
+their name is linked to another device and that the keepers have been asked, and
+the world remembers the knock:
+
+- Keepers online (or the next to arrive) see *"Someone wants to come in as Poppy
+  from a new device… type: welcome Poppy"*. `welcome Poppy` moves the name to the
+  new device (the old one stops working), and the kid just joins again.
+- On the server's machine: `world.txt welcome Poppy`. The server's own log also
+  prints each knock.
+- `unlink Poppy` (keepers, in the world) or `world.txt release Poppy` frees a name
+  for whichever device uses it next.
 
 **Things belong to whoever made them.** Only the maker can `unmake` or `push`
 something; everyone else is told whose it is. Unmaking tucks a thing away rather
