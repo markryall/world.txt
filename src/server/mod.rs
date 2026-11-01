@@ -3,6 +3,7 @@
 
 mod db;
 mod game;
+mod nature;
 mod rng;
 mod terrain;
 mod tutorial;

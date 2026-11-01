@@ -278,7 +278,7 @@ impl World {
     }
 
     /// A small coloured map centred on (cx, cy).
-    pub fn minimap(&self, cx: i64, cy: i64, people: &[(i64, i64)]) -> Vec<Line> {
+    pub fn minimap(&self, cx: i64, cy: i64, people: &[(i64, i64)], finds: &[(i64, i64)]) -> Vec<Line> {
         let (rw, rh) = (7, 4);
         let mut out = Vec::new();
         for y in cy - rh..=cy + rh {
@@ -290,6 +290,8 @@ impl World {
                     line = line.b(Col::White, "☺");
                 } else if self.things_at(x, y).next().is_some() {
                     line = line.c(Col::Yellow, "✦");
+                } else if finds.contains(&(x, y)) {
+                    line = line.b(Col::Pink, "•");
                 } else if !in_bounds(x, y) {
                     line = line.c(Col::DeepBlue, "≈");
                 } else {

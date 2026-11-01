@@ -1,6 +1,9 @@
 //! The one task that owns the world. Connections send it events; it
 //! answers with lines of text and status updates.
 
+mod gather;
+
+use super::nature::Find;
 use super::rng::Rng;
 use super::terrain::Terrain;
 use super::tutorial::{self, Act};
@@ -26,6 +29,8 @@ struct Player {
     reply_to: Option<String>,
     /// First-steps progress: an index into tutorial::STEPS, or DONE.
     tutorial: u8,
+    /// Ticks until something bites, while a line is in the water.
+    fishing: Option<u8>,
 }
 
 struct Game {
@@ -33,11 +38,13 @@ struct Game {
     players: HashMap<u64, Player>,
     phase: Phase,
     rng: Rng,
+    /// Flowers, butterflies, shells... waiting to be gathered.
+    finds: Vec<Find>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed) };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new() };
     let mut tick = tokio::time::interval(TICK);
     loop {
         tokio::select! {
@@ -112,7 +119,7 @@ impl Game {
                 self.world.weather.wind_label()
             ),
             clock: Clock::label(),
-            map: self.world.minimap(p.x, p.y, &people),
+            map: self.world.minimap(p.x, p.y, &people, &self.find_positions()),
             here: self.others_here(id),
             humans: self.players.values().filter(|p| !p.bot).count() as u32,
         };
@@ -127,7 +134,10 @@ impl Game {
 
     fn look(&self, id: u64) {
         let Some(p) = self.players.get(&id) else { return };
-        let lines = self.world.describe(p.x, p.y, &self.others_here(id));
+        let mut lines = self.world.describe(p.x, p.y, &self.others_here(id));
+        let exits = lines.pop();
+        lines.extend(self.find_lines(p.x, p.y));
+        lines.extend(exits);
         self.send(id, lines);
     }
 
@@ -151,7 +161,7 @@ impl Game {
             .filter(|&(x, y)| self.world.terrain(x, y).walkable())
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial });
+        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None });
 
         self.send(
             id,
@@ -243,6 +253,13 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "gather" | "pick" | "catch" | "collect" | "forage" | "g" => return self.cmd_gather(id, rest),
+            "fish" => return self.cmd_fish(id),
+            "satchel" | "bag" | "inventory" | "inv" | "i" => return self.cmd_satchel(id),
+            "journal" | "j" => return self.cmd_journal(id),
+            "give" => return self.cmd_give(id, rest),
+            "place" | "drop" | "put" => return self.cmd_place(id, rest),
+            "release" | "free" => return self.cmd_release(id, rest),
             "skip" => {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.tutorial = tutorial::DONE;
@@ -310,6 +327,7 @@ impl Game {
             p.x = nx;
             p.y = ny;
             p.sky = self.world.weather.sky_at(nx, ny);
+            p.fishing = None; // walking off reels the line in
         }
         self.tell_here(nx, ny, id, Line::col(Col::Cyan, format!("{name} arrives from the {back}.")));
         if to.is_wet() && !self.world.terrain(ox, oy).is_wet() {
@@ -832,6 +850,8 @@ impl Game {
             }
         }
 
+        self.nature_tick();
+
         // Things doing their things, but only when someone's there to see.
         let mut acts: Vec<(i64, i64, String)> = Vec::new();
         for t in &self.world.things {
@@ -1018,6 +1038,12 @@ fn help() -> Vec<Line> {
         h("plant tree|flowers|grass", "make things grow"),
         h("raise / path", "hills, rocks, paths"),
         h("name The Willow Bank", "name this place"),
+        Line::col(Col::Pink, "gather"),
+        h("gather  (or pick, catch)", "take what's here: look for pink • on the map"),
+        h("fish", "by the water, then wait for a bite"),
+        h("satchel / journal", "what you carry / everything you've found"),
+        h("give daisy to Poppy", "share with someone here"),
+        h("place daisy / release moth", "decorate, or set something free"),
         Line::col(Col::Pink, "make things"),
         h("make a frog that croaks when it rains", ""),
         Line::col(Col::Dim, format!("  {:<26}also: at night, during the day, when it's sunny, when someone arrives", "")),

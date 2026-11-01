@@ -96,6 +96,20 @@ Progress is saved by name, so returning visitors never see it again
 
 Clouds drift across the island on the wind, and a whole day passes in 24 minutes.
 
+### Gathering
+
+Little finds pop up around anyone wandering, shown as pink `•` on the map:
+flowers in meadows, butterflies on dry days, fireflies and moonflowers at night,
+mushrooms in the woods after rain, shells on the shore, feathers on the hills,
+crystals up on the rocks. There are 40 species, some rare.
+
+- `gather` (or `pick` / `catch`) takes what's here. Butterflies sometimes flutter
+  off to the next spot.
+- `fish` next to water, then wait for a bite. Ponds and the sea have different fish.
+- `satchel` holds 30 things. `journal` shows every species you've ever found.
+- `give daisy to Poppy` (when you're together), `place daisy` to decorate,
+  `release butterfly` to let it go.
+
 ## Island residents (AI)
 
 Residents are AI characters who join like any other player and call Claude
@@ -137,12 +151,30 @@ character until it hits its reply or hour limit (default 40 replies, 2 hours),
 or you tell it to stop. Lines in the log starting with `!` are the ones that
 want a response.
 
+**Keep this to people you trust, and out of auto mode.** Unlike Moss (who can
+only send game commands), the session behind `/world-resident` can run
+anything on your machine, and every line players type is fed to it. The skill
+treats world text as data and declines out-of-game requests in character, but
+that's guidance, not a lock. So:
+
+- Run it in Claude Code's **default permission mode**, never auto mode or with
+  permissions bypassed. Anything beyond game commands then still asks you first.
+  The skill refuses to start otherwise.
+- Prefer it on your home network or Tailscale. A public tunnel means anyone with
+  the link and password can talk to that session.
+- For extra isolation, run the session in a container that holds only this repo
+  and can reach nothing but the world. For example, Claude Code's
+  [devcontainer](https://code.claude.com/docs/en/devcontainer) setup, with the
+  bridge pointed at the host: `world.txt bridge Claudia --server ws://host.docker.internal:4040`.
+  Inside a container, the skill skips its permission-mode check.
+
 ## Layout
 
 - `src/protocol.rs`: JSON messages with named colours, so any client can draw them
 - `src/server/`: networking (`mod.rs`), the game loop and commands (`game.rs`),
   the island (`world.rs`, `terrain.rs`), weather and clock (`weather.rs`), SQLite (`db.rs`)
 - `src/client.rs`: the ratatui terminal client
+- `src/server/nature.rs` and `src/server/game/gather.rs`: things to find, and gathering
 - `src/agent.rs`: AI residents
 - `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside
 - `.claude/skills/world-resident/`: the Claude Code skill

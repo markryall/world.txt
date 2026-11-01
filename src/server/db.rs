@@ -39,7 +39,13 @@ impl Db {
                  name TEXT NOT NULL, action TEXT, trigger TEXT,
                  maker TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS players (
-                 name TEXT PRIMARY KEY, x INTEGER NOT NULL, y INTEGER NOT NULL);",
+                 name TEXT PRIMARY KEY, x INTEGER NOT NULL, y INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS satchel (
+                 player TEXT NOT NULL, species TEXT NOT NULL, count INTEGER NOT NULL,
+                 PRIMARY KEY (player, species));
+             CREATE TABLE IF NOT EXISTS journal (
+                 player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
+                 PRIMARY KEY (player, species));",
         )?;
         // Added later: first-steps progress. Players from before it existed
         // have clearly found their feet, so they start as done (99).
@@ -123,6 +129,41 @@ impl Db {
     pub fn remove_thing(&self, id: i64) -> anyhow::Result<()> {
         self.conn.execute("DELETE FROM things WHERE id = ?1", [id])?;
         Ok(())
+    }
+
+    /// What someone is carrying: (species id, count), in the order found.
+    pub fn satchel(&self, player: &str) -> anyhow::Result<Vec<(String, i64)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT species, count FROM satchel WHERE player = ?1 AND count > 0 ORDER BY rowid")?;
+        let rows = stmt.query_map([player], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn satchel_add(&self, player: &str, species: &str, n: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO satchel (player, species, count) VALUES (?1, ?2, ?3)
+             ON CONFLICT(player, species) DO UPDATE SET count = count + excluded.count",
+            params![player, species, n],
+        )?;
+        self.conn.execute("DELETE FROM satchel WHERE count <= 0", [])?;
+        Ok(())
+    }
+
+    /// Note a discovery. True if it's the first of its kind for this player.
+    pub fn journal_add(&self, player: &str, species: &str) -> anyhow::Result<bool> {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+        let n = self.conn.execute(
+            "INSERT OR IGNORE INTO journal (player, species, found_at) VALUES (?1, ?2, ?3)",
+            params![player, species, now],
+        )?;
+        Ok(n > 0)
+    }
+
+    pub fn journal(&self, player: &str) -> anyhow::Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT species FROM journal WHERE player = ?1")?;
+        let rows = stmt.query_map([player], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     /// Where a returning player was, and how far through first steps.
