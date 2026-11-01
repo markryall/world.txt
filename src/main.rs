@@ -115,6 +115,13 @@ enum Cmd {
         #[arg(long, default_value = "world.db")]
         db: String,
     },
+    /// Make someone an island keeper (run on the server's machine).
+    Promote {
+        /// Their nickname or username.
+        name: String,
+        #[arg(long, default_value = "world.db")]
+        db: String,
+    },
     /// Print a new magic link for someone's next device.
     Link {
         /// Their nickname or username.
@@ -170,6 +177,7 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Bridge { name, server, password, dir, invite } => bridge::run(name, &server, password, dir, invite).await,
         Cmd::Invite { nickname, keeper, url, db } => server::invite(&db, &nickname, keeper, url.as_deref()),
         Cmd::Link { name, url, db } => server::link(&db, &name, url.as_deref()),
+        Cmd::Promote { name, db } => server::promote(&db, &name),
         Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
         Cmd::Release { name, db } => server::release(&db, &name),
         Cmd::Welcome { name, code, db } => server::welcome(&db, &name, &code),

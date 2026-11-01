@@ -22,6 +22,13 @@ someone new. Pass `--url https://your.address` (or `WORLD_URL`) to `serve` and
 Browsers keep the device token per web address, so stick to one address (a named
 tunnel, or the same home address).
 
+**Keepers** look after the island. In the world they can `invite` and `link`,
+`promote Lu` / `demote Lu` (the last keeper can't step down), `kick Sam` for a
+break or `ban Sam` for good (`unban`), `signout Sam` to sign out all of
+someone's devices (a lost iPad: then `link Sam` for a fresh start), and `users`
+to see everyone with their devices and when they were last seen. On the server's
+machine, `world.txt promote Lu` always works.
+
 Cargo won't put a `.` in a binary name, so `cargo build` makes `target/release/world`
 and `make install` copies it into place as `world.txt`. `cargo run -- serve` works too.
 

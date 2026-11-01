@@ -169,6 +169,23 @@ impl Db {
         Ok(())
     }
 
+    /// Sign someone out everywhere. How many devices were removed.
+    pub fn remove_devices(&self, user: &str) -> anyhow::Result<usize> {
+        Ok(self.conn.execute("DELETE FROM devices WHERE user = ?1", [user])?)
+    }
+
+    /// Everyone, for keepers: (username, nickname, keeper, devices, last seen).
+    pub fn accounts(&self) -> anyhow::Result<Vec<(String, String, bool, i64, Option<i64>)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT p.name, COALESCE(p.nickname, p.name), p.keeper,
+                    (SELECT COUNT(*) FROM devices d WHERE d.user = p.name),
+                    (SELECT MAX(last_seen) FROM devices d WHERE d.user = p.name)
+             FROM players p ORDER BY p.keeper DESC, COALESCE(p.nickname, p.name) COLLATE NOCASE",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? != 0, r.get(3)?, r.get(4)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     pub fn keeper_count(&self) -> i64 {
         self.conn.query_row("SELECT COUNT(*) FROM players WHERE keeper != 0", [], |r| r.get(0)).unwrap_or(0)
     }

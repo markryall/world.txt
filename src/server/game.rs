@@ -236,8 +236,12 @@ impl Game {
         let key_hash = token.as_deref().or(new_token.as_deref()).map(super::names::hash);
         if !self.is_keeper(&user) {
             if let Some(until) = self.world.db.banned_until(&user, key_hash.as_deref(), now) {
-                let mins = ((until - now) / 60).max(1);
-                bye(&format!("🌙 A keeper has asked you to take a break. You can come back in about {mins} minutes."));
+                if until - now > 365 * 86_400 {
+                    bye("🚫 The island keepers have closed the island to you.");
+                } else {
+                    let mins = ((until - now) / 60).max(1);
+                    bye(&format!("🌙 A keeper has asked you to take a break. You can come back in about {mins} minutes."));
+                }
                 return;
             }
         }
@@ -444,6 +448,12 @@ impl Game {
             "unmute" | "unblock" => return self.cmd_mute(id, rest, false),
             "mutes" => return self.cmd_mutes(id),
             "kick" => return self.cmd_kick(id, rest),
+            "ban" => return self.cmd_ban(id, rest),
+            "unban" => return self.cmd_unkick(id, rest),
+            "promote" => return self.cmd_promote(id, rest, true),
+            "demote" => return self.cmd_promote(id, rest, false),
+            "signout" | "sign-out" => return self.cmd_signout(id, rest),
+            "users" | "accounts" => return self.cmd_users(id),
             "unkick" => return self.cmd_unkick(id, rest),
             "push" | "carry" | "move" => return self.cmd_push(id, rest),
             "quit" | "exit" | "bye" => {
@@ -1237,11 +1247,103 @@ impl Game {
         }
         let user = self.world.db.resolve_user(name).unwrap_or_else(|| name.trim().to_string());
         let msg = if self.world.db.lift_ban(&user)? {
-            format!("🌤 {} can come back whenever they like.", name.trim())
+            format!("🌤 {} can come back whenever they like.", super::names::full(&self.world.nick(&user), &user))
         } else {
             format!("{} wasn't on a break.", name.trim())
         };
         self.say1(id, Line::col(Col::Green, msg));
+        Ok(())
+    }
+
+    /// Find someone for a keeper command, by nickname or username.
+    fn keeper_target(&self, id: u64, name: &str) -> Option<String> {
+        if !self.is_keeper(&self.user(id)) {
+            self.say1(id, Line::plain("Only island keepers can do that."));
+            return None;
+        }
+        let found = self.world.db.resolve_user(name);
+        if found.is_none() {
+            self.say1(id, Line::plain(format!("There's nobody called '{}' on the island. ('users' lists everyone)", name.trim())));
+        }
+        found
+    }
+
+    fn send_off(&self, user: &str, reason: &str) {
+        for p in self.players.values().filter(|p| p.user == user) {
+            let _ = p.tx.send(ToClient::Bye { reason: reason.to_string() });
+        }
+    }
+
+    fn cmd_ban(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some(target) = self.keeper_target(id, name) else { return Ok(()) };
+        if self.is_keeper(&target) {
+            self.say1(id, Line::plain("Keepers can't ban other keepers. (demote them first, if you must)"));
+            return Ok(());
+        }
+        // A ban is a break that never ends.
+        self.world.db.add_ban(&target, None, i64::MAX / 2)?;
+        self.send_off(&target, "🚫 The island keepers have closed the island to you.");
+        let who = super::names::full(&self.world.nick(&target), &target);
+        self.say1(id, Line::col(Col::Yellow, format!("🚫 {who} is banned. 'unban {target}' to let them back.")));
+        println!("🚫 {} banned {who}", self.user(id));
+        Ok(())
+    }
+
+    fn cmd_promote(&mut self, id: u64, name: &str, keeper: bool) -> anyhow::Result<()> {
+        let Some(target) = self.keeper_target(id, name) else { return Ok(()) };
+        let who = super::names::full(&self.world.nick(&target), &target);
+        if !keeper && target == self.user(id) && self.world.db.keeper_count() <= 1 {
+            self.say1(id, Line::plain("You're the last keeper, so you'd better stay one! Promote someone else first."));
+            return Ok(());
+        }
+        self.world.db.set_keeper(&target, keeper)?;
+        if keeper {
+            self.say1(id, Line::col(Col::Green, format!("🗝  {who} is an island keeper now.")));
+            if let Some(pid) = self.find_player(&target) {
+                self.say1(pid, Line::col(Col::Green, "🗝  You're an island keeper now! Type help to see what keepers can do."));
+            }
+        } else {
+            self.say1(id, Line::col(Col::Dim, format!("{who} isn't a keeper any more.")));
+        }
+        Ok(())
+    }
+
+    fn cmd_signout(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some(target) = self.keeper_target(id, name) else { return Ok(()) };
+        let n = self.world.db.remove_devices(&target)?;
+        self.send_off(&target, "💌 You've been signed out. Ask an island keeper for a new magic link to come back.");
+        let who = super::names::full(&self.world.nick(&target), &target);
+        let devices = if n == 1 { "1 device".to_string() } else { format!("{n} devices") };
+        self.say1(id, Line::col(Col::Yellow, format!("💌 Signed {who} out of {devices}. 'link {target}' makes them a new magic link.")));
+        Ok(())
+    }
+
+    fn cmd_users(&mut self, id: u64) -> anyhow::Result<()> {
+        if !self.is_keeper(&self.user(id)) {
+            self.say1(id, Line::plain("Only island keepers can see everyone. Try 'who' for who's here now."));
+            return Ok(());
+        }
+        let now = super::accounts::now();
+        let mut lines = vec![Line::new().b(Col::Magenta, "🪪 Everyone on the island")];
+        for (user, nick, keeper, devices, seen) in self.world.db.accounts()? {
+            let seen = match seen.map(|t| now - t) {
+                None => "never signed in".to_string(),
+                Some(s) if s < 3600 => "seen just now".to_string(),
+                Some(s) if s < 86_400 => format!("seen {}h ago", s / 3600),
+                Some(s) => format!("seen {}d ago", s / 86_400),
+            };
+            let online = if self.players.values().any(|p| p.user == user) { " ☺ here" } else { "" };
+            lines.push(
+                Line::new()
+                    .t("  ")
+                    .b(Col::Cyan, nick)
+                    .c(Col::Dim, format!(" {user}"))
+                    .c(Col::Yellow, if keeper { " 🗝" } else { "" })
+                    .c(Col::Dim, format!("  · {devices} device{} · {seen}", if devices == 1 { "" } else { "s" }))
+                    .c(Col::Green, online),
+            );
+        }
+        self.send(id, lines);
         Ok(())
     }
 
@@ -1606,6 +1708,10 @@ fn help() -> Vec<Line> {
         h("welcome Poppy FROG-42", "let Poppy in from a new device (the code is on her screen)"),
         h("unlink Poppy", "free a name for whoever uses it next"),
         h("kick Sam [minutes] / unkick Sam", "send someone off for a break (30 min)"),
+        h("ban Sam / unban Sam", "close the island to someone"),
+        h("promote Lu / demote Lu", "make someone a keeper, or not"),
+        h("signout Sam", "sign out all their devices (a lost iPad)"),
+        h("users", "everyone, with their devices"),
         Line::new(),
         Line::col(Col::Dim, format!("The island is {SIZE}×{SIZE}. A whole day passes in 24 minutes.")),
     ]

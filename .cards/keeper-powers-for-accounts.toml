@@ -1,7 +1,7 @@
 name = "Keeper powers for accounts"
-status = "todo"
+status = "done"
 description = "Keepers are stored in the world, not a server flag: 'promote <user>' / 'demote <user>' (the server machine can always make one). Ban by user ('ban', 'unban'), which actually sticks now nobody can sign themselves up. 'signout <user>' removes all their devices (lost iPad). 'users' lists everyone with nickname, username, keeper and devices."
 created_at = "2026-11-01T20:35:42.185937Z"
-updated_at = "2026-11-01T20:35:42.185937Z"
+updated_at = "2026-11-01T20:49:09.213074Z"
 tags = ["accounts"]
 priority = "high"

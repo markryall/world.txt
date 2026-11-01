@@ -243,3 +243,12 @@ fn names_clean(raw: &str) -> String {
     let mut c = n.chars();
     c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
 }
+
+/// `world.txt promote <name>`: the server's machine can always make a keeper.
+pub fn promote(db_path: &str, name: &str) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let Some(user) = db.resolve_user(name) else { anyhow::bail!("there's nobody called {name}") };
+    db.set_keeper(&user, true)?;
+    println!("🗝  {} ({user}) is an island keeper now.", db.nickname(&user).unwrap_or_default());
+    Ok(())
+}
