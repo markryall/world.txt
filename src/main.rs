@@ -1,4 +1,5 @@
 mod agent;
+mod bridge;
 mod client;
 mod protocol;
 mod server;
@@ -60,6 +61,26 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Keep a resident connected for something else to drive (e.g. a Claude Code session).
+    Bridge {
+        name: String,
+        #[arg(long, env = "WORLD_SERVER", default_value = "ws://127.0.0.1:4040")]
+        server: String,
+        #[arg(long, env = "WORLD_PASSWORD")]
+        password: Option<String>,
+        /// Where the log and socket live.
+        #[arg(long, default_value = "tmp/bridge")]
+        dir: std::path::PathBuf,
+    },
+    /// Send one command through a running bridge and print what comes back.
+    Send {
+        name: String,
+        /// The command, e.g. say hello there
+        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+        #[arg(long, default_value = "tmp/bridge")]
+        dir: std::path::PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -71,5 +92,7 @@ async fn main() -> anyhow::Result<()> {
             let persona = persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());
             agent::run(agent::Options { name, persona, server, password, daily_usd, state_dir, dry_run }).await
         }
+        Cmd::Bridge { name, server, password, dir } => bridge::run(name, &server, password, dir).await,
+        Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
     }
 }

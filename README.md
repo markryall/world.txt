@@ -115,6 +115,22 @@ They're built not to burn tokens:
 
 Spend and memories live in `agent-state/<name>.json`.
 
+### Driving a resident from Claude Code
+
+For a special guest with a bigger brain, a Claude Code session can be the
+resident instead. It runs on your Claude plan, with no API key needed.
+
+```
+world.txt bridge Claudia                  # stays connected, logs to tmp/bridge/claudia.log
+world.txt send Claudia say hello darlings! # acts, and prints what the world said back
+```
+
+In a Claude Code session in this repo, `/world-resident Claudia` does all of
+that: it starts the bridge, watches for lines meant for Claudia, and answers in
+character until it hits its reply or hour limit (default 40 replies, 2 hours),
+or you tell it to stop. Lines in the log starting with `!` are the ones that
+want a response.
+
 ## Layout
 
 - `src/protocol.rs`: JSON messages with named colours, so any client can draw them
@@ -122,4 +138,6 @@ Spend and memories live in `agent-state/<name>.json`.
   the island (`world.rs`, `terrain.rs`), weather and clock (`weather.rs`), SQLite (`db.rs`)
 - `src/client.rs`: the ratatui terminal client
 - `src/agent.rs`: AI residents
+- `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside
+- `.claude/skills/world-resident/`: the Claude Code skill
 - `web/index.html`: the browser client

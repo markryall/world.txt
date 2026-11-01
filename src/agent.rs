@@ -87,7 +87,7 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default();
 
-    let (ws, _) = tokio_tungstenite::connect_async(&opts.server).await?;
+    let ws = crate::bridge::connect_retry(&opts.server).await?;
     let (mut sink, mut source) = ws.split();
     let hello = ToServer::Hello { name: opts.name.clone(), password: opts.password.clone(), bot: true };
     sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
@@ -228,7 +228,7 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
 }
 
 /// Does this line deserve a response? Returns a short reason.
-fn trigger(text: &str, me: &str) -> Option<&'static str> {
+pub(crate) fn trigger(text: &str, me: &str) -> Option<&'static str> {
     let lower = text.to_lowercase();
     if lower.starts_with("you ") || lower.starts_with(me) {
         return None; // our own actions echoed back
