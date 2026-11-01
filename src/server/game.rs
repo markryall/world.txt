@@ -5,6 +5,7 @@ mod boards;
 mod craft;
 mod gather;
 mod homes;
+mod travel;
 
 use super::nature::Find;
 use super::rng::Rng;
@@ -42,6 +43,8 @@ struct Player {
     muted: std::collections::HashSet<String>,
     /// Hash of the device key they joined with, so a kick covers the device too.
     key_hash: Option<String>,
+    /// Who they're walking to, with `join`.
+    travel: Option<String>,
 }
 
 impl Player {
@@ -70,6 +73,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Ve
         eprintln!("couldn't put up the Island Journal: {e}");
     }
     let mut tick = tokio::time::interval(TICK);
+    let mut stride = tokio::time::interval(Duration::from_millis(500));
     loop {
         tokio::select! {
             ev = events.recv() => match ev {
@@ -77,6 +81,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Ve
                 None => break,
             },
             _ = tick.tick() => game.tick(),
+            _ = stride.tick() => game.step_travellers(),
         }
     }
 }
@@ -241,7 +246,7 @@ impl Game {
                 eprintln!("claiming {name}: {e}");
             }
         }
-        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash });
+        self.players.insert(id, Player { name: name.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None });
 
         self.send(
             id,
@@ -321,6 +326,7 @@ impl Game {
         };
 
         if let Some(&(_, _, dx, dy)) = DIRS.iter().find(|d| d.0 == verb || d.1 == verb) {
+            self.stop_travelling(id, false);
             return self.walk(id, dx, dy);
         }
         if homes::BUILDING.contains(&verb.as_str()) && !self.may_build_here(id) {
@@ -340,6 +346,8 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "join" | "visit" => return self.cmd_join(id, rest),
+            "stop" => self.stop_travelling(id, true),
             "map" | "m" => {
                 if let Some(p) = self.players.get(&id) {
                     let people: Vec<(i64, i64)> =
@@ -431,6 +439,7 @@ impl Game {
     fn walk(&mut self, id: u64, dx: i64, dy: i64) -> anyhow::Result<()> {
         let Some(p) = self.players.get(&id) else { return Ok(()) };
         let (ox, oy, name) = (p.x, p.y, p.name.clone());
+        let quiet = p.travel.is_some(); // `join` walks without a look at every step
         let (nx, ny) = (ox + dx, oy + dy);
         let to = self.world.terrain(nx, ny);
         if !in_bounds(nx, ny) || !to.walkable() {
@@ -447,10 +456,14 @@ impl Game {
             p.fishing = None; // walking off reels the line in
         }
         self.tell_here(nx, ny, id, Line::col(Col::Cyan, format!("{name} arrives from the {back}.")));
-        if to.is_wet() && !self.world.terrain(ox, oy).is_wet() {
-            self.say1(id, Line::col(Col::Blue, "You wade in. The water is cool around your legs."));
+        if quiet {
+            // just the step, below
+        } else {
+            if to.is_wet() && !self.world.terrain(ox, oy).is_wet() {
+                self.say1(id, Line::col(Col::Blue, "You wade in. The water is cool around your legs."));
+            }
+            self.look(id);
         }
-        self.look(id);
         // Things that respond to arrivals.
         let reactions: Vec<String> = self
             .world
@@ -1371,6 +1384,7 @@ fn help() -> Vec<Line> {
         h("reply thanks!  (or r)", "answer whoever told you"),
         h("chat hi everyone  (@all)", "everyone in the world hears"),
         h("find Poppy", "which way to walk to them"),
+        h("join Poppy / stop", "walk to them automatically"),
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune"),
         h("sit / rest / dance / wave", "vibes"),

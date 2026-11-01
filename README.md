@@ -140,7 +140,9 @@ Progress is saved by name, so returning visitors never see it again
   scale: you, friends, homes, boards, and numbered named places
 - `say hi` (or `'hi`), `:waves`, `shout`, `hum C E G`
 - `@Poppy hi` talks to someone anywhere, `reply` answers them, `chat` (or `@all`) reaches
-  everyone, and `find Poppy` tells you which way to walk. In the browser, tap a name to message them.
+  everyone, `find Poppy` tells you which way to walk, and `join Poppy` walks you
+  there automatically (around the water, following if they move; `stop` to stop).
+  In the browser, tap a name to message them.
 - `dig`, `fill`, `plant tree|flowers|grass`, `raise`, `path`, `name The Willow Bank`
 - `make a frog that croaks when it rains`, `push frog north`, `unmake frog`
 
