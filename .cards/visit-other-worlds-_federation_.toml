@@ -1,0 +1,7 @@
+name = "Visit other worlds (federation)"
+status = "todo"
+description = "Let people travel between world.txt servers, not just islands. Each world gets an identity (a key pair, plus a public info page like /.well-known/world.txt naming it). Your home world signs a passport ('this is Poppy, sunny-otter-42, from ryall.island'); a portal (or a boat) takes you to another world, which checks the passport with your home world. Destination keepers decide: visitors wait at the door until a keeper types 'admit poppy@ryall.island', or keepers 'trust ryall.island' to let a friendly world's people straight in. Bans, mutes and kicks work on visitors. First version: only your identity travels (shown as 'Poppy (sunny-otter-42@ryall.island)'); satchels, homes and journals stay home, since a world can't trust things made elsewhere. Split into: world identity, passports and visiting, trusted worlds. Best after 'Boats to other islands'."
+created_at = "2026-11-01T20:57:52.985484Z"
+updated_at = "2026-11-01T20:57:52.985484Z"
+tags = ["federation"]
+priority = "low"
