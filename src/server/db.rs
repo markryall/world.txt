@@ -159,6 +159,11 @@ impl Db {
         Ok(self.conn.last_insert_rowid())
     }
 
+    pub fn set_thing_action(&self, id: i64, action: Option<&str>) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE things SET action = ?2 WHERE id = ?1", params![id, action])?;
+        Ok(())
+    }
+
     pub fn move_thing(&self, id: i64, x: i64, y: i64) -> anyhow::Result<()> {
         self.conn
             .execute("UPDATE things SET x = ?2, y = ?3 WHERE id = ?1", params![id, x, y])?;

@@ -5,6 +5,7 @@ mod boards;
 mod craft;
 mod gather;
 mod homes;
+mod music;
 mod travel;
 
 use super::nature::Find;
@@ -64,11 +65,13 @@ struct Game {
     journal_board: Option<i64>,
     /// Names that may tidy up anyone's things.
     keepers: Vec<String>,
+    /// Who last hummed where, for noticing a jam.
+    last_hum: HashMap<(i64, i64), (String, std::time::Instant)>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, keepers: Vec<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, keepers, last_hum: HashMap::new() };
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -347,6 +350,8 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "teach" => return self.cmd_teach(id, rest),
+            "play" | "wind" => return self.cmd_play(id),
             "join" | "visit" => return self.cmd_join(id, rest),
             "stop" => self.stop_travelling(id, true),
             "map" | "m" => {
@@ -566,6 +571,7 @@ impl Game {
                 });
             }
         }
+        self.notice_jam(x, y, &name);
         Ok(())
     }
 
@@ -939,6 +945,13 @@ impl Game {
             return Ok(());
         }
         let (name, action, trigger) = parse_make(text);
+        if music::is_music_box(&name) {
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &who, Some(music::music_kind()))?;
+            self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach C E G E C"));
+            self.tell_here(x, y, id, Line::col(Col::Pink, format!("🎶 {who} makes {name}.")));
+            self.status_all();
+            return Ok(());
+        }
         if boards::is_board_name(&name) {
             if self.world.things_at(x, y).any(|t| t.is_board()) {
                 self.say1(id, Line::plain("There's already a board here. Try 'post hello!'"));
@@ -1430,7 +1443,8 @@ fn help() -> Vec<Line> {
         h("find Poppy", "which way to walk to them"),
         h("join Poppy / stop", "walk to them automatically"),
         h("shout hello", "carries a long way"),
-        h("hum C E G", "a little tune"),
+        h("hum C E G", "a little tune (hum together to jam!)"),
+        h("make a music box / teach C E G / play", "a box that remembers your tune"),
         h("sit / rest / dance / wave", "vibes"),
         h("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
         Line::col(Col::Pink, "shape the land"),

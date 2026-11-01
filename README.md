@@ -146,6 +146,9 @@ Progress is saved by name, so returning visitors never see it again
   In the browser, tap a name to message them.
 - `dig`, `fill`, `plant tree|flowers|grass`, `raise`, `path`, `name The Willow Bank`
 - `make a frog that croaks when it rains`, `push frog north`, `unmake frog`
+- `make a music box`, then `teach C E G E C` (only its maker can) and `play`; it also
+  plays now and then when people are near. Two people humming at the same spot
+  are told they're making music together. In the browser, tunes play as real notes.
 
 Clouds drift across the island on the wind, and a whole day passes in 24 minutes.
 

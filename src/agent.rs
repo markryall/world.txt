@@ -40,7 +40,7 @@ const MAX_NOTES: usize = 30;
 /// Commands a resident may use. No unmake, push, shout or world-wide chat.
 const ALLOWED: &[&str] = &[
     "say", "emote", "me", "tell", "reply", "look", "hum", "sing", "whistle", "plant", "dig",
-    "path", "make", "gather", "pick", "catch", "fish", "give", "read", "post", "sit", "rest", "dance", "wave", "find", "n", "s", "e", "w", "ne", "nw", "se",
+    "path", "make", "gather", "pick", "catch", "fish", "give", "read", "post", "play", "sit", "rest", "dance", "wave", "find", "n", "s", "e", "w", "ne", "nw", "se",
     "sw", "north", "south", "east", "west", "north-east", "north-west", "south-east", "south-west",
 ];
 
