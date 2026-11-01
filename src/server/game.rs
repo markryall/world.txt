@@ -15,6 +15,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedReceiver;
 
+/// Starting a line with any of these says it out loud.
+const SAY_QUOTES: [char; 6] = ['\'', '"', '‘', '’', '“', '”'];
 const TICK: Duration = Duration::from_secs(3);
 const SHOUT_RANGE: i64 = 10;
 
@@ -217,7 +219,8 @@ impl Game {
             return Ok(());
         }
         // Shortcuts: 'hello  and  :waves
-        if let Some(rest) = input.strip_prefix('\'').or_else(|| input.strip_prefix('"')) {
+        // Phones like to "smarten" quotes, so curly ones count too.
+        if let Some(rest) = input.strip_prefix(SAY_QUOTES) {
             return self.cmd_say(id, rest.trim());
         }
         if let Some(rest) = input.strip_prefix(':') {
@@ -523,8 +526,8 @@ impl Game {
         }
         let from = self.players[&id].name.clone();
         let target = self.players[&tid].name.clone();
-        self.say1(id, Line::new().c(Col::Pink, format!("✉ You tell {target}: ")).c(Col::White, msg));
-        self.say1(tid, Line::new().b(Col::Pink, format!("✉ {from}")).c(Col::Pink, " tells you: ").c(Col::White, msg));
+        self.say1(id, Line::new().c(Col::Pink, format!("✉ You say to {target}: ")).c(Col::White, msg));
+        self.say1(tid, Line::new().b(Col::Pink, format!("✉ {from}")).c(Col::Pink, " says to you: ").c(Col::White, msg));
         if let Some(t) = self.players.get_mut(&tid) {
             t.reply_to = Some(from);
         }
@@ -884,7 +887,7 @@ impl Game {
 fn said_something(input: &str, verb: &str) -> bool {
     let text = if verb == "say" {
         input.split_once(char::is_whitespace).map_or("", |(_, r)| r)
-    } else if let Some(r) = input.strip_prefix(['\'', '"']) {
+    } else if let Some(r) = input.strip_prefix(SAY_QUOTES) {
         r
     } else {
         ""
@@ -1015,7 +1018,11 @@ fn clean_name(raw: &str) -> String {
 }
 
 fn help() -> Vec<Line> {
-    let h = |cmd: &str, what: &str| Line::new().c(Col::Yellow, format!("  {cmd:<26}")).t(what.to_string());
+    // No column padding, so it reads fine on a narrow phone screen too.
+    let h = |cmd: &str, what: &str| {
+        let line = Line::new().c(Col::Yellow, format!("  {cmd}"));
+        if what.is_empty() { line } else { line.c(Col::Dim, format!("  {what}")) }
+    };
     vec![
         Line::new().b(Col::Magenta, "✨ Things you can do ✨"),
         Line::col(Col::Pink, "wander"),
@@ -1046,7 +1053,7 @@ fn help() -> Vec<Line> {
         h("place daisy / release moth", "decorate, or set something free"),
         Line::col(Col::Pink, "make things"),
         h("make a frog that croaks when it rains", ""),
-        Line::col(Col::Dim, format!("  {:<26}also: at night, during the day, when it's sunny, when someone arrives", "")),
+        Line::col(Col::Dim, "    also: at night, during the day, when it's sunny, when someone arrives"),
         h("push bench north", "move something"),
         h("unmake bench", "make it go away"),
         Line::new(),
@@ -1057,6 +1064,15 @@ fn help() -> Vec<Line> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phone_quotes_still_say_things() {
+        for input in ["'hi", "’hi", "‘hi", "\"hi", "“hi", "say hi"] {
+            let verb = input.split_whitespace().next().unwrap().to_lowercase();
+            assert!(said_something(input, &verb), "{input}");
+        }
+        assert!(!said_something("’", "’"));
+    }
 
     #[test]
     fn makes_a_rainy_frog() {

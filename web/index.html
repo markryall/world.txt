@@ -49,7 +49,19 @@
   @keyframes pulse { 50% { background: var(--yellow); color: var(--bg); } }
   @media (prefers-reduced-motion: reduce) { #hint.on, .pulse { animation: none; } .pulse { outline: 2px solid var(--yellow); } }
   #sound { background: none; border: 0; color: var(--dim); font: inherit; cursor: pointer; padding: 0; }
+  #chips { display: none; gap: 6px; overflow-x: auto; padding: 8px 12px 0; background: var(--panel);
+    border-top: 1px solid var(--line); scrollbar-width: none; }
+  #chips::-webkit-scrollbar { display: none; }
+  #chips button { flex: none; background: var(--line); color: var(--fg); border: 0; border-radius: 16px;
+    font: inherit; font-size: 14px; height: 34px; padding: 0 12px; touch-action: manipulation; }
+  #chips button:active { background: var(--magenta); color: var(--bg); }
   @media (max-width: 720px) {
+    #chips { display: flex; }
+    #input { border-top: 0; }
+    /* While typing, the keyboard needs the room: keep just the place name. */
+    body.typing #map, body.typing #pad, body.typing #weather, body.typing #clock,
+    body.typing #here, body.typing #sound { display: none; }
+    body.typing #side { padding: 6px 12px; }
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     #side { order: -1; border-left: 0; border-bottom: 1px solid var(--line); flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; padding: 8px; gap: 8px 14px; }
     #map { font-size: 13px; padding: 0; }
@@ -86,6 +98,13 @@
 </div>
 <div id="hint" role="button" tabindex="0">
   <span id="hint-text"></span><span class="go">try it</span><span class="skip" id="hint-skip">skip</span>
+</div>
+<div id="chips">
+  <button data-prefill="say ">💬 say</button><button data-c="gather">🧺 gather</button>
+  <button data-c="satchel">satchel</button><button data-c="journal">📖 journal</button>
+  <button data-c="plant flowers">🌼 plant</button><button data-c="fish">🎣 fish</button>
+  <button data-prefill="chat ">📣 chat</button><button data-c="who">who</button>
+  <button data-c="look">👀 look</button><button data-c="help">help</button>
 </div>
 <form id="input" autocomplete="off">
   <input id="cmd" placeholder="say hi, dig, make a frog that croaks when it rains…" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
@@ -131,6 +150,10 @@ function paintLine(line) {
   return frag;
 }
 
+// Ask for the plain-text look of symbols phones like to draw as wide emoji
+// (☺ ♣ ▲ ☀ ☁ …), so the map's columns stay lined up.
+const textStyle = (s) => ({ ...s, t: s.t.replace(/([\u2600-\u27BF])(?!\uFE0E)/g, '$1\uFE0E') });
+
 function status(m) {
   $('#place').textContent = m.place;
   $('#weather').textContent = m.weather;
@@ -149,7 +172,7 @@ function status(m) {
   map.replaceChildren();
   m.map.forEach((line, i) => {
     if (i) map.appendChild(document.createTextNode('\n'));
-    map.appendChild(paintLine(line));
+    map.appendChild(paintLine(line.map(textStyle)));
   });
   sky = m.weather;
   updateRain();
@@ -262,6 +285,25 @@ $('#cmd').onkeydown = (e) => {
   if (e.key === 'ArrowDown') { hist = Math.min(history.length, hist + 1); $('#cmd').value = history[hist] || ''; e.preventDefault(); }
 };
 document.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => send(b.dataset.c));
+
+// Phones: give the conversation the room while the keyboard is up.
+const cmdBox = $('#cmd');
+cmdBox.addEventListener('focus', () => document.body.classList.add('typing'));
+cmdBox.addEventListener('blur', () => setTimeout(() => {
+  if (document.activeElement !== cmdBox) document.body.classList.remove('typing');
+}, 150));
+// Chips keep the keyboard up instead of stealing focus.
+document.querySelectorAll('#chips button').forEach((b) =>
+  b.addEventListener('mousedown', (e) => { if (document.activeElement === cmdBox) e.preventDefault(); }));
+if (window.visualViewport) {
+  const fit = () => {
+    document.body.style.height = window.visualViewport.height + 'px';
+    window.scrollTo(0, 0);
+    log.scrollTop = log.scrollHeight;
+  };
+  window.visualViewport.addEventListener('resize', fit);
+  fit();
+}
 document.querySelectorAll('[data-prefill]').forEach((b) => b.onclick = () => prefill(b.dataset.prefill));
 
 // ---- sound: hums become notes, rain sounds like rain --------------------

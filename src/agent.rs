@@ -230,12 +230,13 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
 /// Does this line deserve a response? Returns a short reason.
 pub(crate) fn trigger(text: &str, me: &str) -> Option<&'static str> {
     let lower = text.to_lowercase();
-    if lower.starts_with("you ") || lower.starts_with(me) {
+    let own_chat = lower.starts_with(&format!("💬 {me}:"));
+    if lower.starts_with("you ") || lower.starts_with(me) || own_chat || lower.starts_with("✉ you ") {
         return None; // our own actions echoed back
     }
     if lower.contains("for the first time") {
         Some("someone new just arrived on the island; maybe welcome them with @Name")
-    } else if lower.contains(" tells you:") {
+    } else if lower.contains(" says to you:") || lower.contains(" tells you:") {
         Some("someone sent you a message")
     } else if lower.contains(me) {
         Some("someone mentioned you")
@@ -467,7 +468,10 @@ mod tests {
 
     #[test]
     fn wakes_for_the_right_things() {
-        assert!(trigger("Poppy tells you: hi moss", "moss").is_some());
+        assert!(trigger("✉ Poppy says to you: hi moss", "moss").is_some());
+        assert!(trigger("✉ Poppy tells you: hi", "moss").is_some()); // older servers
+        assert!(trigger("💬 Moss: party on the beach!", "moss").is_none());
+        assert!(trigger("💬 Poppy: where's moss?", "moss").is_some());
         assert!(trigger("Poppy says, \"hello\"", "moss").is_some());
         assert!(trigger("You say, \"hi\"", "moss").is_none());
         assert!(trigger("Moss says, \"mrrp\"", "moss").is_none());
