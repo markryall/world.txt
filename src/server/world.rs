@@ -3,7 +3,7 @@
 use super::db::{Db, ThingRow, TileRow};
 use super::rng::{self, fbm};
 use super::terrain::Terrain;
-use super::weather::{Clock, Phase, Sky, Weather};
+use super::weather::{Clock, Phase, Season, Sky, Weather};
 use crate::protocol::{Col, Line};
 
 pub const SIZE: i64 = 64;
@@ -300,7 +300,7 @@ impl World {
 
         let mut text = rng::pick(here.descriptions(), self.seed, x, y).to_string();
         text.push(' ');
-        text.push_str(&atmosphere(here, sky, phase, self.weather.breezy(), self.seed, x, y));
+        text.push_str(&atmosphere(here, sky, phase, Clock::season(), self.weather.breezy(), self.seed, x, y));
         out.push(Line::plain(text));
 
         // What lies around.
@@ -450,10 +450,35 @@ impl World {
     }
 }
 
+/// A touch of the season, for descriptions.
+fn season_line(here: Terrain, season: Season) -> &'static str {
+    use Terrain::*;
+    match (season, here) {
+        (Season::Spring, Forest) => "Fresh green leaves are unfurling everywhere.",
+        (Season::Spring, Meadow | Grass) => "Blossom petals drift on the breeze.",
+        (Season::Spring, Sand | Water | DeepWater) => "The sea sparkles in the spring light.",
+        (Season::Spring, _) => "Everything feels new and green.",
+        (Season::Summer, Forest) => "The woods are deep, green and humming.",
+        (Season::Summer, Meadow | Grass) => "The air is thick with the hum of summer.",
+        (Season::Summer, Sand | Water | DeepWater) => "The sand is warm and the water inviting.",
+        (Season::Summer, _) => "It's a long, golden summer.",
+        (Season::Autumn, Forest) => "The trees blaze red and gold, and leaves drift down.",
+        (Season::Autumn, Meadow | Grass) => "The grass has turned gold, and there's a crispness in the air.",
+        (Season::Autumn, Sand | Water | DeepWater) => "A cool autumn wind comes in off the sea.",
+        (Season::Autumn, _) => "Autumn leaves skitter across the ground.",
+        (Season::Winter, Forest) => "The bare branches are traced with frost.",
+        (Season::Winter, Meadow | Grass) => "Frost silvers every blade of grass.",
+        (Season::Winter, Pond | Water) => "A thin skin of ice edges the water.",
+        (Season::Winter, Sand | DeepWater) => "The sea is grey and the wind is cold.",
+        (Season::Winter, _) => "The air is cold and clear.",
+    }
+}
+
 fn atmosphere(
     here: Terrain,
     sky: Sky,
     phase: Phase,
+    season: Season,
     breezy: bool,
     seed: u64,
     x: i64,
@@ -471,11 +496,16 @@ fn atmosphere(
         (_, Sky::Drizzle) => "A fine drizzle hangs in the air.",
         (_, Sky::Rain) => "Rain falls steadily.",
     };
-    let mut s = light.to_string();
+    let snow = season == Season::Winter;
+    let mut s = if snow { light.replace("drizzle", "flurry of snow").replace("Rain falls", "Snow falls") } else { light.to_string() };
     if sky == Sky::Rain && phase != Phase::Day {
-        s.push_str(" Rain falls steadily.");
+        s.push_str(if snow { " Snow falls steadily." } else { " Rain falls steadily." });
     }
-    if sky.wet() {
+    s.push(' ');
+    s.push_str(season_line(here, season));
+    if sky.wet() && snow {
+        s.push_str(" Snow settles softly on everything.");
+    } else if sky.wet() {
         let wet = match here {
             Terrain::Forest => "Drops patter on the leaves above.",
             Terrain::Water | Terrain::Pond | Terrain::DeepWater => "Raindrops dimple the water.",

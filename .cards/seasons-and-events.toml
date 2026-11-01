@@ -1,7 +1,7 @@
 name = "Seasons and events"
-status = "todo"
+status = "inprogress"
 description = "Spring blossom, autumn leaves to collect, a lantern festival on a set day, and scheduled parties (Claudia hosting on the beach)."
 created_at = "2026-11-01T14:36:29.491317Z"
-updated_at = "2026-11-01T14:36:29.491317Z"
+updated_at = "2026-11-01T20:59:11.275124Z"
 tags = ["magic"]
 priority = "low"

@@ -31,6 +31,7 @@ pub const RECIPES: &[Recipe] = &[
     Recipe { makes: "shell_necklace", needs: &[(Any(Kind::Shell), 2), (Exactly("sea_glass"), 1)] },
     Recipe { makes: "cairn", needs: &[(Exactly("pebble"), 5)] },
     Recipe { makes: "conch_horn", needs: &[(Exactly("conch"), 1)] },
+    Recipe { makes: "leaf_crown", needs: &[(Any(Kind::Leaf), 3)] },
     Recipe {
         makes: "garland",
         needs: &[(Any(Kind::Flower), 1), (Any(Kind::Feather), 1), (Any(Kind::Shell), 1), (Any(Kind::Stone), 1)],
@@ -45,6 +46,7 @@ fn need_label(need: Need, n: i64) -> String {
             Kind::Feather => "feather",
             Kind::Mushroom => "mushroom",
             Kind::Stone => "stone",
+            Kind::Leaf => "leaf",
             _ => "thing",
         }
         .to_string(),

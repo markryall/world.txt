@@ -13,7 +13,7 @@ use super::nature::Find;
 use super::rng::Rng;
 use super::terrain::Terrain;
 use super::tutorial::{self, Act};
-use super::weather::{Clock, Phase, Sky};
+use super::weather::{Clock, Phase, Season, Sky};
 use super::world::{DIRS, SIZE, Trigger, World, capitalise, in_bounds, strip_article};
 use super::{ClientTx, Event};
 use crate::protocol::{Col, Line, ToClient};
@@ -64,6 +64,8 @@ struct Game {
     world: World,
     players: HashMap<u64, Player>,
     phase: Phase,
+    season: Season,
+    festival: bool,
     rng: Rng,
     /// Flowers, butterflies, shells... waiting to be gathered.
     finds: Vec<Find>,
@@ -79,7 +81,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url };
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -163,8 +165,8 @@ impl Game {
             place: self.world.place_title(p.x, p.y),
             weather: format!(
                 "{} {} · wind from the {}",
-                sky.icon(Clock::phase()),
-                sky.label(),
+                sky.icon_in(Clock::phase(), Clock::season()),
+                sky.label_in(Clock::season()),
                 self.world.weather.wind_label()
             ),
             clock: Clock::label(),
@@ -273,6 +275,9 @@ impl Game {
             self.say1(id, Line::col(Col::Dim, format!("Your username is {user}: it's yours forever. Your nickname ({name}) can change any time: nickname Pip")));
         }
         self.show_hint(id);
+        if let Some(f) = Clock::festival() {
+            self.say1(id, Line::new().b(Col::Yellow, format!("{} {}", f.icon, f.greeting)));
+        }
         self.deliver_mail(id);
         for (&pid, p) in &self.players {
             if pid != id {
@@ -1376,6 +1381,24 @@ impl Game {
     fn tick(&mut self) {
         self.world.weather.step();
 
+        let season = Clock::season();
+        if season != self.season {
+            self.season = season;
+            for p in self.players.values() {
+                let _ = p.tx.send(ToClient::Lines { lines: vec![Line::new().b(Col::Magenta, season.arrival())] });
+            }
+        }
+        let festival = Clock::festival();
+        if festival.is_some() != self.festival {
+            self.festival = festival.is_some();
+            let line = match festival {
+                Some(f) => Line::new().b(Col::Yellow, format!("{} {}", f.icon, f.greeting)),
+                None => Line::col(Col::Dim, "The festival is over. What a day! ✨"),
+            };
+            for p in self.players.values() {
+                let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
+            }
+        }
         let phase = Clock::phase();
         if phase != self.phase {
             self.phase = phase;
@@ -1396,7 +1419,7 @@ impl Game {
             let (x, y) = (p.x, p.y);
             let sky = self.world.weather.sky_at(x, y);
             if sky != p.sky {
-                if let Some(msg) = sky_change(p.sky, sky) {
+                if let Some(msg) = sky_change(p.sky, sky, Clock::season()) {
                     self.say1(id, Line::col(Col::Blue, msg));
                 }
                 if let Some(p) = self.players.get_mut(&id) {
@@ -1404,7 +1427,7 @@ impl Game {
                 }
             } else if self.rng.chance(1.0 / 14.0) {
                 let terrain = self.world.terrain(x, y);
-                if let Some(line) = ambient(&mut self.rng, terrain, sky, phase) {
+                if let Some(line) = ambient(&mut self.rng, terrain, sky, phase, Clock::season()) {
                     self.say1(id, Line::col(Col::Dim, line));
                 }
             }
@@ -1453,7 +1476,19 @@ fn said_something(input: &str, verb: &str) -> bool {
     !text.trim().is_empty()
 }
 
-fn sky_change(from: Sky, to: Sky) -> Option<&'static str> {
+fn sky_change(from: Sky, to: Sky, season: Season) -> Option<&'static str> {
+    if season == Season::Winter {
+        return Some(match (from, to) {
+            (_, Sky::Rain) if from != Sky::Drizzle => "Snow starts to fall, thick and soft. ❄",
+            (Sky::Drizzle, Sky::Rain) => "The flurries thicken into proper snow. ❄",
+            (_, Sky::Drizzle) if from == Sky::Rain => "The snow thins to a few drifting flakes.",
+            (_, Sky::Drizzle) => "A few snowflakes come drifting down. ❄",
+            (Sky::Rain | Sky::Drizzle, Sky::Cloudy) => "The snow stops. Everything is white and hushed.",
+            (Sky::Clear, Sky::Cloudy) => "Heavy grey clouds roll in. It smells like snow.",
+            (_, Sky::Clear) => "The clouds part, and the frost sparkles in the light.",
+            _ => return None,
+        });
+    }
     Some(match (from, to) {
         (_, Sky::Rain) if from != Sky::Drizzle => "Fat drops start to fall, and then it's properly raining. ☔",
         (Sky::Drizzle, Sky::Rain) => "The drizzle thickens into real rain. ☔",
@@ -1466,9 +1501,31 @@ fn sky_change(from: Sky, to: Sky) -> Option<&'static str> {
     })
 }
 
-fn ambient(rng: &mut Rng, terrain: Terrain, sky: Sky, phase: Phase) -> Option<&'static str> {
+fn ambient(rng: &mut Rng, terrain: Terrain, sky: Sky, phase: Phase, season: Season) -> Option<&'static str> {
     use Terrain::*;
     let night = phase == Phase::Night;
+    if season == Season::Winter && sky.wet() {
+        return Some(*rng.pick(&[
+            "Snowflakes settle on your shoulders.",
+            "Your footsteps crunch in the fresh snow.",
+            "The whole world is hushed under the snow.",
+        ]));
+    }
+    if rng.chance(0.35) {
+        let seasonal: &[&str] = match (season, terrain) {
+            (Season::Spring, Meadow | Grass) => &["Blossom petals drift by on the breeze.", "A blackbird is singing its heart out."],
+            (Season::Spring, Forest) => &["Fresh green leaves are unfurling all around.", "Bluebells nod in the shade."],
+            (Season::Summer, Sand | Water) => &["The water glitters in the summer sun.", "Warm sand shifts under your feet."],
+            (Season::Summer, _) => &["The air hums with summer.", "A dragonfly hangs in the warm air, then darts away."],
+            (Season::Autumn, Forest) => &["A leaf spins down past your nose.", "Somewhere, a squirrel is busily burying acorns."],
+            (Season::Autumn, _) => &["A cool wind sends leaves skittering past.", "There's woodsmoke on the breeze."],
+            (Season::Winter, _) => &["Your breath puffs out in little clouds.", "A robin hops along, bright against the frost."],
+            _ => &[],
+        };
+        if !seasonal.is_empty() {
+            return Some(*rng.pick(seasonal));
+        }
+    }
     let options: &[&str] = match (terrain, sky.wet(), night) {
         (_, true, _) => &[
             "Rain ticks softly all around you.",

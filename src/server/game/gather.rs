@@ -29,6 +29,7 @@ impl Kind {
             Kind::Stone => "💎",
             Kind::Fish => "🐟",
             Kind::Berry => "🫐",
+            Kind::Leaf => "🍂",
             Kind::Craft => "✨",
         }
     }
@@ -50,6 +51,7 @@ impl Kind {
             Kind::Stone => &["stone", "stones", "rock", "crystal", "gem"],
             Kind::Fish => &["fish"],
             Kind::Berry => &["berry", "berries"],
+            Kind::Leaf => &["leaf", "leaves", "acorn", "pinecone", "seed"],
             Kind::Craft => &["craft", "crafts"],
         }
     }
@@ -104,7 +106,8 @@ impl Game {
                 continue;
             }
             let sky = self.world.weather.sky_at(x, y);
-            let Some(species) = nature::choose(&mut self.rng, ground, sky, phase, false) else { continue };
+            let (season, festival) = (Clock::season(), Clock::festival().is_some());
+            let Some(species) = nature::choose(&mut self.rng, ground, sky, phase, season, festival, false) else { continue };
             let until = nature::lifetime(&mut self.rng);
             self.finds.push(Find { species, x, y, until });
 
@@ -156,7 +159,7 @@ impl Game {
         let fish = if self.rng.chance(0.2) {
             None
         } else {
-            nature::choose(&mut self.rng, water, sky, Clock::phase(), true)
+            nature::choose(&mut self.rng, water, sky, Clock::phase(), Clock::season(), false, true)
         };
         match fish {
             None => self.say1(id, Line::col(Col::Blue, "🎣 The float goes still. Nothing bites this time. Try again?")),
@@ -398,7 +401,7 @@ impl Game {
                 nature::When::Rain => Trigger::Rain,
                 nature::When::Day => Trigger::Day,
                 nature::When::DryDay => Trigger::Sun,
-                nature::When::Any => Trigger::Always,
+                nature::When::Any | nature::When::In(_) | nature::When::Festival(_) => Trigger::Always,
             };
             (Some(s.here.to_string()), t)
         } else {
