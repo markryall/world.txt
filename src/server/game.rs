@@ -170,15 +170,22 @@ impl Game {
             super::names::NameCheck::Taken(tried) => {
                 let reason = match tried {
                     Some(hash) => {
-                        if let Err(e) = self.world.db.add_knock(&name, &hash) {
-                            eprintln!("remembering a knock for {name}: {e}");
+                        let fresh = super::names::knock_code(self.rng.next());
+                        match self.world.db.add_knock(&name, &hash, &fresh) {
+                            Ok(code) => {
+                                self.tell_keepers_about_knocks();
+                                println!("🔐 {name} knocked from a new device (ask them for their code, then: welcome {name} <code>)");
+                                format!(
+                                    "🔐 {name} is linked to another device. To use this one, ask an island keeper \
+                                     to let you in and tell them this code: {code} \
+                                     Once they say yes, just join again. (Or pick a different name.)"
+                                )
+                            }
+                            Err(e) => {
+                                eprintln!("remembering a knock for {name}: {e}");
+                                format!("🔐 The name {name} is linked to another device. Try a different name!")
+                            }
                         }
-                        self.tell_keepers_about_knocks();
-                        println!("🔐 {name} knocked from a new device (a keeper can type: welcome {name})");
-                        format!(
-                            "🔐 {name} is linked to another device. I've asked the island keepers to let this one in: \
-                             once they say yes, just join again. (Or pick a different name.)"
-                        )
                     }
                     None => format!("🔐 The name {name} is linked to another device. Try a different name!"),
                 };
@@ -860,12 +867,13 @@ impl Game {
             return;
         }
         let mut lines = Vec::new();
-        for (name, ago) in knocks {
+        for (name, devices, ago) in knocks {
             let when = if ago < 60 { "just now".to_string() } else if ago < 3600 { format!("{}m ago", ago / 60) } else { format!("{}h ago", ago / 3600) };
+            let who = if devices == 1 { "Someone wants".to_string() } else { format!("{devices} devices want") };
             lines.push(
                 Line::new()
-                    .c(Col::Yellow, format!("🔐 Someone wants to come in as {name} from a new device ({when}). If that's really {name}, type: "))
-                    .b(Col::Yellow, format!("welcome {name}")),
+                    .c(Col::Yellow, format!("🔐 {who} to come in as {name} ({when}). Ask {name} for the code on their screen, then type: "))
+                    .b(Col::Yellow, format!("welcome {name} <code>")),
             );
         }
         for p in self.players.values().filter(|p| self.is_keeper(&p.name)) {
@@ -873,15 +881,20 @@ impl Game {
         }
     }
 
-    fn cmd_welcome(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+    fn cmd_welcome(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
         let Some((_, _, who)) = self.here(id) else { return Ok(()) };
         if !self.is_keeper(&who) {
             self.say1(id, Line::plain("Only island keepers can let a new device in."));
             return Ok(());
         }
-        match self.world.db.welcome(name.trim())? {
-            Some(n) => self.say1(id, Line::col(Col::Green, format!("✅ {n}'s new device can come in now. (Their old one won't work any more.)"))),
-            None => self.say1(id, Line::plain(format!("Nobody's knocking as '{}' right now.", name.trim()))),
+        let mut words = rest.split_whitespace();
+        let (Some(name), Some(code)) = (words.next(), words.next()) else {
+            self.say1(id, Line::plain("Ask them for the code on their screen, then: welcome Poppy FROG-42"));
+            return Ok(());
+        };
+        match self.world.db.welcome(name, code)? {
+            Some(n) => self.say1(id, Line::col(Col::Green, format!("✅ {n}'s new device can come in now. (Any other device for {n} won't work any more.)"))),
+            None => self.say1(id, Line::plain(format!("That code doesn't match anyone knocking as {name}. Check the code on their screen?"))),
         }
         Ok(())
     }
@@ -1224,7 +1237,7 @@ fn help() -> Vec<Line> {
         h("push bench north", "move something"),
         h("unmake bench / undo", "take away something you made, or bring it back"),
         Line::col(Col::Pink, "island keepers"),
-        h("welcome Poppy", "let Poppy in from a new device"),
+        h("welcome Poppy FROG-42", "let Poppy in from a new device (the code is on her screen)"),
         h("unlink Poppy", "free a name for whoever uses it next"),
         Line::new(),
         Line::col(Col::Dim, format!("The island is {SIZE}×{SIZE}. A whole day passes in 24 minutes.")),

@@ -181,16 +181,16 @@ pub fn release(db_path: &str, name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `world.txt welcome <Name>`: let the device that last knocked as this name in.
-pub fn welcome(db_path: &str, name: &str) -> anyhow::Result<()> {
+/// `world.txt welcome <Name> <code>`: let the device showing that code in.
+pub fn welcome(db_path: &str, name: &str, code: &str) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
-    match db.welcome(name)? {
-        Some(n) => println!("✅ {n}'s new device can come in now. (Their old one won't work any more.)"),
+    match db.welcome(name, code)? {
+        Some(n) => println!("✅ {n}'s new device can come in now. (Any other device for {n} won't work any more.)"),
         None => {
-            println!("Nobody has knocked as {name} in the last day.");
+            println!("That code doesn't match anyone knocking as {name} in the last day.");
             let knocks = db.knocks()?;
             if !knocks.is_empty() {
-                let names: Vec<String> = knocks.into_iter().map(|(n, _)| n).collect();
+                let names: Vec<String> = knocks.into_iter().map(|(n, _, _)| n).collect();
                 println!("Waiting to be let in: {}", names.join(", "));
             }
         }

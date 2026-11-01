@@ -14,6 +14,16 @@ pub enum NameCheck {
     Taken(Option<String>),
 }
 
+/// A short code for a knocking device to read out to a keeper, e.g. "FROG-42".
+pub fn knock_code(roll: u64) -> String {
+    const WORDS: &[&str] = &[
+        "FROG", "BEE", "MOSS", "FERN", "MOTH", "WREN", "OWL", "SHELL", "DAISY", "POPPY", "PEARL", "CLOUD",
+        "LEAF", "STAR", "SNAIL", "OTTER", "MAPLE", "ACORN", "CORAL", "BERRY",
+    ];
+    let word = WORDS[(roll % WORDS.len() as u64) as usize];
+    format!("{word}-{}", 10 + (roll / 97) % 90)
+}
+
 pub fn hash(key: &str) -> String {
     Sha256::digest(key.trim().as_bytes()).iter().map(|b| format!("{b:02x}")).collect()
 }

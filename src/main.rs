@@ -82,9 +82,11 @@ enum Cmd {
         #[arg(long, default_value = "world.db")]
         db: String,
     },
-    /// Let a kid's new device into their name, after it knocked.
+    /// Let a kid's new device into their name, using the code it was shown.
     Welcome {
         name: String,
+        /// The code on their screen, e.g. FROG-42.
+        code: String,
         #[arg(long, default_value = "world.db")]
         db: String,
     },
@@ -111,6 +113,6 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Bridge { name, server, password, dir } => bridge::run(name, &server, password, dir).await,
         Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
         Cmd::Release { name, db } => server::release(&db, &name),
-        Cmd::Welcome { name, db } => server::welcome(&db, &name),
+        Cmd::Welcome { name, code, db } => server::welcome(&db, &name, &code),
     }
 }

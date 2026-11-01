@@ -21,15 +21,16 @@ name is turned away.
 Browsers keep that key **per web address**, so a new quick-tunnel link, switching
 between your home address and the tunnel, or Safari clearing old site data can
 leave a kid with a fresh key. **Stick to one address** (a named tunnel, or the same
-home address every time) to avoid it. When it happens anyway, the kid is told
-their name is linked to another device and that the keepers have been asked, and
-the world remembers the knock:
+home address every time) to avoid it. When it happens anyway, the kid's screen shows a short code
+(like `FROG-42`) to read out to an island keeper, and the world remembers the knock:
 
-- Keepers online (or the next to arrive) see *"Someone wants to come in as Poppy
-  from a new device… type: welcome Poppy"*. `welcome Poppy` moves the name to the
-  new device (the old one stops working), and the kid just joins again.
-- On the server's machine: `world.txt welcome Poppy`. The server's own log also
-  prints each knock.
+- Keepers online (or the next to arrive) are told someone wants to come in as
+  Poppy, but never see the code. Ask Poppy for the code on her screen, then type
+  `welcome Poppy FROG-42`. Only the device showing that code gets the name (any
+  other device stops working), and Poppy just joins again. If a stranger tried the
+  name too, their code won't match.
+- On the server's machine: `world.txt welcome Poppy FROG-42`. The server's own log
+  also notes each knock.
 - `unlink Poppy` (keepers, in the world) or `world.txt release Poppy` frees a name
   for whichever device uses it next.
 

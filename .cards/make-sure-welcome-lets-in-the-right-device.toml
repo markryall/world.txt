@@ -1,7 +1,7 @@
 name = "Make sure welcome lets in the right device"
-status = "todo"
+status = "done"
 description = "'welcome Poppy' lets in whichever device knocked as Poppy most recently, and keepers can't see which device that was. If a stranger tried the name after the real Poppy knocked (likely on the public link), welcome would hand them her name, satchel and journal and lock her iPad out. Idea: the refused device is shown a short code ('tell a keeper: FROG-42'), the world keeps every recent knock with its code, and the keeper types 'welcome Poppy FROG-42', so only the device the kid is actually holding gets in. Until then: check with the kid that they've just tried, and have them try again straight after."
 created_at = "2026-11-01T14:48:01.522279Z"
-updated_at = "2026-11-01T14:48:01.522279Z"
+updated_at = "2026-11-01T14:49:45.072115Z"
 tags = ["safety"]
 priority = "high"

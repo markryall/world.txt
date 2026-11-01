@@ -239,8 +239,8 @@ function connect(name, password) {
         history.replaceState(null, '', location.pathname);
         setTimeout(() => location.reload(), 2000);
       } else if (m.reason.includes('linked to another device')) {
-        // Keep the name: once a keeper says yes, joining again just works.
-        setTimeout(() => location.reload(), 6000);
+        // Stay on this message: the kid needs to read the code to a keeper.
+        // Their name is kept, so once a keeper says yes, joining again just works.
       } else if (m.reason.includes('already here')) {
         // Back to the name screen to pick another.
         try { localStorage.removeItem('world.name'); } catch {}

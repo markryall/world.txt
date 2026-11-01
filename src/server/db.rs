@@ -61,8 +61,10 @@ impl Db {
                  player TEXT NOT NULL, board INTEGER NOT NULL,
                  following INTEGER NOT NULL DEFAULT 0, last_seen INTEGER NOT NULL DEFAULT 0,
                  PRIMARY KEY (player, board));
-             CREATE TABLE IF NOT EXISTS knocks (
-                 name TEXT PRIMARY KEY, key_hash TEXT NOT NULL, at INTEGER NOT NULL);
+             DROP TABLE IF EXISTS knocks;
+             CREATE TABLE IF NOT EXISTS door_knocks (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 name TEXT NOT NULL, key_hash TEXT NOT NULL, code TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -373,42 +375,59 @@ impl Db {
         Ok(())
     }
 
-    /// Someone tried a claimed name from a new device: remember it for a keeper.
-    pub fn add_knock(&self, name: &str, key_hash: &str) -> anyhow::Result<()> {
+    /// Someone tried a claimed name from a new device: remember the knock and
+    /// its code. The same device knocking again within a day keeps its code.
+    pub fn add_knock(&self, name: &str, key_hash: &str, new_code: &str) -> anyhow::Result<String> {
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
+        let existing: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT code FROM door_knocks WHERE name = ?1 AND key_hash = ?2 AND at > ?3 - 86400",
+                params![name, key_hash, now],
+                |r| r.get(0),
+            )
+            .ok();
+        if let Some(code) = existing {
+            self.conn.execute(
+                "UPDATE door_knocks SET at = ?3 WHERE name = ?1 AND key_hash = ?2",
+                params![name, key_hash, now],
+            )?;
+            return Ok(code);
+        }
         self.conn.execute(
-            "INSERT INTO knocks (name, key_hash, at) VALUES (?1, ?2, ?3)
-             ON CONFLICT(name) DO UPDATE SET key_hash = excluded.key_hash, at = excluded.at",
-            params![name, key_hash, now],
+            "INSERT INTO door_knocks (name, key_hash, code, at) VALUES (?1, ?2, ?3, ?4)",
+            params![name, key_hash, new_code, now],
         )?;
-        Ok(())
+        Ok(new_code.to_string())
     }
 
-    /// Recent knocks (within a day), oldest first: (name, seconds ago).
-    pub fn knocks(&self) -> anyhow::Result<Vec<(String, i64)>> {
+    /// Names with recent knocks (within a day): (name, devices knocking, seconds since the latest).
+    pub fn knocks(&self) -> anyhow::Result<Vec<(String, i64, i64)>> {
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name, ?1 - at FROM knocks WHERE at > ?1 - 86400 ORDER BY at")?;
-        let rows = stmt.query_map([now], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        let mut stmt = self.conn.prepare(
+            "SELECT name, COUNT(*), ?1 - MAX(at) FROM door_knocks WHERE at > ?1 - 86400
+             GROUP BY name ORDER BY MAX(at)",
+        )?;
+        let rows = stmt.query_map([now], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
-    /// Let the device that knocked for this name use it from now on (the old
-    /// device stops working). Returns the name as it's stored, if there was a knock.
-    pub fn welcome(&self, name: &str) -> anyhow::Result<Option<String>> {
+    /// Let the device that was shown this code use the name from now on (any
+    /// other device stops working). Returns the name as stored, if the code matched.
+    pub fn welcome(&self, name: &str, code: &str) -> anyhow::Result<Option<String>> {
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
         let knock: Option<(String, String)> = self
             .conn
             .query_row(
-                "SELECT name, key_hash FROM knocks WHERE name = ?1 COLLATE NOCASE AND at > ?2 - 86400",
-                params![name, now],
+                "SELECT name, key_hash FROM door_knocks
+                 WHERE name = ?1 COLLATE NOCASE AND code = ?2 COLLATE NOCASE AND at > ?3 - 86400",
+                params![name, code.trim(), now],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .ok();
         let Some((stored, hash)) = knock else { return Ok(None) };
         self.conn.execute("UPDATE players SET key_hash = ?2 WHERE name = ?1", params![stored, hash])?;
-        self.conn.execute("DELETE FROM knocks WHERE name = ?1", [&stored])?;
+        self.conn.execute("DELETE FROM door_knocks WHERE name = ?1", [&stored])?;
         Ok(Some(stored))
     }
 
