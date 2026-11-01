@@ -32,6 +32,16 @@ enum Cmd {
         /// Island keepers (comma-separated names) can tidy up anyone's things.
         #[arg(long, env = "WORLD_KEEPERS", value_delimiter = ',')]
         keeper: Vec<String>,
+        /// Daily copies to keep in backups/ next to the db (0 turns backups off).
+        #[arg(long, default_value_t = 14)]
+        keep_backups: usize,
+    },
+    /// Copy the world to backups/ right now.
+    Backup {
+        #[arg(long, default_value = "world.db")]
+        db: String,
+        #[arg(long, default_value_t = 14)]
+        keep_backups: usize,
     },
     /// Wander in.
     Play {
@@ -104,7 +114,16 @@ enum Cmd {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     match Cli::parse().cmd {
-        Cmd::Serve { addr, db, seed, password, keeper } => server::run(&addr, &db, seed, password, keeper).await,
+        Cmd::Serve { addr, db, seed, password, keeper, keep_backups } => {
+            server::run(&addr, &db, seed, password, keeper, keep_backups).await
+        }
+        Cmd::Backup { db, keep_backups } => {
+            let made = server::backup::backup(&db, keep_backups, true)?;
+            if let Some(p) = made {
+                println!("💾 backed up the world to {}", p.display());
+            }
+            Ok(())
+        }
         Cmd::Play { name, server, password } => client::run(name, &server, password).await,
         Cmd::Agent { name, persona, server, password, daily_usd, state_dir, dry_run } => {
             let persona = persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());

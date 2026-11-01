@@ -107,6 +107,10 @@ cloudflared tunnel run --url http://localhost:4040 world
   it sleeping.
 - Everything people make is saved to `world.db` next to where you ran `serve`, so
   restarting is safe.
+- **Backups:** the server copies the world to `backups/world-<date>.db` (next to
+  the db) once a day while it runs, and keeps the newest 14 (`--keep-backups 14`,
+  0 turns it off). `world.txt backup` makes one right now. To restore, stop the
+  server and copy a backup over `world.db`.
 
 For family only, [Tailscale](https://tailscale.com) is a nice alternative: share
 the machine with them and they join at `http://<machine-name>:4040`, with nothing

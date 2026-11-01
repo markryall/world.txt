@@ -1,6 +1,7 @@
 //! Networking. Each connection is a small task that shuttles messages
 //! between its websocket and the single game task that owns the world.
 
+pub mod backup;
 mod db;
 mod game;
 pub mod names;
@@ -32,6 +33,7 @@ pub async fn run(
     seed: u64,
     password: Option<String>,
     keepers: Vec<String>,
+    keep_backups: usize,
 ) -> anyhow::Result<()> {
     let password: Arc<Option<String>> = Arc::new(password.filter(|p| !p.is_empty()));
     let db = db::Db::open(db_path)?;
@@ -41,6 +43,9 @@ pub async fn run(
         println!("🗝  island keepers: {}", keepers.join(", "));
     }
     tokio::spawn(game::run(world, events_rx, keepers));
+    if keep_backups > 0 {
+        tokio::spawn(backup::run_daily(db_path.to_string(), keep_backups));
+    }
 
     let listener = TcpListener::bind(addr).await?;
     println!("🌍 world.txt is open: browser http://{addr}  ·  terminal ws://{addr}  (db: {db_path})");

@@ -5,3 +5,4 @@ tmp/
 agent-state/
 .cards/.logs/
 .cards/.claims/
+backups/

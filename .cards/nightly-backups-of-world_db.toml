@@ -1,7 +1,7 @@
 name = "Nightly backups of world.db"
-status = "todo"
+status = "done"
 description = "world.db is the only copy of the whole island. Keep dated copies (e.g. nightly, last 14 days) using SQLite's online backup so it's safe while the server runs."
 created_at = "2026-11-01T14:36:29.461722Z"
-updated_at = "2026-11-01T14:36:29.461722Z"
+updated_at = "2026-11-01T14:54:56.536876Z"
 tags = ["safety"]
 priority = "high"
