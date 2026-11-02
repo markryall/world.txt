@@ -145,6 +145,7 @@
     <h1>✨ world.txt ✨</h1>
     <p>a small island · no battles · just vibes</p>
     <p id="join-msg"></p>
+    <button id="join-go" type="submit" hidden>Enter the world 🌍</button>
   </form>
 </div>
 <script>
@@ -217,10 +218,16 @@ let invite = params.get('invite');
 // Arriving from another world, with a passport from home.
 let passport = params.get('passport');
 
-function showJoin(message) {
+function showJoin(message, enter = false) {
   $('#join').style.display = 'flex';
   $('#join-msg').textContent = message;
+  $('#join-go').hidden = !enter;
+  if (enter) $('#join-go').focus();
 }
+$('#join form').onsubmit = (e) => {
+  e.preventDefault();
+  if (!$('#join-go').hidden) start();
+};
 
 function start() {
   $('#join').style.display = 'none';
@@ -383,7 +390,10 @@ function send(text) {
   ws.send(JSON.stringify({ type: 'cmd', text }));
 }
 
-if (invite || passport || stored('world.token')) start();
+// An invite waits for a real click: link previews (iMessage, mail scanners)
+// load the page and run its script, and would use the one-use link up.
+if (invite) showJoin("You've been invited 💌", true);
+else if (passport || stored('world.token')) start();
 else showJoin('world.txt is invite-only. Open the magic link an island keeper sent you! 💌');
 
 $('#input').onsubmit = (e) => {
