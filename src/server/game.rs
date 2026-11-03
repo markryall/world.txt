@@ -4,6 +4,7 @@
 mod boards;
 pub(super) use boards::backfill_journal;
 mod companions;
+mod cook;
 mod craft;
 mod events;
 mod gather;
@@ -68,6 +69,8 @@ struct Player {
     /// Scenery lines since they last did anything: someone who's stepped away
     /// shouldn't come back to a screenful of birdsong.
     ambient_quiet: u8,
+    /// When each thing last did its thing for them, so a frog doesn't croak on and on.
+    seen_acts: HashMap<i64, std::time::Instant>,
     /// The radio this browser has been told it can hear: (how loud, stream).
     radios: HashMap<i64, (f32, String)>,
 }
@@ -101,6 +104,8 @@ struct Game {
     spins: HashMap<i64, gramophone::Spin>,
     /// Radios and the stream each is tuned to, by thing id.
     radios: HashMap<i64, String>,
+    /// What's cooking at each campfire and oven, by thing id.
+    cooking: HashMap<i64, cook::Cooking>,
     /// Jukeboxes' queues, by thing id.
     jukes: HashMap<i64, jukebox::Jukebox>,
     /// Radios' programme guides, for saying what's on air.
@@ -113,7 +118,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new() };
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
@@ -132,6 +137,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
                 game.row_boats();
                 game.update_radios();
                 game.jukes_tick();
+                game.cooking_tick();
             }
         }
     }
@@ -313,7 +319,7 @@ impl Game {
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         let full = super::names::full(&name, &user);
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new() });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new() });
 
         self.send(
             id,
@@ -452,6 +458,9 @@ impl Game {
             "play" | "wind" if self.has_gramophone_here(id) && !self.has_music_box_here(id) => return self.cmd_play_music(id),
             "play" | "wind" => return self.cmd_play(id),
             "tune" => return self.cmd_tune(id, rest),
+            "cook" | "bake" | "brew" | "grill" | "roast" | "toast" => return self.cmd_cook(id, rest),
+            "eat" | "drink" | "sip" | "nibble" => return self.cmd_eat(id, rest),
+            "serve" => return self.cmd_serve(id, rest),
             "add" | "queue" if self.has_jukebox_here(id) => return self.cmd_add_songs(id),
             "jukebox" | "juke" => return self.cmd_jukebox(id),
             "skip" if rest.is_empty() && self.juke_skippable(id) => return self.cmd_skip_song(id),
@@ -1096,6 +1105,13 @@ impl Game {
             self.status_all();
             return Ok(());
         }
+        if let Some(kind) = cook::kitchen(&name) {
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(kind))?;
+            self.say1(id, Line::new().c(Col::Yellow, "🔥 You make ").b(Col::Yellow, &name).c(Col::Yellow, ". Type cook to see what you could make here."));
+            self.tell_here(x, y, id, Line::col(Col::Yellow, format!("🔥 {who} makes {name}.")));
+            self.status_all();
+            return Ok(());
+        }
         if music::is_music_box(&name) {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(music::music_kind()))?;
             self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach C E G E C"));
@@ -1534,6 +1550,7 @@ impl Game {
             Some(i) if !what.is_empty() => {
                 let t = self.world.remove_thing(i, &self.user(id))?;
                 self.forget_jukebox(t.id);
+                self.forget_kitchen(t.id);
                 self.stop_spin(t.id);
                 self.forget_radio(t.id);
                 self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
@@ -1657,7 +1674,7 @@ impl Game {
         self.animals_tick();
 
         // Things doing their things, but only when someone's there to see.
-        let mut acts: Vec<(i64, i64, String)> = Vec::new();
+        let mut acts: Vec<(i64, i64, i64, String)> = Vec::new();
         for t in &self.world.things {
             let Some(action) = &t.action else { continue };
             if !self.players.values().any(|p| p.x == t.x && p.y == t.y) {
@@ -1673,11 +1690,21 @@ impl Game {
                 Trigger::Arrive => false,
             };
             if active && self.rng.chance(0.07) {
-                acts.push((t.x, t.y, sentence(&format!("{} {action}", the(&t.name)))));
+                acts.push((t.id, t.x, t.y, sentence(&format!("{} {action}", the(&t.name)))));
             }
         }
-        for (x, y, text) in acts {
-            self.tell_here(x, y, 0, Line::col(Col::Yellow, text));
+        // Each thing at most every few minutes for each person, and like the
+        // scenery, not on and on to someone who's stepped away.
+        for (tid, x, y, text) in acts {
+            for p in self.players.values_mut().filter(|p| p.x == x && p.y == y && !p.bot) {
+                let recent = p.seen_acts.get(&tid).is_some_and(|t| t.elapsed() < ACT_EVERY);
+                if recent || p.ambient_quiet >= AMBIENT_WHILE_IDLE {
+                    continue;
+                }
+                p.seen_acts.insert(tid, std::time::Instant::now());
+                p.ambient_quiet += 1;
+                let _ = p.tx.send(ToClient::Lines { lines: vec![Line::col(Col::Yellow, text.clone())] });
+            }
         }
 
         self.status_all();
@@ -1720,6 +1747,9 @@ fn sky_change(from: Sky, to: Sky, season: Season) -> Option<&'static str> {
         _ => return None,
     })
 }
+
+/// How often one made thing does its thing for one person.
+const ACT_EVERY: Duration = Duration::from_secs(180);
 
 /// Scenery lines someone gets while not doing anything, before it goes quiet.
 const AMBIENT_WHILE_IDLE: u8 = 2;
@@ -1952,6 +1982,18 @@ const HELP: &[HelpTopic] = &[
             ("craft wind chime", "make it (then place it, or give it away)"),
         ],
         footer: None,
+    },
+    HelpTopic {
+        name: "cooking",
+        also: &["cook", "food", "kitchen", "eat", "baking", "bake"],
+        title: "🍳 cooking",
+        keepers: false,
+        items: &[
+            ("make a campfire / make a clay oven", "somewhere to cook, wherever you like"),
+            ("cook / cook mint tea", "what you could make, then make it (a few moments)"),
+            ("eat stew / serve crumble", "enjoy it, or share with everyone here"),
+        ],
+        footer: Some("Herbs and honey turn up as you wander. While it cooks, the smell drifts to everyone nearby."),
     },
     HelpTopic {
         name: "animals",

@@ -20,12 +20,15 @@ pub enum Kind {
     Fish,
     Berry,
     Leaf,
+    Herb,
+    /// Cooked at a campfire or oven, never found lying about.
+    Food,
     /// Made by crafting, never found lying about.
     Craft,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 10] = [
+    pub const ALL: [Kind; 12] = [
         Kind::Flower,
         Kind::Butterfly,
         Kind::Bug,
@@ -36,6 +39,8 @@ impl Kind {
         Kind::Fish,
         Kind::Berry,
         Kind::Leaf,
+        Kind::Herb,
+        Kind::Food,
     ];
     pub fn title(self) -> &'static str {
         match self {
@@ -49,6 +54,8 @@ impl Kind {
             Kind::Fish => "🐟 Fish",
             Kind::Berry => "🫐 Berries",
             Kind::Leaf => "🍂 Leaves & seeds",
+            Kind::Herb => "🌿 Herbs & honey",
+            Kind::Food => "🍲 Things you've cooked",
             Kind::Craft => "✂️ Crafts",
         }
     }
@@ -198,6 +205,10 @@ pub const SPECIES: &[Species] = &[
     Species { id: "blackberry", name: "blackberry", kind: Berry, rarity: Common, when: Any, ground: &[T::Forest, T::Meadow], here: "hangs dark and juicy on a bramble" },
     Species { id: "strawberry", name: "wild strawberry", kind: Berry, rarity: Common, when: Any, ground: &[T::Meadow, T::Grass], here: "peeks out red from under its leaves" },
     Species { id: "bilberry", name: "bilberry", kind: Berry, rarity: Uncommon, when: Any, ground: &[T::Hill, T::Forest], here: "grows low and dusty blue" },
+    // herbs and honey, for cooking
+    Species { id: "wild_mint", name: "sprig of wild mint", kind: Herb, rarity: Common, when: Any, ground: &[T::Meadow, T::Grass, T::Pond], here: "smells sharp and green as you brush past" },
+    Species { id: "thyme", name: "bunch of wild thyme", kind: Herb, rarity: Common, when: DryDay, ground: &[T::Hill, T::Grass, T::Stone], here: "grows in a little cushion, smelling of warm hillsides" },
+    Species { id: "honeycomb", name: "piece of honeycomb", kind: Herb, rarity: Uncommon, when: DryDay, ground: &[T::Forest, T::Meadow], here: "drips gold from a hollow tree, bees humming lazily around it" },
     // seasonal
     Species { id: "cherry_blossom", name: "cherry blossom", kind: Flower, rarity: Uncommon, when: In(Season::Spring), ground: MEADOWY, here: "drifts down, pale and pink" },
     Species { id: "dragonfly", name: "dragonfly", kind: Bug, rarity: Common, when: In(Season::Summer), ground: MEADOWY, here: "zips past on shimmering wings" },
@@ -232,6 +243,13 @@ pub const SPECIES: &[Species] = &[
     Species { id: "shell_necklace", name: "shell necklace", kind: Craft, rarity: Uncommon, when: DryDay, ground: &[], here: "glitters in the sunshine" },
     Species { id: "cairn", name: "little stone cairn", kind: Craft, rarity: Common, when: Any, ground: &[], here: "" },
     Species { id: "conch_horn", name: "conch horn", kind: Craft, rarity: Rare, when: Any, ground: &[], here: "hums with the faraway sound of the sea" },
+    // cooked: `here` is how it looks (and smells) once placed
+    Species { id: "mint_tea", name: "mug of mint tea", kind: Food, rarity: Common, when: Any, ground: &[], here: "steams gently, smelling of mint" },
+    Species { id: "grilled_fish", name: "piece of grilled fish", kind: Food, rarity: Common, when: Any, ground: &[], here: "smells of woodsmoke and the sea" },
+    Species { id: "mushroom_stew", name: "bowl of mushroom stew", kind: Food, rarity: Common, when: Any, ground: &[], here: "steams, rich and earthy, with a smell of thyme" },
+    Species { id: "toasted_acorns", name: "handful of toasted acorns", kind: Food, rarity: Common, when: Any, ground: &[], here: "smells warm and nutty" },
+    Species { id: "berry_crumble", name: "slice of berry crumble", kind: Food, rarity: Uncommon, when: Any, ground: &[], here: "smells of warm berries and honey" },
+    Species { id: "honey_cake", name: "slice of honey cake", kind: Food, rarity: Uncommon, when: Any, ground: &[], here: "smells sweet and golden" },
     Species { id: "garland", name: "rainbow garland", kind: Craft, rarity: Uncommon, when: Any, ground: &[], here: "flutters in every colour" },
 ];
 

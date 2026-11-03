@@ -38,21 +38,26 @@ pub const RECIPES: &[Recipe] = &[
     },
 ];
 
-fn need_label(need: Need, n: i64) -> String {
-    let what = match need {
+pub(super) fn need_label(need: Need, n: i64) -> String {
+    let (one, many) = match need {
         Any(k) => match k {
-            Kind::Flower => "flower",
-            Kind::Shell => "shell",
-            Kind::Feather => "feather",
-            Kind::Mushroom => "mushroom",
-            Kind::Stone => "stone",
-            Kind::Leaf => "leaf",
-            _ => "thing",
+            Kind::Flower => ("flower", "flowers"),
+            Kind::Shell => ("shell", "shells"),
+            Kind::Feather => ("feather", "feathers"),
+            Kind::Mushroom => ("mushroom", "mushrooms"),
+            Kind::Stone => ("stone", "stones"),
+            Kind::Leaf => ("leaf", "leaves"),
+            Kind::Berry => ("berry", "berries"),
+            Kind::Fish => ("fish", "fish"),
+            Kind::Herb => ("herb", "herbs"),
+            _ => ("thing", "things"),
+        },
+        Exactly(id) => {
+            let name = nature::by_id(id).map_or(id, |s| s.name);
+            return if n == 1 { name.to_string() } else { format!("{n} × {name}") };
         }
-        .to_string(),
-        Exactly(id) => nature::by_id(id).map_or(id.to_string(), |s| s.name.to_string()),
     };
-    if n == 1 { format!("1 {what}") } else { format!("{n} {what}s") }
+    if n == 1 { format!("1 {one}") } else { format!("{n} {many}") }
 }
 
 fn fits(need: Need, s: &Species) -> bool {
@@ -112,6 +117,7 @@ impl Game {
             );
         }
         lines.push(Line::col(Col::Dim, "  craft <name> to make one. Placed crafts come alive!"));
+        lines.push(Line::col(Col::Dim, "  For food, make a campfire and type cook."));
         self.send(id, lines);
         Ok(())
     }

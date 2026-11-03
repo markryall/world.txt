@@ -425,6 +425,17 @@ islands. There are about 60 species, some rare.
 - `give daisy to Poppy` (when you're together), `place daisy` to decorate,
   `release butterfly` to let it go.
 
+### Cooking
+
+Make a campfire (or a camp stove) or a clay oven wherever you fancy, then
+`cook` to see what you've the makings of and `cook mint tea` to make it, from
+things you've gathered as they are. It takes a few moments, and smells: as it
+goes on, halfway, and when it's done, the smell drifts to everyone nearby.
+Then there are a few helpings in your satchel to `eat`, or `serve` to everyone
+standing with you. Wild mint, thyme and honeycomb turn up as you wander. Mint
+tea, toasted acorns, grilled fish and mushroom stew cook on a fire; berry
+crumble and honey cake in the oven.
+
 ### Companions
 
 Wild animals turn up right beside people now and then: a fox in the woods, a

@@ -1,0 +1,7 @@
+name = "Cooking"
+status = "done"
+description = "Simple, cozy cooking for people with a few moments: make a campfire or a clay oven anywhere, then 'cook mint tea' (plain 'cook' shows what you have the makings of) from things you've gathered, as they are: no prep steps or crafting trees. It takes 15–40 seconds and gives off three smells (going on, halfway, done) that drift to everyone nearby. Then there are a few helpings in your satchel to 'eat', or 'serve' to whoever's standing with you. Wild mint, thyme and honeycomb turn up as new finds. No hunger, spoiling or burning."
+created_at = "2026-11-03T06:51:44.000000Z"
+updated_at = "2026-11-03T06:51:44.000000Z"
+tags = ["belonging"]
+priority = "medium"

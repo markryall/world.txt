@@ -30,12 +30,14 @@ impl Kind {
             Kind::Fish => "🐟",
             Kind::Berry => "🫐",
             Kind::Leaf => "🍂",
+            Kind::Herb => "🌿",
+            Kind::Food => "🍲",
             Kind::Craft => "✨",
         }
     }
     fn verb(self) -> &'static str {
         match self {
-            Kind::Flower | Kind::Mushroom | Kind::Berry => "pick",
+            Kind::Flower | Kind::Mushroom | Kind::Berry | Kind::Herb => "pick",
             Kind::Butterfly | Kind::Bug | Kind::Fish => "catch",
             _ => "collect",
         }
@@ -52,12 +54,14 @@ impl Kind {
             Kind::Fish => &["fish"],
             Kind::Berry => &["berry", "berries"],
             Kind::Leaf => &["leaf", "leaves", "acorn", "pinecone", "seed"],
+            Kind::Herb => &["herb", "herbs", "mint", "thyme", "honey", "honeycomb"],
+            Kind::Food => &["food", "dish", "meal", "snack"],
             Kind::Craft => &["craft", "crafts"],
         }
     }
 }
 
-fn matches(s: &Species, what: &str) -> bool {
+pub(super) fn matches(s: &Species, what: &str) -> bool {
     let w = crate::server::world::strip_article(what.trim()).to_lowercase();
     w.is_empty() || s.name.contains(&w) || s.id == w || s.kind.words().contains(&w.as_str())
 }
