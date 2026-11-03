@@ -34,6 +34,8 @@ use tokio::sync::mpsc::UnboundedReceiver;
 const SAY_QUOTES: [char; 6] = ['\'', '"', '‘', '’', '“', '”'];
 const TICK: Duration = Duration::from_secs(3);
 const SHOUT_RANGE: i64 = 10;
+/// How long a place's description may be.
+const DESCRIBE_MAX: usize = 280;
 
 struct Player {
     /// Nickname: what everyone sees, and it can change.
@@ -518,6 +520,7 @@ impl Game {
             "unshare" => return self.cmd_invite(id, rest, false),
             "invite" => return self.cmd_new_invite(id, rest),
             "link" => return self.cmd_new_link(id, rest),
+            "describe" => return self.cmd_describe(id, rest),
             "fold" => return self.cmd_fold(id, rest),
             "invites" => return self.cmd_invites(id),
             "revoke" => return self.cmd_revoke(id, rest),
@@ -1095,6 +1098,36 @@ impl Game {
         self.say1(id, Line::new().c(Col::Green, "This place will be known as ").b(Col::Magenta, &name).c(Col::Green, "."));
         self.tell_here(x, y, id, Line::col(Col::Green, format!("{who} names this place {name}.")));
         self.status_all();
+        Ok(())
+    }
+
+    /// `describe A messy little den…`: your own words for a spot at your home,
+    /// shown in place of the land's when anyone looks. `describe` alone clears it.
+    fn cmd_describe(&mut self, id: u64, text: &str) -> anyhow::Result<()> {
+        let Some((x, y, who)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
+        // Homes are checked before this (only their people may change them).
+        if self.world.home_at(x, y).is_none() && !self.is_keeper(&user) {
+            self.say1(id, Line::plain("You can describe places at your home. Find a spot you like and 'claim' it first!"));
+            return Ok(());
+        }
+        let text: String = text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(DESCRIBE_MAX).collect();
+        if text.is_empty() {
+            if self.world.descriptions.contains_key(&(x, y)) {
+                self.world.set_description(x, y, None, &user, boards::now())?;
+                self.say1(id, Line::col(Col::Green, "You let this place go back to how it was."));
+            } else {
+                self.say1(id, Line::plain("Describe it how? e.g. 'describe A messy little den, records stacked everywhere and fairy lights over the jukebox.'"));
+            }
+            return Ok(());
+        }
+        let mut text = capitalise(&text);
+        if !text.ends_with(['.', '!', '?', '…', '"', ')']) {
+            text.push('.');
+        }
+        self.world.set_description(x, y, Some(text), &user, boards::now())?;
+        self.say1(id, Line::col(Col::Green, "✍ You take in the place and make it yours. 'look' to see it."));
+        self.tell_here(x, y, id, Line::col(Col::Green, format!("{who} looks around, making this place their own.")));
         Ok(())
     }
 
@@ -2084,6 +2117,7 @@ const HELP: &[HelpTopic] = &[
             ("claim", "make the patch around you your home (one each)"),
             ("home", "go straight home from anywhere"),
             ("share Lu / unshare Lu / guests", "who else may build at your home"),
+            ("describe A cosy den, fairy lights…", "in your own words, what people see here when they look (describe alone clears it)"),
         ],
         footer: None,
     },

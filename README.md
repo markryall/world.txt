@@ -362,6 +362,11 @@ called "Poppy's Home" (with "Poppy's Garden" around it) unless you `name` it.
 the friends you `share` it with, and keepers can make, place, dig, plant or name
 things there (`unshare`, `guests`). Claiming somewhere else moves your home.
 
+Each spot of your home can have your own words, which anyone who looks there
+sees in place of the land's: `describe A messy little den, records stacked
+everywhere and fairy lights strung over the jukebox.` (up to 280 characters;
+`describe` on its own puts it back).
+
 ### Islands and boats
 
 The world is an archipelago of four islands, each in its own patch of sea:

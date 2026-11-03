@@ -8,7 +8,7 @@ use crate::server::world::{HOME_RADIUS, Home};
 /// Commands that change a place, which a home's owner gets a say over.
 pub const BUILDING: &[&str] = &[
     "dig", "fill", "plant", "raise", "pile", "path", "pave", "name", "call-this", "make", "build", "create",
-    "place", "drop", "put",
+    "place", "drop", "put", "describe",
 ];
 
 impl Game {

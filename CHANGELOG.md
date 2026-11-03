@@ -2,6 +2,12 @@
 
 ## 0.2.1 (2026-11-03)
 
+- `describe` puts your own words on a spot at your home, which everyone who
+  looks there sees (`describe` on its own puts the land's back).
+- Much lighter on the server when lots of people are about: a step only
+  refreshes the maps that can see it, at most twice a second, and the maps are
+  half the size. In a load test on a small Fly.io machine, a world went from
+  falling over at about 150 busy people to handling 300 comfortably.
 - `dig` chips rock down to a hill, so no rock is stuck forever.
 - `link me` gives you a magic link for your own new device (phone, laptop,
   tablet), so you don't need a keeper for it. Keepers can still `link Poppy`.

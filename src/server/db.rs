@@ -102,6 +102,10 @@ impl Db {
                  host TEXT PRIMARY KEY, by TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS used_passports (
                  nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS descriptions (
+                 x INTEGER NOT NULL, y INTEGER NOT NULL, text TEXT NOT NULL,
+                 by TEXT NOT NULL, at INTEGER NOT NULL,
+                 PRIMARY KEY (x, y));
              CREATE TABLE IF NOT EXISTS stations (
                  name TEXT PRIMARY KEY COLLATE NOCASE, url TEXT NOT NULL, guide TEXT,
                  by TEXT NOT NULL, at INTEGER NOT NULL);
@@ -223,6 +227,26 @@ impl Db {
     /// The world's stations: (name, stream, guide), by name.
     pub fn stations(&self) -> anyhow::Result<Vec<(String, String, Option<String>)>> {
         let mut stmt = self.conn.prepare("SELECT name, url, guide FROM stations ORDER BY name COLLATE NOCASE")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    // ---- descriptions people write for places ---------------------------------
+
+    pub fn set_description(&self, x: i64, y: i64, text: Option<&str>, by: &str, at: i64) -> anyhow::Result<()> {
+        match text {
+            Some(t) => self.conn.execute(
+                "INSERT INTO descriptions (x, y, text, by, at) VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(x, y) DO UPDATE SET text = excluded.text, by = excluded.by, at = excluded.at",
+                params![x, y, t, by, at],
+            )?,
+            None => self.conn.execute("DELETE FROM descriptions WHERE x = ?1 AND y = ?2", params![x, y])?,
+        };
+        Ok(())
+    }
+
+    pub fn descriptions(&self) -> anyhow::Result<Vec<(i64, i64, String)>> {
+        let mut stmt = self.conn.prepare("SELECT x, y, text FROM descriptions")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }

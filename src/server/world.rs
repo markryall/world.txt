@@ -100,6 +100,8 @@ pub struct World {
     pub homes: Vec<Home>,
     /// username → nickname, for everyone who's ever visited.
     pub nicks: std::collections::HashMap<String, String>,
+    /// What people have written about places (`describe`), by position.
+    pub descriptions: std::collections::HashMap<(i64, i64), String>,
     pub weather: Weather,
     pub db: Db,
 }
@@ -163,7 +165,8 @@ impl World {
             .map(|(owner, x, y, guests)| Home { owner, x, y, guests })
             .collect();
         let nicks = db.users()?.into_iter().collect();
-        let mut world = World { seed, tiles, things, homes, nicks, weather: Weather::new(SIZE, seed), db };
+        let descriptions = db.descriptions()?.into_iter().map(|(x, y, t)| ((x, y), t)).collect();
+        let mut world = World { seed, tiles, things, homes, nicks, descriptions, weather: Weather::new(SIZE, seed), db };
         world.ensure_docks()?;
         Ok(world)
     }
@@ -182,6 +185,15 @@ impl World {
         }
         self.tiles[idx(x, y)].terrain = terrain;
         self.persist_tile(x, y)
+    }
+
+    pub fn set_description(&mut self, x: i64, y: i64, text: Option<String>, by: &str, at: i64) -> anyhow::Result<()> {
+        self.db.set_description(x, y, text.as_deref(), by, at)?;
+        match text {
+            Some(t) => self.descriptions.insert((x, y), t),
+            None => self.descriptions.remove(&(x, y)),
+        };
+        Ok(())
     }
 
     pub fn set_name(&mut self, x: i64, y: i64, name: Option<String>) -> anyhow::Result<()> {
@@ -357,7 +369,11 @@ impl World {
 
         out.push(Line::new().t("").b(Col::Magenta, format!("~ {} ~", self.place_title(x, y))));
 
-        let mut text = rng::pick(here.descriptions_in(Clock::season()), self.seed, x, y).to_string();
+        // Someone's own words for the place, or the land's.
+        let mut text = match self.descriptions.get(&(x, y)) {
+            Some(d) => d.clone(),
+            None => rng::pick(here.descriptions_in(Clock::season()), self.seed, x, y).to_string(),
+        };
         text.push(' ');
         text.push_str(&atmosphere(here, sky, phase, Clock::season(), self.weather.breezy(), self.seed, x, y));
         out.push(Line::plain(text));
