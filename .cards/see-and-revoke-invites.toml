@@ -1,5 +1,5 @@
 name = "See and revoke invites"
-status = "todo"
+status = "done"
 description = "Keepers make magic links but can't see what happened to them. 'world.txt invites' (and 'invites' in the world for keepers) lists recent links: who for, made when, pending / used / expired. 'revoke <who>' cancels someone's unused links, for a link sent to the wrong person."
 created_at = "2026-11-03T00:03:18.000000Z"
 updated_at = "2026-11-03T00:03:18.000000Z"

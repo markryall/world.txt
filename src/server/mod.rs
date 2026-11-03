@@ -197,6 +197,34 @@ async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>)
     Ok(())
 }
 
+/// `world.txt invites`: recent magic links and what became of them.
+pub fn invites(db_path: &str) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let now = accounts::now();
+    let list = db.invites(30)?;
+    if list.is_empty() {
+        println!("💌 no invites yet");
+    }
+    for (user, nick, expires, used_at) in list {
+        println!("💌 {nick} ({user}): {}", accounts::invite_state(expires, used_at, now));
+    }
+    Ok(())
+}
+
+/// `world.txt revoke <name>`: cancel someone's unused links.
+pub fn revoke(db_path: &str, name: &str) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let user = one_user(&db, name)?;
+    let n = db.revoke_invites(&user)?;
+    let nick = db.nickname(&user).unwrap_or_default();
+    match n {
+        0 => println!("{nick} ({user}) had no unused links."),
+        1 => println!("✂️  cancelled {nick}'s unused link ({user})"),
+        n => println!("✂️  cancelled {nick}'s {n} unused links ({user})"),
+    }
+    Ok(())
+}
+
 /// `world.txt rename <name>`: give the world a proper name.
 pub fn rename(db_path: &str, name: &str) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;

@@ -428,6 +428,8 @@ impl Game {
             "invite" => return self.cmd_new_invite(id, rest),
             "link" => return self.cmd_new_link(id, rest),
             "fold" => return self.cmd_fold(id, rest),
+            "invites" => return self.cmd_invites(id),
+            "revoke" => return self.cmd_revoke(id, rest),
             "guests" => return self.cmd_guests(id),
             "read" => return self.cmd_read(id, rest),
             "post" | "note" => return self.cmd_post(id, rest),
@@ -1290,6 +1292,41 @@ impl Game {
         found.into_iter().next()
     }
 
+    /// Keepers: recent magic links and what became of them.
+    fn cmd_invites(&mut self, id: u64) -> anyhow::Result<()> {
+        if !self.is_keeper(&self.user(id)) {
+            self.say1(id, Line::plain("Only island keepers can see invites."));
+            return Ok(());
+        }
+        let now = super::accounts::now();
+        let mut lines = vec![Line::new().b(Col::Magenta, "💌 Recent magic links")];
+        let list = self.world.db.invites(20)?;
+        if list.is_empty() {
+            lines.push(Line::col(Col::Dim, "  None yet. 'invite Poppy' makes one."));
+        }
+        for (user, nick, expires, used_at) in list {
+            let state = super::accounts::invite_state(expires, used_at, now);
+            let col = if state.starts_with("waiting") { Col::Yellow } else { Col::Dim };
+            lines.push(Line::new().t("  ").b(Col::Cyan, nick).c(Col::Dim, format!(" {user}  · ")).c(col, state));
+        }
+        lines.push(Line::col(Col::Dim, "  'revoke Sam' cancels their unused links."));
+        self.send(id, lines);
+        Ok(())
+    }
+
+    /// Keepers: `revoke Sam` cancels their unused links.
+    fn cmd_revoke(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some(target) = self.keeper_target(id, name) else { return Ok(()) };
+        let who = super::names::full(&self.world.nick(&target), &target);
+        let msg = match self.world.db.revoke_invites(&target)? {
+            0 => format!("{who} has no unused links."),
+            1 => format!("✂️  Cancelled {who}'s unused link."),
+            n => format!("✂️  Cancelled {who}'s {n} unused links."),
+        };
+        self.say1(id, Line::col(Col::Yellow, msg));
+        Ok(())
+    }
+
     /// Keepers: `fold Mark into dappled-lamb-80` moves an old account's things
     /// into someone's account and removes the old one.
     fn cmd_fold(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
@@ -1801,6 +1838,7 @@ fn help() -> Vec<Line> {
         h("ban Sam / unban Sam", "close the island to someone"),
         h("promote Lu / demote Lu", "make someone a keeper, or not"),
         h("signout Sam", "sign out all their devices (a lost iPad)"),
+        h("invites / revoke Sam", "see recent magic links, or cancel someone's unused ones"),
         h("fold Mark into dappled-lamb-80", "move an old account's things into someone's account"),
         h("users", "everyone, with their devices"),
         h("visitors / admit / turn away", "people sailing in from other worlds"),

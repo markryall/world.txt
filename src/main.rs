@@ -103,6 +103,18 @@ enum Cmd {
         #[arg(long, default_value = "world.db")]
         db: String,
     },
+    /// Recent magic links: waiting, used or expired.
+    Invites {
+        #[arg(long, default_value = "world.db")]
+        db: String,
+    },
+    /// Cancel someone's unused magic links (one sent to the wrong person).
+    Revoke {
+        /// Their nickname or username.
+        name: String,
+        #[arg(long, default_value = "world.db")]
+        db: String,
+    },
     /// Give the world a proper name (shown to visitors and other worlds).
     Rename {
         /// e.g. "Willow Bank"
@@ -189,6 +201,8 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Bridge { name, server, dir, invite } => bridge::run(name, &server, dir, invite).await,
         Cmd::Invite { nickname, keeper, url, db } => server::invite(&db, &nickname, keeper, url.as_deref()),
         Cmd::Link { name, url, db } => server::link(&db, &name, url.as_deref()),
+        Cmd::Invites { db } => server::invites(&db),
+        Cmd::Revoke { name, db } => server::revoke(&db, &name),
         Cmd::Rename { name, db } => server::rename(&db, &name),
         Cmd::Promote { name, db } => server::promote(&db, &name),
         Cmd::BackfillJournal { db } => server::backfill_journal(&db),

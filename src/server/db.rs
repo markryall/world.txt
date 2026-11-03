@@ -120,6 +120,8 @@ impl Db {
         // Unmade things are tucked away rather than deleted, so they can come back.
         let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_by TEXT", []);
         let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_at INTEGER", []);
+        // When an invite was opened, for keepers keeping track.
+        let _ = conn.execute("ALTER TABLE invites ADD COLUMN used_at INTEGER", []);
         Ok(Db { conn })
     }
 
@@ -219,8 +221,28 @@ impl Db {
                 |r| r.get(0),
             )
             .ok()?;
-        self.conn.execute("UPDATE invites SET used = 1 WHERE token_hash = ?1", [token_hash]).ok()?;
+        self.conn
+            .execute("UPDATE invites SET used = 1, used_at = ?2 WHERE token_hash = ?1", params![token_hash, now])
+            .ok()?;
         Some(user)
+    }
+
+    /// Recent invites, newest first: (username, nickname, expires, used_at).
+    /// `used_at` is None while unused; old ones from before it was kept show 0.
+    pub fn invites(&self, limit: usize) -> anyhow::Result<Vec<(String, String, i64, Option<i64>)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT i.user, COALESCE(p.nickname, i.user), i.expires,
+                    CASE WHEN i.used = 0 THEN NULL ELSE COALESCE(i.used_at, 0) END
+             FROM invites i LEFT JOIN players p ON p.name = i.user
+             ORDER BY i.expires DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([limit as i64], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Cancel someone's unused invites. How many there were.
+    pub fn revoke_invites(&self, user: &str) -> anyhow::Result<usize> {
+        Ok(self.conn.execute("DELETE FROM invites WHERE user = ?1 AND used = 0", [user])?)
     }
 
     pub fn add_device(&self, user: &str, token_hash: &str, now: i64) -> anyhow::Result<()> {
@@ -857,5 +879,19 @@ mod tests {
         assert_eq!(db.take_mail("dappled-lamb-80").unwrap().len(), 1);
         assert!(db.is_keeper("dappled-lamb-80"), "keeping keeper powers from the old account");
         assert!(db.satchel("Mark").unwrap().is_empty());
+    }
+
+    #[test]
+    fn invites_show_whether_theyre_used_and_can_be_revoked() {
+        let db = Db::open(":memory:").unwrap();
+        db.create_user("sunny-seal-32", "Tom", -1, -1).unwrap();
+        db.add_invite("sunny-seal-32", "a", 1_000).unwrap();
+        db.add_invite("sunny-seal-32", "b", 2_000).unwrap();
+        assert_eq!(db.redeem_invite("a", 500).as_deref(), Some("sunny-seal-32"));
+        let list = db.invites(10).unwrap();
+        assert_eq!(list[0], ("sunny-seal-32".into(), "Tom".into(), 2_000, None));
+        assert_eq!(list[1].3, Some(500));
+        assert_eq!(db.revoke_invites("sunny-seal-32").unwrap(), 1, "only the unused one goes");
+        assert_eq!(db.redeem_invite("b", 600), None);
     }
 }

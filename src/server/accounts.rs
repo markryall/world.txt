@@ -54,3 +54,23 @@ pub fn link(url: Option<&str>, token: &str) -> String {
         None => format!("<world address>/#invite={token}"),
     }
 }
+
+/// How an invite stands, for keepers: "used 2h ago", "waiting (6d left)", "expired".
+pub fn invite_state(expires: i64, used_at: Option<i64>, now: i64) -> String {
+    fn ago(s: i64) -> String {
+        match s {
+            s if s < 3600 => "just now".into(),
+            s if s < 86_400 => format!("{}h ago", s / 3600),
+            s => format!("{}d ago", s / 86_400),
+        }
+    }
+    match used_at {
+        Some(0) => "used".into(),
+        Some(t) => format!("used {}", ago(now - t)),
+        None if expires <= now => "expired".into(),
+        None => {
+            let left = expires - now;
+            if left < 86_400 { format!("waiting ({}h left)", (left / 3600).max(1)) } else { format!("waiting ({}d left)", left / 86_400) }
+        }
+    }
+}
