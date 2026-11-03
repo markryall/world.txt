@@ -64,6 +64,9 @@ pub enum Event {
     Cmd { id: u64, text: String },
     /// Music from a browser playing a gramophone.
     Audio { id: u64, frames: Vec<String>, title: Option<String> },
+    /// Songs picked for a jukebox, and a jukebox song finishing.
+    Queue { id: u64, thing: i64, songs: Vec<crate::protocol::Song> },
+    TrackDone { id: u64, thing: i64, key: String },
     /// What a radio's on, looked up elsewhere: None if nothing's known.
     RadioNews { thing: i64, title: Option<String> },
     Leave { id: u64 },
@@ -180,6 +183,12 @@ async fn connection(
             }
             ToServer::Audio { frames, title } if joined => {
                 events.send(Event::Audio { id, frames, title })?;
+            }
+            ToServer::Queue { thing, songs } if joined => {
+                events.send(Event::Queue { id, thing, songs })?;
+            }
+            ToServer::TrackDone { thing, key } if joined => {
+                events.send(Event::TrackDone { id, thing, key })?;
             }
             _ => {}
         }

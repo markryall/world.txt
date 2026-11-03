@@ -135,7 +135,7 @@
 </div>
 <div id="gramo">
   <span id="gramo-msg">🎶 Choose some songs to play on the gramophone</span>
-  <label>🎵 choose songs<input id="gramo-files" type="file" accept="audio/*" multiple hidden></label>
+  <label><span id="gramo-pick">🎵 choose songs</span><input id="gramo-files" type="file" accept="audio/*" multiple hidden></label>
   <button id="gramo-stop" type="button">⏹ stop</button>
 </div>
 <form id="input" autocomplete="off">
@@ -267,6 +267,9 @@ function connect() {
     else if (m.type === 'hint') hint(m);
     else if (m.type === 'board') board(m);
     else if (m.type === 'spin_start') hostStart(m.thing);
+    else if (m.type === 'juke_add') jukeAdd(m.thing);
+    else if (m.type === 'juke_turn') jukeTurn(m.thing, m.key);
+    else if (m.type === 'juke_stop') jukeStop();
     else if (m.type === 'spin_stop') hostStop();
     else if (m.type === 'audio') hear(m);
     else if (m.type === 'audio_end') unhear(m.thing);
@@ -560,37 +563,63 @@ const TAP = `class Tap extends AudioWorkletProcessor {
 }
 registerProcessor('tap', Tap);`;
 const gramo = { thing: null, ctx: null, el: null, encoder: null, timer: null, files: [], idx: 0, ts: 0, pending: [], title: null,
-  accL: new Float32Array(FRAME), accR: new Float32Array(FRAME), accN: 0 };
+  onEnd: null, accL: new Float32Array(FRAME), accR: new Float32Array(FRAME), accN: 0 };
+// Songs waiting on a jukebox: they stay here, by key, until their turn.
+const juke = { thing: null, files: new Map() };
+const canPlay = () => 'AudioEncoder' in window;
 
+// The bar above the input: playing a gramophone, adding to a jukebox, or
+// your jukebox song playing.
+let barMode = null;
+function bar(mode, msg) {
+  barMode = mode;
+  $('#gramo').classList.toggle('on', !!mode);
+  if (!mode) return;
+  $('#gramo-msg').textContent = msg;
+  $('#gramo-pick').parentElement.hidden = mode === 'juke-turn' || !canPlay();
+  $('#gramo-pick').textContent = mode === 'gramophone' ? '🎵 choose songs' : '📀 add songs';
+  $('#gramo-stop').textContent = { gramophone: '⏹ stop', 'juke-add': '✕ done', 'juke-turn': '⏭ skip' }[mode];
+}
+
+// The record player: an audio element, tapped and encoded as it plays.
+async function recorder() {
+  if (gramo.ctx) return;
+  const ctx = new AudioContext({ sampleRate: 48000 });
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: 'application/javascript' })));
+  const el = new Audio();
+  el.onended = () => gramo.onEnd?.();
+  const tap = new AudioWorkletNode(ctx, 'tap', { outputChannelCount: [2] });
+  ctx.createMediaElementSource(el).connect(tap).connect(ctx.destination);
+  tap.port.onmessage = (e) => encode(e.data);
+  const encoder = new AudioEncoder({
+    output: (chunk) => { const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); gramo.pending.push(b64(b)); },
+    error: (e) => { $('#gramo-msg').textContent = `🎶 Couldn't play that: ${e.message}`; },
+  });
+  encoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 96000 });
+  Object.assign(gramo, { ctx, el, encoder, timer: setInterval(sendAudio, 200) });
+}
+
+function playFile(f) {
+  if (gramo.el.src) URL.revokeObjectURL(gramo.el.src);
+  gramo.el.src = URL.createObjectURL(f);
+  gramo.title = f.name.replace(/\.[^.]+$/, '');
+  gramo.el.play().catch(() => {});
+}
+
+// Gramophone: your songs, round and round, until you stop.
 function hostStart(thing) {
   gramo.thing = thing;
-  $('#gramo').classList.add('on');
-  $('#gramo-msg').textContent = 'AudioEncoder' in window
-    ? '🎶 Choose some songs to play on the gramophone'
-    : "🎶 This browser can't play to a gramophone yet. Chrome can!";
+  bar('gramophone', canPlay() ? '🎶 Choose some songs to play on the gramophone' : "🎶 This browser can't play to a gramophone yet. Chrome can!");
 }
 
 async function hostPlay(files) {
-  if (!files.length || !('AudioEncoder' in window)) return;
+  if (!files.length || !canPlay()) return;
   gramo.files = [...files];
   gramo.idx = 0;
   try {
-    if (!gramo.ctx) {
-      const ctx = new AudioContext({ sampleRate: 48000 });
-      await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: 'application/javascript' })));
-      const el = new Audio();
-      el.onended = () => { gramo.idx = (gramo.idx + 1) % gramo.files.length; playTrack(); };
-      const tap = new AudioWorkletNode(ctx, 'tap', { outputChannelCount: [2] });
-      ctx.createMediaElementSource(el).connect(tap).connect(ctx.destination);
-      tap.port.onmessage = (e) => encode(e.data);
-      const encoder = new AudioEncoder({
-        output: (chunk) => { const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); gramo.pending.push(b64(b)); },
-        error: (e) => { $('#gramo-msg').textContent = `🎶 Couldn't play that: ${e.message}`; },
-      });
-      encoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 96000 });
-      Object.assign(gramo, { ctx, el, encoder, timer: setInterval(sendAudio, 200) });
-    }
+    await recorder();
     await gramo.ctx.resume();
+    gramo.onEnd = () => { gramo.idx = (gramo.idx + 1) % gramo.files.length; playTrack(); };
     playTrack();
   } catch (e) {
     $('#gramo-msg').textContent = `🎶 Couldn't start the gramophone: ${e.message}`;
@@ -600,16 +629,13 @@ async function hostPlay(files) {
 function playTrack() {
   const f = gramo.files[gramo.idx];
   if (!f) return;
-  if (gramo.el.src) URL.revokeObjectURL(gramo.el.src);
-  gramo.el.src = URL.createObjectURL(f);
-  gramo.title = f.name.replace(/\.[^.]+$/, '');
+  playFile(f);
   $('#gramo-msg').textContent = `🎶 Playing ${gramo.title}`;
-  gramo.el.play().catch(() => {});
 }
 
 // Gather the tapped sound into 20ms frames for the encoder.
 function encode([l, r]) {
-  if (!gramo.encoder || gramo.encoder.state !== 'configured') return;
+  if (!gramo.encoder || gramo.encoder.state !== 'configured' || gramo.el?.paused) return;
   for (let off = 0; off < l.length;) {
     const n = Math.min(FRAME - gramo.accN, l.length - off);
     gramo.accL.set(l.subarray(off, off + n), gramo.accN);
@@ -637,13 +663,60 @@ function hostStop() {
   try { gramo.encoder?.close(); } catch {}
   gramo.el?.pause();
   gramo.ctx?.close();
-  Object.assign(gramo, { thing: null, ctx: null, el: null, encoder: null, timer: null, files: [], pending: [], title: null, accN: 0 });
-  $('#gramo').classList.remove('on');
+  Object.assign(gramo, { thing: null, ctx: null, el: null, encoder: null, timer: null, files: [], pending: [], title: null, onEnd: null, accN: 0 });
+  bar(null);
   $('#gramo-files').value = '';
 }
 
-$('#gramo-files').onchange = (e) => hostPlay(e.target.files);
-$('#gramo-stop').onclick = () => send('stop music');
+// Jukebox: pick songs (only their titles go to the world), then wait for your turn.
+function jukeAdd(thing) {
+  juke.thing = thing;
+  bar('juke-add', canPlay() ? '📀 Choose songs for the jukebox' : "📀 This browser can't play to a jukebox yet. Chrome can!");
+}
+
+function jukeQueue(files) {
+  const songs = [...files].map((f) => {
+    const key = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+    juke.files.set(key, f);
+    return { key, title: f.name.replace(/\.[^.]+$/, '') };
+  });
+  if (!songs.length || !ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({ type: 'queue', thing: juke.thing, songs }));
+  bar('juke-add', `📀 Added ${songs.length === 1 ? 'a song' : songs.length + ' songs'}. Keep this tab open until your turn 🎶`);
+}
+
+async function jukeTurn(thing, key) {
+  const f = juke.files.get(key);
+  const done = () => ws?.readyState === 1 && ws.send(JSON.stringify({ type: 'track_done', thing, key }));
+  if (!f || !canPlay()) return done();
+  try {
+    await recorder();
+    await gramo.ctx.resume();
+    gramo.onEnd = () => { juke.files.delete(key); gramo.onEnd = null; bar(null); done(); };
+    playFile(f);
+    bar('juke-turn', `📀 Your song is playing on the jukebox: ${gramo.title}`);
+  } catch (e) {
+    done();
+  }
+}
+
+function jukeStop() {
+  gramo.onEnd = null;
+  gramo.el?.pause();
+  gramo.pending = [];
+  if (barMode === 'juke-turn') bar(null);
+}
+
+$('#gramo-files').onchange = (e) => {
+  if (barMode === 'gramophone') hostPlay(e.target.files);
+  else jukeQueue(e.target.files);
+  e.target.value = '';
+};
+$('#gramo-stop').onclick = () => {
+  if (barMode === 'gramophone') send('stop music');
+  else if (barMode === 'juke-turn') send('skip');
+  else bar(null);
+};
 
 // Listening: frames from a gramophone in earshot, played a moment behind.
 const listening = {};

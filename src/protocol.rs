@@ -147,6 +147,20 @@ pub enum ToClient {
     AudioEnd { thing: i64 },
     /// A radio you can hear (url and how loud), or can't any more (no url).
     Radio { thing: i64, url: Option<String>, gain: f32 },
+    /// Open the song picker for this jukebox.
+    JukeAdd { thing: i64 },
+    /// Your turn on the jukebox: play this song (by its key) to everyone nearby.
+    JukeTurn { thing: i64, key: String },
+    /// Stop playing your song on this jukebox (skipped, or it's moved on).
+    JukeStop { thing: i64 },
+}
+
+/// A song waiting on a jukebox: a key the browser knows it by, and its title.
+/// The song itself never leaves the browser until it plays.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Song {
+    pub key: String,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,6 +191,10 @@ pub enum ToServer {
         #[serde(default)]
         title: Option<String>,
     },
+    /// Songs picked for a jukebox (titles only).
+    Queue { thing: i64, songs: Vec<Song> },
+    /// This browser's jukebox song has finished.
+    TrackDone { thing: i64, key: String },
 }
 
 /// A board as plain lines, for clients that show it in their log. `None`

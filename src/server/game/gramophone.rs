@@ -31,6 +31,8 @@ pub fn kind() -> &'static str {
 pub struct Spin {
     pub host: u64,
     pub title: Option<String>,
+    /// A jukebox turn, rather than someone's gramophone.
+    pub jukebox: bool,
 }
 
 /// How loud a gramophone sounds this many steps away: 1 beside it, fading out.
@@ -47,7 +49,7 @@ pub fn clean_title(raw: &str) -> Option<String> {
 
 /// Gramophones and radios: things that play real sound.
 pub fn makes_sound(kind: Option<&str>) -> bool {
-    kind == Some(KIND) || kind == Some(super::radio::kind())
+    kind == Some(KIND) || kind == Some(super::radio::kind()) || kind == Some(super::jukebox::kind())
 }
 
 fn steps(a: (i64, i64), b: (i64, i64)) -> i64 {
@@ -86,7 +88,7 @@ impl Game {
     }
 
     /// Tell everyone within earshot of a gramophone.
-    fn tell_earshot(&self, thing: i64, except: u64, line: Line) {
+    pub(super) fn tell_earshot(&self, thing: i64, except: u64, line: Line) {
         let Some(t) = self.world.things.iter().find(|t| t.id == thing) else { return };
         for (pid, p) in &self.players {
             if *pid != except && (p.x - t.x).abs().max((p.y - t.y).abs()) <= EARSHOT {
@@ -121,7 +123,7 @@ impl Game {
             self.say1(id, Line::plain("You're playing music on another gramophone. 'stop music' there first."));
             return Ok(());
         }
-        self.spins.insert(thing, Spin { host: id, title: None });
+        self.spins.insert(thing, Spin { host: id, title: None, jukebox: false });
         if let Some(p) = self.players.get(&id) {
             let _ = p.tx.send(ToClient::SpinStart { thing });
         }
@@ -132,7 +134,10 @@ impl Game {
 
     /// `stop music`: stop what you're playing (keepers can stop anyone's, here).
     pub(super) fn cmd_stop_music(&mut self, id: u64) -> anyhow::Result<()> {
-        if let Some(thing) = self.spins.iter().find(|(_, s)| s.host == id).map(|(t, _)| *t) {
+        if let Some((thing, juke)) = self.spins.iter().find(|(_, s)| s.host == id).map(|(t, s)| (*t, s.jukebox)) {
+            if juke {
+                return self.cmd_skip_song(id);
+            }
             self.stop_spin(thing);
             return Ok(());
         }
@@ -181,7 +186,10 @@ impl Game {
             return;
         };
         let title = title.as_deref().and_then(clean_title);
-        if title.is_some() && title != self.spins[&thing].title {
+        if self.spins[&thing].jukebox {
+            // The jukebox says what's on itself, when each turn starts.
+            self.juke_heard(thing);
+        } else if title.is_some() && title != self.spins[&thing].title {
             if let Some(s) = self.spins.get_mut(&thing) {
                 s.title = title.clone();
             }

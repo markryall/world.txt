@@ -9,6 +9,7 @@ mod events;
 mod gather;
 mod gramophone;
 mod homes;
+mod jukebox;
 mod music;
 mod radio;
 mod sailing;
@@ -100,6 +101,8 @@ struct Game {
     spins: HashMap<i64, gramophone::Spin>,
     /// Radios and the stream each is tuned to, by thing id.
     radios: HashMap<i64, String>,
+    /// Jukeboxes' queues, by thing id.
+    jukes: HashMap<i64, jukebox::Jukebox>,
     /// Radios' programme guides, for saying what's on air.
     radio_guides: HashMap<i64, String>,
     /// What each radio's on, as far as the world last looked.
@@ -110,7 +113,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new() };
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
@@ -128,6 +131,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
                 game.step_travellers();
                 game.row_boats();
                 game.update_radios();
+                game.jukes_tick();
             }
         }
     }
@@ -141,6 +145,8 @@ impl Game {
             Event::Leave { id } => self.leave(id),
             Event::Audio { id, frames, title } => self.audio(id, frames, title),
             Event::RadioNews { thing, title } => self.radio_news(thing, title),
+            Event::Queue { id, thing, songs } => self.queue_songs(id, thing, songs),
+            Event::TrackDone { id, thing, key } => self.track_done(id, thing, &key),
             Event::Cmd { id, text } => {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.ambient_quiet = 0;
@@ -350,6 +356,7 @@ impl Game {
         if self.waiting.remove(&id).is_some() {
             return; // a visitor who gave up waiting
         }
+        self.juke_leave(id);
         self.stop_spins_by(id);
         let Some(p) = self.players.remove(&id) else { return };
         if p.bot {
@@ -445,6 +452,10 @@ impl Game {
             "play" | "wind" if self.has_gramophone_here(id) && !self.has_music_box_here(id) => return self.cmd_play_music(id),
             "play" | "wind" => return self.cmd_play(id),
             "tune" => return self.cmd_tune(id, rest),
+            "add" | "queue" if self.has_jukebox_here(id) => return self.cmd_add_songs(id),
+            "jukebox" | "juke" => return self.cmd_jukebox(id),
+            "skip" if rest.is_empty() && self.juke_skippable(id) => return self.cmd_skip_song(id),
+            "unqueue" => return self.cmd_unqueue(id),
             "radio" if rest.trim() == "off" => return self.cmd_radio_off(id),
             "radio" if rest.trim_start().starts_with("guide") => {
                 return self.cmd_radio_guide(id, rest.trim_start().trim_start_matches("guide"));
@@ -1067,19 +1078,19 @@ impl Game {
             return Ok(());
         }
         let (name, action, trigger) = parse_make(text);
-        if gramophone::is_gramophone(&name) || radio::is_radio(&name) {
+        if gramophone::is_gramophone(&name) || radio::is_radio(&name) || jukebox::is_jukebox(&name) {
             if let Some(other) = self.sound_too_close(x, y, None) {
                 self.say1(id, Line::plain(format!("{} is too close: two songs at once would be a muddle. Try ten or so steps further away.", capitalise(&the(&other)))));
                 return Ok(());
             }
-            let gramo = gramophone::is_gramophone(&name);
-            let kind = if gramo { gramophone::kind() } else { radio::kind() };
-            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(kind))?;
-            let how = if gramo {
-                "Stand here and 'play music' to play songs from your computer for everyone nearby."
+            let (kind, how) = if jukebox::is_jukebox(&name) {
+                (jukebox::kind(), "Anyone can 'add songs' from their computer, and it plays one each, taking turns.")
+            } else if gramophone::is_gramophone(&name) {
+                (gramophone::kind(), "Stand here and 'play music' to play songs from your computer for everyone nearby.")
             } else {
-                "Tune it to a station's stream: tune radio https://…"
+                (radio::kind(), "Tune it to a station's stream: tune radio https://…")
             };
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(kind))?;
             self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, format!(". {how}")));
             self.tell_here(x, y, id, Line::col(Col::Pink, format!("🎶 {who} makes {name}.")));
             self.status_all();
@@ -1522,6 +1533,7 @@ impl Game {
             }
             Some(i) if !what.is_empty() => {
                 let t = self.world.remove_thing(i, &self.user(id))?;
+                self.forget_jukebox(t.id);
                 self.stop_spin(t.id);
                 self.forget_radio(t.id);
                 self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
@@ -1905,6 +1917,8 @@ const HELP: &[HelpTopic] = &[
             ("hum C E G", "a little tune (hum together to jam!)"),
             ("make a music box / teach C E G / play", "a box that remembers your tune"),
             ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
+            ("make a jukebox / add songs / jukebox", "everyone adds songs from their computer; it plays one each, taking turns"),
+            ("skip / unqueue", "skip your song (keepers: any), or take yours out of the queue"),
             ("make a radio / tune radio https://… / radio off", "an internet radio station for everyone nearby"),
             ("radio guide https://…", "where it finds what's on air, if its stream doesn't say"),
         ],

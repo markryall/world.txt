@@ -334,7 +334,11 @@ Progress is saved by name, so returning visitors never see it again
   are told they're making music together. In the browser, tunes play as real notes.
 - `make a gramophone`, stand by it and `play music`, then choose songs from your
   computer: everyone nearby hears them, loudest beside it and fading over five
-  steps (`stop music` to stop). `make a radio` and `tune radio https://…` plays
+  steps (`stop music` to stop). `make a jukebox` is a gramophone everyone can add
+  to: `add songs` picks songs from your computer (only their titles go to the
+  world), and it plays one song per person, taking turns, each streamed from its
+  owner's browser when their turn comes (`jukebox` shows the queue, `skip`,
+  `unqueue`). Keep your tab open until your turn. `make a radio` and `tune radio https://…` plays
   an internet radio station the same way (`radio off`), and says what's
   playing when the stream does; for stations whose stream doesn't, `radio guide
   https://…` points it at a programme guide in AirNet's format, to say what show

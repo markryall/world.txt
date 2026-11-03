@@ -80,7 +80,7 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                             }
                             Ok(msg @ ToClient::Welcome { .. }) => crate::identity::on_sign_in("player", server, &msg),
                             // Sound is for browsers.
-                            Ok(ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. }) | Err(_) => {}
+                            Ok(ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. }) | Err(_) => {}
                         }
                     }
                     Some(Ok(_)) => {}

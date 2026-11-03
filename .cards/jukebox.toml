@@ -1,0 +1,7 @@
+name = "Jukebox"
+status = "done"
+description = "A gramophone everyone can add to. 'make a jukebox'; at it, 'add songs' picks songs from your own computer, and only their titles go to the world, into the jukebox's queue. It takes turns one song per person (round-robin), and when it's your turn the world asks your browser to stream that song to everyone in earshot, like a gramophone, then moves on. 'jukebox' shows the queue, 'skip' skips the current song (its owner or a keeper), 'unqueue' takes yours out. Keep your tab open until your turn: leaving drops your songs, and a browser that goes quiet for 10 seconds is skipped. Counts as a sound maker for spacing."
+created_at = "2026-11-03T05:39:32.000000Z"
+updated_at = "2026-11-03T05:39:32.000000Z"
+tags = ["belonging"]
+priority = "medium"
