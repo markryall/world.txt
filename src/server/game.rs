@@ -400,7 +400,10 @@ impl Game {
         }
 
         match verb.as_str() {
-            "help" | "?" => self.send(id, help()),
+            "help" | "?" => {
+                let keeper = self.is_keeper(&self.user(id));
+                self.send(id, help(rest, keeper));
+            }
             "look" | "l" | "examine" | "x" if rest.is_empty() => self.look(id),
             "look" | "l" | "examine" | "x" => self.cmd_examine(id, rest),
             "go" | "walk" if rest.trim_start_matches("to the ").trim_start_matches("to ").starts_with("dock") => {
@@ -1835,92 +1838,249 @@ fn clean_name(raw: &str) -> String {
     capitalise(&name)
 }
 
-fn help() -> Vec<Line> {
+/// Help, a topic at a time: `help` gives the essentials and the topics,
+/// `help music` one topic, `help all` the lot.
+struct HelpTopic {
+    name: &'static str,
+    also: &'static [&'static str],
+    title: &'static str,
+    keepers: bool,
+    items: &'static [(&'static str, &'static str)],
+    footer: Option<&'static str>,
+}
+
+const HELP: &[HelpTopic] = &[
+    HelpTopic {
+        name: "moving",
+        also: &["move", "walking", "walk", "travel", "sailing", "sail", "map"],
+        title: "🧭 getting about",
+        keepers: false,
+        items: &[
+            ("n s e w ne nw se sw", "walk about"),
+            ("look / look <thing>", "take it all in"),
+            ("map", "the whole island, with friends and named places"),
+            ("who", "who's out in the world"),
+            ("find Poppy", "which way to walk to them"),
+            ("join Poppy / stop", "walk to them automatically"),
+            ("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
+            ("sail to other.world", "visit another world (their keepers let you in)"),
+            ("events / go event", "what's coming up on the island, and walk there"),
+        ],
+        footer: Some("There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
+    },
+    HelpTopic {
+        name: "talking",
+        also: &["talk", "chat", "people", "friends"],
+        title: "💬 talking",
+        keepers: false,
+        items: &[
+            ("say hi  (or 'hi)", "talk to people here"),
+            ("emote waves  (or :waves)", "do a little something"),
+            ("sit / rest / dance / wave", "a little bonhomie"),
+            ("@Poppy hi  (or tell)", "talk to someone anywhere (kept for them if they're away)"),
+            ("reply thanks!  (or r)", "answer whoever told you"),
+            ("chat hi everyone  (@all)", "everyone in the world hears"),
+            ("shout hello", "carries a long way"),
+            ("nickname Pip", "change what you're called (your username stays)"),
+            ("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
+        ],
+        footer: None,
+    },
+    HelpTopic {
+        name: "music",
+        also: &["sound", "songs", "radio", "gramophone", "tunes"],
+        title: "🎶 music",
+        keepers: false,
+        items: &[
+            ("hum C E G", "a little tune (hum together to jam!)"),
+            ("make a music box / teach C E G / play", "a box that remembers your tune"),
+            ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
+            ("make a radio / tune radio https://… / radio off", "an internet radio station for everyone nearby"),
+        ],
+        footer: Some("Turn the sound on (🔊 in the browser) to hear them. Gramophones and radios carry five steps, and you only ever hear the nearest."),
+    },
+    HelpTopic {
+        name: "land",
+        also: &["shaping", "shape", "digging", "dig", "planting", "garden", "gardening"],
+        title: "🌱 shaping the land",
+        keepers: false,
+        items: &[
+            ("dig / fill", "ponds, earth, sandbanks"),
+            ("plant tree|flowers|grass", "make things grow"),
+            ("raise / path", "hills, rocks, paths"),
+            ("name The Willow Bank", "name this place"),
+        ],
+        footer: None,
+    },
+    HelpTopic {
+        name: "gathering",
+        also: &["gather", "fishing", "fish", "satchel", "journal", "crafting", "craft"],
+        title: "🧺 gathering and crafting",
+        keepers: false,
+        items: &[
+            ("gather  (or pick, catch)", "take what's here: look for pink • on the map"),
+            ("fish", "by the water, then wait for a bite"),
+            ("satchel / journal", "what you carry / everything you've found"),
+            ("give daisy to Poppy", "share with someone here"),
+            ("place daisy / release moth", "decorate, or set something free"),
+            ("recipes", "what you can make from what you've gathered"),
+            ("craft wind chime", "make it (then place it, or give it away)"),
+        ],
+        footer: None,
+    },
+    HelpTopic {
+        name: "animals",
+        also: &["companions", "companion", "pets", "pet"],
+        title: "🦊 animal friends",
+        keepers: false,
+        items: &[
+            ("befriend fox", "offer a wild animal a berry (it may take a few)"),
+            ("petname Rusty / pet / let go", "your friend follows you everywhere"),
+        ],
+        footer: None,
+    },
+    HelpTopic {
+        name: "making",
+        also: &["make", "build", "things"],
+        title: "✨ making things",
+        keepers: false,
+        items: &[
+            ("make a frog that croaks when it rains", "also: at night, during the day, when it's sunny, when someone arrives"),
+            ("push bench north", "move something"),
+            ("unmake bench / undo", "take away something you made, or bring it back"),
+        ],
+        footer: None,
+    },
+    HelpTopic {
+        name: "home",
+        also: &["homes", "claim"],
+        title: "🏡 home",
+        keepers: false,
+        items: &[
+            ("claim", "make the patch around you your home (one each)"),
+            ("home", "go straight home from anywhere"),
+            ("share Lu / unshare Lu / guests", "who else may build at your home"),
+        ],
+        footer: None,
+    },
+    HelpTopic {
+        name: "boards",
+        also: &["noticeboards", "noticeboard", "notes", "board"],
+        title: "📌 noticeboards",
+        keepers: false,
+        items: &[
+            ("make a noticeboard", "put one up for everyone"),
+            ("read / read more", "the notes here, then older ones"),
+            ("post see you at sunset!", "leave a note (and follow the board)"),
+            ("boards / follow / unfollow", "boards you hear about from anywhere"),
+            ("archive / read week 2026-11-02", "past pages of the Island Journal"),
+        ],
+        footer: None,
+    },
+    HelpTopic {
+        name: "keepers",
+        also: &["keeper", "admin"],
+        title: "🗝 island keepers",
+        keepers: true,
+        items: &[
+            ("invite Poppy", "make an account for someone new, and get their magic link"),
+            ("link Poppy", "a new magic link for someone's new device"),
+            ("invites / revoke Sam", "see recent magic links, or cancel someone's unused ones"),
+            ("users", "everyone, with their devices"),
+            ("kick Sam [minutes] / unkick Sam", "send someone off for a break (30 min)"),
+            ("ban Sam / unban Sam", "close the island to someone"),
+            ("promote Lu / demote Lu", "make someone a keeper, or not"),
+            ("signout Sam", "sign out all their devices (a lost iPad)"),
+            ("fold Poppy into sunny-otter-42", "move an old account's things into someone's account"),
+            ("visitors / admit / turn away", "people sailing in from other worlds"),
+            ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
+            ("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
+        ],
+        footer: None,
+    },
+];
+
+fn help_item(cmd: &str, what: &str) -> Line {
     // No column padding, so it reads fine on a narrow phone screen too.
-    let h = |cmd: &str, what: &str| {
-        let line = Line::new().c(Col::Yellow, format!("  {cmd}"));
-        if what.is_empty() { line } else { line.c(Col::Dim, format!("  {what}")) }
-    };
-    vec![
-        Line::new().b(Col::Magenta, "✨ Things you can do ✨"),
-        Line::col(Col::Pink, "wander"),
-        h("n s e w ne nw se sw", "walk about"),
-        h("look / look <thing>", "take it all in"),
-        h("tutorial / skip", "first steps again, or hide them"),
-        h("who", "who's out in the world"),
-        h("map", "the whole island, with friends and named places"),
-        Line::col(Col::Pink, "chat"),
-        h("say hi  (or 'hi)", "talk to people here"),
-        h("emote waves  (or :waves)", "do a little something"),
-        h("@Poppy hi  (or tell)", "talk to someone anywhere (kept for them if they're away)"),
-        h("reply thanks!  (or r)", "answer whoever told you"),
-        h("chat hi everyone  (@all)", "everyone in the world hears"),
-        h("find Poppy", "which way to walk to them"),
-        h("join Poppy / stop", "walk to them automatically"),
-        h("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
-        h("sail to other.world", "visit another world (their keepers let you in)"),
-        h("events / go event", "what's coming up on the island, and walk there"),
-        h("shout hello", "carries a long way"),
-        h("hum C E G", "a little tune (hum together to jam!)"),
-        h("make a music box / teach C E G / play", "a box that remembers your tune"),
-        h("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby (browser)"),
-        h("make a radio / tune radio https://… / radio off", "an internet radio station for everyone nearby (browser)"),
-        h("sit / rest / dance / wave", "a little bonhomie"),
-        h("nickname Pip", "change what you're called (your username stays)"),
-        h("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
-        Line::col(Col::Pink, "shape the land"),
-        h("dig / fill", "ponds, earth, sandbanks"),
-        h("plant tree|flowers|grass", "make things grow"),
-        h("raise / path", "hills, rocks, paths"),
-        h("name The Willow Bank", "name this place"),
-        Line::col(Col::Pink, "gather"),
-        h("gather  (or pick, catch)", "take what's here: look for pink • on the map"),
-        h("fish", "by the water, then wait for a bite"),
-        h("satchel / journal", "what you carry / everything you've found"),
-        h("give daisy to Poppy", "share with someone here"),
-        h("place daisy / release moth", "decorate, or set something free"),
-        Line::col(Col::Pink, "companions"),
-        h("befriend fox", "offer a wild animal a berry (it may take a few)"),
-        h("petname Rusty / pet / let go", "your friend follows you everywhere"),
-        Line::col(Col::Pink, "crafting"),
-        h("recipes", "what you can make from what you've gathered"),
-        h("craft wind chime", "make it (then place it, or give it away)"),
-        Line::col(Col::Pink, "home"),
-        h("claim", "make the patch around you your home (one each)"),
-        h("home", "go straight home from anywhere"),
-        h("share Lu / unshare Lu / guests", "who else may build at your home"),
-        Line::col(Col::Pink, "noticeboards"),
-        h("make a noticeboard", "put one up for everyone"),
-        h("read / read more", "the notes here, then older ones"),
-        h("post see you at sunset!", "leave a note (and follow the board)"),
-        h("boards / follow / unfollow", "boards you hear about from anywhere"),
-        h("archive / read week 2026-11-02", "past pages of the Island Journal"),
-        Line::col(Col::Pink, "make things"),
-        h("make a frog that croaks when it rains", ""),
-        Line::col(Col::Dim, "    also: at night, during the day, when it's sunny, when someone arrives"),
-        h("push bench north", "move something"),
-        h("unmake bench / undo", "take away something you made, or bring it back"),
-        Line::col(Col::Pink, "island keepers"),
-        h("invite Poppy", "make an account for someone new, and get their magic link"),
-        h("link Poppy", "a new magic link for someone's new device"),
-        h("kick Sam [minutes] / unkick Sam", "send someone off for a break (30 min)"),
-        h("ban Sam / unban Sam", "close the island to someone"),
-        h("promote Lu / demote Lu", "make someone a keeper, or not"),
-        h("signout Sam", "sign out all their devices (a lost iPad)"),
-        h("invites / revoke Sam", "see recent magic links, or cancel someone's unused ones"),
-        h("fold Poppy into sunny-otter-42", "move an old account's things into someone's account"),
-        h("users", "everyone, with their devices"),
-        h("visitors / admit / turn away", "people sailing in from other worlds"),
-        h("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
-        h("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
-        Line::new(),
-        Line::col(Col::Dim, "There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
-    ]
+    let line = Line::new().c(Col::Yellow, format!("  {cmd}"));
+    if what.is_empty() { line } else { line.c(Col::Dim, format!("  {what}")) }
+}
+
+fn help_topic(t: &HelpTopic) -> Vec<Line> {
+    let mut lines = vec![Line::col(Col::Pink, t.title)];
+    lines.extend(t.items.iter().map(|(c, w)| help_item(c, w)));
+    if let Some(f) = t.footer {
+        lines.push(Line::col(Col::Dim, format!("  {f}")));
+    }
+    lines
+}
+
+fn help(topic: &str, keeper: bool) -> Vec<Line> {
+    let topic = topic.trim().to_lowercase();
+    let topics = || HELP.iter().filter(|t| keeper || !t.keepers);
+    if topic == "all" {
+        let mut lines = vec![Line::new().b(Col::Magenta, "✨ Everything you can do ✨")];
+        for t in topics() {
+            lines.extend(help_topic(t));
+        }
+        return lines;
+    }
+    if !topic.is_empty() {
+        if let Some(t) = topics().find(|t| t.name == topic || t.also.contains(&topic.as_str())) {
+            return help_topic(t);
+        }
+    }
+    let mut lines = Vec::new();
+    if topic.is_empty() {
+        lines.push(Line::new().b(Col::Magenta, "✨ Things you can do ✨"));
+        lines.extend(
+            [
+                ("n s e w  (and ne nw se sw)", "walk about"),
+                ("look", "take it all in"),
+                ("say hi", "talk to people here"),
+                ("who / map", "who's around, and the whole island"),
+                ("tutorial / skip", "first steps again, or hide them"),
+            ]
+            .iter()
+            .map(|(c, w)| help_item(c, w)),
+        );
+        lines.push(Line::col(Col::Dim, "  ↑ for things you've typed before, Ctrl-R to search them (browser)"));
+    } else {
+        lines.push(Line::plain(format!("There's no help on '{topic}'. Try one of these:")));
+    }
+    lines.push(Line::col(Col::Pink, "more help"));
+    for t in topics() {
+        let blurb = t.title.split_once(' ').map_or(t.title, |(_, rest)| rest);
+        lines.push(help_item(&format!("help {}", t.name), blurb));
+    }
+    lines.push(help_item("help all", "everything at once"));
+    lines
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn help_comes_a_topic_at_a_time() {
+        let text = |lines: Vec<Line>| lines.iter().map(|l| l.0.iter().map(|s| s.t.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n");
+        let short = text(help("", false));
+        assert!(short.contains("help music") && short.contains("help all"));
+        assert!(!short.contains("help keepers"), "keepers' topic only for keepers");
+        assert!(text(help("", true)).contains("help keepers"));
+        assert!(text(help("radio", false)).contains("tune radio"));
+        assert!(text(help("MUSIC", false)).contains("make a gramophone"));
+        assert!(text(help("nonsense", false)).contains("no help on 'nonsense'"));
+        assert!(!text(help("keepers", false)).contains("invite Poppy"));
+        assert!(text(help("all", true)).contains("invite Poppy") && text(help("all", false)).contains("befriend fox"));
+        // Every name and alias leads to just one topic.
+        let mut seen = std::collections::HashSet::new();
+        for t in HELP {
+            for n in std::iter::once(&t.name).chain(t.also) {
+                assert!(seen.insert(*n), "'{n}' is used twice");
+            }
+        }
+    }
 
     #[test]
     fn phone_quotes_still_say_things() {
