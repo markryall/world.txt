@@ -9,9 +9,18 @@ case "${1:-}" in
   "") echo "usage: deploy/fly-deploy <world>|all   (worlds: $(worlds | tr '\n' ' '))" >&2; exit 2 ;;
   all) set -- $(worlds) ;;
 esac
+took() { s=$(( $(date +%s) - $1 )); printf '%dm%02ds' $((s / 60)) $((s % 60)); }
+start=$(date +%s)
+summary=""
 for w in "$@"; do
   cfg="deploy/fly/$w.toml"
   [ -f "$cfg" ] || { echo "no $cfg (copy deploy/fly/example.toml to make one)" >&2; exit 1; }
   echo "🚀 deploying $w"
+  t=$(date +%s)
   fly deploy . --config "$cfg"
+  echo "⏱  $w took $(took "$t")"
+  summary="$summary  $w $(took "$t")\n"
 done
+if [ "$#" -gt 1 ]; then
+  printf "⏱  all done in %s:\n$summary" "$(took "$start")"
+fi
