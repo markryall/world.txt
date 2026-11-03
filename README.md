@@ -140,6 +140,9 @@ cloudflared tunnel run --url http://localhost:4040 world
    Check it with `curl https://example.com/.well-known/world.txt`: it should show
    your world's name and address.
 
+   Give it a proper name too, if you like: `world.txt rename "Willow Bank"`.
+   Visitors and other worlds see it; the address stays the same.
+
 6. **Make yourself a keeper** and open the link it prints:
 
    ```

@@ -103,6 +103,13 @@ enum Cmd {
         #[arg(long, default_value = "world.db")]
         db: String,
     },
+    /// Give the world a proper name (shown to visitors and other worlds).
+    Rename {
+        /// e.g. "Willow Bank"
+        name: String,
+        #[arg(long, default_value = "world.db")]
+        db: String,
+    },
     /// Write past weeks' discoveries into the Island Journal's archive.
     BackfillJournal {
         #[arg(long, default_value = "world.db")]
@@ -182,6 +189,7 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Bridge { name, server, dir, invite } => bridge::run(name, &server, dir, invite).await,
         Cmd::Invite { nickname, keeper, url, db } => server::invite(&db, &nickname, keeper, url.as_deref()),
         Cmd::Link { name, url, db } => server::link(&db, &name, url.as_deref()),
+        Cmd::Rename { name, db } => server::rename(&db, &name),
         Cmd::Promote { name, db } => server::promote(&db, &name),
         Cmd::BackfillJournal { db } => server::backfill_journal(&db),
         Cmd::Service { action } => match action {

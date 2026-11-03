@@ -44,7 +44,7 @@ pub async fn run(
     let world = world::World::load_or_create(db, seed)?;
     // This world's public face, for other worlds checking its passports.
     let info: Arc<Option<federation::WorldInfo>> =
-        Arc::new(url.as_deref().map(|u| federation::WorldInfo::new(u, &federation::world_key(&world.db).expect("a signing key"))));
+        Arc::new(url.as_deref().map(|u| federation::WorldInfo::new(u, &federation::world_key(&world.db).expect("a signing key"), world.db.meta(federation::NAME_KEY))));
     let (events_tx, events_rx) = mpsc::unbounded_channel();
     if world.db.keeper_count() == 0 {
         println!("🗝  No island keepers yet. Make yourself one: world.txt invite <YourName> --keeper --db {db_path}");
@@ -165,6 +165,18 @@ async fn is_websocket(stream: &TcpStream) -> anyhow::Result<bool> {
 
 const PAGE: &str = include_str!("../../web/index.html");
 
+/// The page, wearing the world's name if it has one.
+fn page(info: &Option<federation::WorldInfo>) -> String {
+    match info {
+        Some(i) if i.name != federation::host(&i.url) => {
+            let name = i.name.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+            PAGE.replacen("<title>world.txt</title>", &format!("<title>{name} · world.txt</title>"), 1)
+                .replacen("<h1>✨ world.txt ✨</h1>", &format!("<h1>✨ {name} ✨</h1>"), 1)
+        }
+        _ => PAGE.to_string(),
+    }
+}
+
 async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>) -> anyhow::Result<()> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let mut buf = [0u8; 4096];
@@ -172,7 +184,7 @@ async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>)
     let req = String::from_utf8_lossy(&buf[..n]);
     let path = req.split_whitespace().nth(1).unwrap_or("/");
     let (status, ctype, body) = match (path, info) {
-        ("/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", PAGE.to_string()),
+        ("/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", page(info)),
         (federation::WELL_KNOWN, Some(info)) => ("200 OK", "application/json", serde_json::to_string(info)?),
         _ => ("404 Not Found", "text/plain; charset=utf-8", "nothing here, babe\n".to_string()),
     };
@@ -185,12 +197,27 @@ async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>)
     Ok(())
 }
 
+/// `world.txt rename <name>`: give the world a proper name.
+pub fn rename(db_path: &str, name: &str) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let name = federation::clean_world_name(name);
+    if name.is_empty() {
+        anyhow::bail!("a world name needs a letter or two, e.g. world.txt rename \"Willow Bank\"");
+    }
+    db.set_meta(federation::NAME_KEY, &name)?;
+    println!("🌍 this world is called {name} now. Restart it (or run service install again) for it to show.");
+    Ok(())
+}
+
 /// `world.txt invite <nickname> [--keeper]`: a new account and its magic link.
 pub fn invite(db_path: &str, nickname: &str, keeper: bool, url: Option<&str>) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
     let nick = names_clean(nickname);
     if nick.is_empty() {
         anyhow::bail!("nicknames need a letter or two");
+    }
+    if !db.matching_users(&nick)?.is_empty() {
+        anyhow::bail!("someone's already called {nick}. For their new device: world.txt link {nick}");
     }
     let user = accounts::create_account(&db, &nick, keeper)?;
     let token = accounts::issue_invite(&db, &user)?;
@@ -207,11 +234,21 @@ pub fn invite(db_path: &str, nickname: &str, keeper: bool, url: Option<&str>) ->
 /// `world.txt link <name>`: a new magic link for someone's next device.
 pub fn link(db_path: &str, name: &str, url: Option<&str>) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
-    let Some(user) = db.resolve_user(name) else { anyhow::bail!("there's nobody called {name}") };
+    let user = one_user(&db, name)?;
     let token = accounts::issue_invite(&db, &user)?;
     println!("💌 A new link for {} ({user}), one use, within {} days:", db.nickname(&user).unwrap_or_default(), accounts::INVITE_DAYS);
     println!("   {}", accounts::link(url, &token));
     Ok(())
+}
+
+/// The one account a name means, or why not.
+fn one_user(db: &db::Db, name: &str) -> anyhow::Result<String> {
+    let found = db.matching_users(name)?;
+    match found.as_slice() {
+        [] => anyhow::bail!("there's nobody called {name}"),
+        [one] => Ok(one.clone()),
+        many => anyhow::bail!("'{name}' could be any of: {} (use their username)", many.join(", ")),
+    }
 }
 
 fn names_clean(raw: &str) -> String {
@@ -223,7 +260,7 @@ fn names_clean(raw: &str) -> String {
 /// `world.txt promote <name>`: the server's machine can always make a keeper.
 pub fn promote(db_path: &str, name: &str) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
-    let Some(user) = db.resolve_user(name) else { anyhow::bail!("there's nobody called {name}") };
+    let user = one_user(&db, name)?;
     db.set_keeper(&user, true)?;
     println!("🗝  {} ({user}) is an island keeper now.", db.nickname(&user).unwrap_or_default());
     Ok(())

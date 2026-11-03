@@ -427,6 +427,7 @@ impl Game {
             "unshare" => return self.cmd_invite(id, rest, false),
             "invite" => return self.cmd_new_invite(id, rest),
             "link" => return self.cmd_new_link(id, rest),
+            "fold" => return self.cmd_fold(id, rest),
             "guests" => return self.cmd_guests(id),
             "read" => return self.cmd_read(id, rest),
             "post" | "note" => return self.cmd_post(id, rest),
@@ -1090,10 +1091,11 @@ impl Game {
             self.say1(id, Line::plain("Only island keepers can make magic links."));
             return Ok(());
         }
-        let Some(user) = self.world.db.resolve_user(name) else {
+        if self.world.db.matching_users(name)?.is_empty() {
             self.say1(id, Line::plain(format!("There's nobody called {} on the island. For someone new: invite {}", name.trim(), name.trim())));
             return Ok(());
-        };
+        }
+        let Some(user) = self.one_user(id, name) else { return Ok(()) };
         let token = super::accounts::issue_invite(&self.world.db, &user)?;
         let lines = self.link_line(&self.world.nick(&user), &user, &token);
         self.send(id, lines);
@@ -1269,11 +1271,53 @@ impl Game {
             self.say1(id, Line::plain("Only island keepers can do that."));
             return None;
         }
-        let found = self.world.db.resolve_user(name);
-        if found.is_none() {
+        let found = self.one_user(id, name);
+        if found.is_none() && self.world.db.matching_users(name).is_ok_and(|m| m.is_empty()) {
             self.say1(id, Line::plain(format!("There's nobody called '{}' on the island. ('users' lists everyone)", name.trim())));
         }
         found
+    }
+
+    /// The one account a name means. If it could mean several (old accounts
+    /// from before nicknames), say which usernames to use instead.
+    fn one_user(&self, id: u64, name: &str) -> Option<String> {
+        let found = self.world.db.matching_users(name).unwrap_or_default();
+        if found.len() > 1 {
+            let which: Vec<String> = found.iter().map(|u| super::names::full(&self.world.nick(u), u)).collect();
+            self.say1(id, Line::plain(format!("'{}' could be {}. Use their username.", name.trim(), which.join(" or "))));
+            return None;
+        }
+        found.into_iter().next()
+    }
+
+    /// Keepers: `fold Mark into dappled-lamb-80` moves an old account's things
+    /// into someone's account and removes the old one.
+    fn cmd_fold(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        if !self.is_keeper(&self.user(id)) {
+            self.say1(id, Line::plain("Only island keepers can do that."));
+            return Ok(());
+        }
+        let Some((old, new)) = rest.split_once(" into ").map(|(a, b)| (a.trim(), b.trim())).filter(|(a, b)| !a.is_empty() && !b.is_empty()) else {
+            self.say1(id, Line::plain("Fold who into who? e.g. 'fold Mark into dappled-lamb-80' (use usernames: 'users' lists them)"));
+            return Ok(());
+        };
+        // Usernames only: this can't be undone, so no guessing from nicknames.
+        let exact = |n: &str| self.world.db.matching_users(n).ok().and_then(|m| m.into_iter().find(|u| u.eq_ignore_ascii_case(n)));
+        let (Some(old), Some(new)) = (exact(old), exact(new)) else {
+            self.say1(id, Line::plain("Use both usernames exactly ('users' lists them), e.g. 'fold Mark into dappled-lamb-80'."));
+            return Ok(());
+        };
+        if old == new {
+            self.say1(id, Line::plain("That's the same account."));
+            return Ok(());
+        }
+        let from = super::names::full(&self.world.nick(&old), &old);
+        let to = super::names::full(&self.world.nick(&new), &new);
+        self.send_off(&old, &format!("🧺 This account has been folded into {to}. Ask an island keeper for a magic link."));
+        self.world.fold_account(&old, &new)?;
+        self.say1(id, Line::col(Col::Green, format!("🧺 Folded {from} into {to}: their satchel, journal, made things, notes and mail are {}'s now.", self.world.nick(&new))));
+        println!("🧺 {} folded {from} into {to}", self.user(id));
+        Ok(())
     }
 
     fn send_off(&self, user: &str, reason: &str) {
@@ -1757,6 +1801,7 @@ fn help() -> Vec<Line> {
         h("ban Sam / unban Sam", "close the island to someone"),
         h("promote Lu / demote Lu", "make someone a keeper, or not"),
         h("signout Sam", "sign out all their devices (a lost iPad)"),
+        h("fold Mark into dappled-lamb-80", "move an old account's things into someone's account"),
         h("users", "everyone, with their devices"),
         h("visitors / admit / turn away", "people sailing in from other worlds"),
         h("trust their.address / untrust / worlds", "let a friendly world's people straight in"),

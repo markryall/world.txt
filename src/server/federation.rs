@@ -54,9 +54,23 @@ pub struct WorldInfo {
 }
 
 impl WorldInfo {
-    pub fn new(url: &str, key: &SigningKey) -> WorldInfo {
-        WorldInfo { name: host(url), url: normalise(url), public_key: hex(key.verifying_key().as_bytes()) }
+    /// Without a proper name, a world goes by its address.
+    pub fn new(url: &str, key: &SigningKey, name: Option<String>) -> WorldInfo {
+        WorldInfo {
+            name: name.unwrap_or_else(|| host(url)),
+            url: normalise(url),
+            public_key: hex(key.verifying_key().as_bytes()),
+        }
     }
+}
+
+/// Where a world's proper name is kept.
+pub const NAME_KEY: &str = "world_name";
+
+/// A world name fit to show: letters, numbers, spaces and a little punctuation.
+pub fn clean_world_name(raw: &str) -> String {
+    let kept: String = raw.chars().filter(|c| c.is_alphanumeric() || " -'.".contains(*c)).take(40).collect();
+    kept.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +138,15 @@ pub async fn verify(token: &str, my_url: &str, now: i64) -> anyhow::Result<Passp
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_world_goes_by_its_name_or_else_its_address() {
+        let key = SigningKey::from_bytes(&[7u8; 32]);
+        assert_eq!(WorldInfo::new("https://Home.Example.com/", &key, None).name, "home.example.com");
+        let named = WorldInfo::new("https://home.example.com", &key, Some("Willow Bank".into()));
+        assert_eq!((named.name.as_str(), named.url.as_str()), ("Willow Bank", "https://home.example.com"));
+        assert_eq!(clean_world_name("  Willow   <b>Bank</b>! "), "Willow bBankb");
+    }
 
     #[test]
     fn passports_round_trip_and_tampering_shows() {

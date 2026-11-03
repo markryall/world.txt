@@ -1,5 +1,5 @@
 name = "Fold old accounts into new ones"
-status = "todo"
+status = "done"
 description = "Old accounts from before invites (plain Iz, Mark, Lu, M: no nickname) win name lookups, so 'link Mark' finds the old Mark rather than the keeper. Keepers (and the server machine) can fold an old account into a new one, moving its satchel, things, homes, mail and journal over and removing it. When a name could mean more than one account, commands say so and list the usernames instead of quietly picking one."
 created_at = "2026-11-03T00:03:18.000000Z"
 updated_at = "2026-11-03T00:03:18.000000Z"

@@ -135,6 +135,70 @@ impl Db {
             .ok()
     }
 
+    /// Everyone a name could mean, by username or nickname. More than one
+    /// means the name is ambiguous (old accounts from before nicknames).
+    pub fn matching_users(&self, name: &str) -> anyhow::Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT name FROM players WHERE name = ?1 COLLATE NOCASE OR nickname = ?1 COLLATE NOCASE
+             ORDER BY (name = ?1 COLLATE NOCASE) DESC, name",
+        )?;
+        let rows = stmt.query_map([name.trim()], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Move everything `old` has into `new`, then remove `old`: satchel and
+    /// journal merge, made things, notes, mail and devices move over, and
+    /// `new` keeps their own home and companion if they already have one.
+    pub fn fold_account(&self, old: &str, new: &str) -> anyhow::Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO satchel (player, species, count) SELECT ?2, species, count FROM satchel WHERE player = ?1
+             ON CONFLICT (player, species) DO UPDATE SET count = count + excluded.count",
+            [old, new],
+        )?;
+        tx.execute(
+            "INSERT INTO journal (player, species, found_at) SELECT ?2, species, found_at FROM journal WHERE player = ?1
+             ON CONFLICT (player, species) DO UPDATE SET found_at = MIN(found_at, excluded.found_at)",
+            [old, new],
+        )?;
+        for (table, col) in [
+            ("things", "maker"),
+            ("things", "removed_by"),
+            ("notes", "author"),
+            ("mail", "recipient"),
+            ("mail", "sender"),
+            ("events", "host"),
+            ("devices", "user"),
+            ("invites", "user"),
+            ("trusted_worlds", "by"),
+            ("bans", "name"),
+        ] {
+            tx.execute(&format!("UPDATE {table} SET {col} = ?2 WHERE {col} = ?1"), [old, new])?;
+        }
+        // Keyed tables: move what doesn't clash, drop what does.
+        for (table, col) in [
+            ("homes", "owner"),
+            ("home_guests", "owner"),
+            ("home_guests", "guest"),
+            ("companions", "owner"),
+            ("board_members", "player"),
+            ("mutes", "player"),
+            ("mutes", "muted"),
+        ] {
+            tx.execute(&format!("UPDATE OR IGNORE {table} SET {col} = ?2 WHERE {col} = ?1"), [old, new])?;
+            tx.execute(&format!("DELETE FROM {table} WHERE {col} = ?1"), [old])?;
+        }
+        tx.execute("DELETE FROM satchel WHERE player = ?1", [old])?;
+        tx.execute("DELETE FROM journal WHERE player = ?1", [old])?;
+        tx.execute(
+            "UPDATE players SET keeper = 1 WHERE name = ?2 AND EXISTS (SELECT 1 FROM players WHERE name = ?1 AND keeper = 1)",
+            [old, new],
+        )?;
+        tx.execute("DELETE FROM players WHERE name = ?1", [old])?;
+        tx.commit()?;
+        Ok(())
+    }
+
     // ---- invites and devices --------------------------------------------------
 
     pub fn add_invite(&self, user: &str, token_hash: &str, expires: i64) -> anyhow::Result<()> {
@@ -765,5 +829,33 @@ impl Db {
             params![name, x, y, tutorial],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn folding_an_old_account_moves_its_things_and_removes_it() {
+        let db = Db::open(":memory:").unwrap();
+        // An old account (username is a plain name) and a new one nicknamed the same.
+        db.conn.execute("INSERT INTO players (name, x, y, keeper) VALUES ('Mark', 1, 1, 1)", []).unwrap();
+        db.create_user("dappled-lamb-80", "Mark", 2, 2).unwrap();
+        assert_eq!(db.matching_users("mark").unwrap(), vec!["Mark", "dappled-lamb-80"]);
+
+        db.satchel_add("Mark", "daisy", 2).unwrap();
+        db.satchel_add("dappled-lamb-80", "daisy", 1).unwrap();
+        db.journal_add("Mark", "frog").unwrap();
+        db.send_mail("Mark", "Iz", "hi", 5).unwrap();
+
+        db.fold_account("Mark", "dappled-lamb-80").unwrap();
+
+        assert_eq!(db.matching_users("Mark").unwrap(), vec!["dappled-lamb-80"]);
+        assert_eq!(db.satchel("dappled-lamb-80").unwrap(), vec![("daisy".to_string(), 3)]);
+        assert_eq!(db.journal("dappled-lamb-80").unwrap(), vec!["frog"]);
+        assert_eq!(db.take_mail("dappled-lamb-80").unwrap().len(), 1);
+        assert!(db.is_keeper("dappled-lamb-80"), "keeping keeper powers from the old account");
+        assert!(db.satchel("Mark").unwrap().is_empty());
     }
 }

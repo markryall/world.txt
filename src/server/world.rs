@@ -307,6 +307,17 @@ impl World {
         Ok(self.things.last())
     }
 
+    /// Fold one account into another, here and in the db.
+    pub fn fold_account(&mut self, old: &str, new: &str) -> anyhow::Result<()> {
+        self.db.fold_account(old, new)?;
+        for t in self.things.iter_mut().filter(|t| t.maker == old) {
+            t.maker = new.to_string();
+        }
+        self.homes = self.db.homes()?.into_iter().map(|(owner, x, y, guests)| Home { owner, x, y, guests }).collect();
+        self.nicks.remove(old);
+        Ok(())
+    }
+
     pub fn move_thing(&mut self, i: usize, x: i64, y: i64) -> anyhow::Result<()> {
         let t = &mut self.things[i];
         t.x = x;
