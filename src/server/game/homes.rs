@@ -89,7 +89,7 @@ impl Game {
         self.tell_here(hx, hy, id, Line::col(Col::Cyan, format!("{name} comes home.")));
         self.look(id);
         self.save_progress(id);
-        self.status_all();
+        self.status_near(id, &[(x, y), (hx, hy)]);
         Ok(())
     }
 

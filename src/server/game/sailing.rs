@@ -99,6 +99,7 @@ impl Game {
                 continue;
             }
             let name = self.players[&id].name.clone();
+            let left = (self.players[&id].x, self.players[&id].y);
             if let Some(p) = self.players.get_mut(&id) {
                 p.voyage = None;
                 p.x = to.0;
@@ -109,7 +110,7 @@ impl Game {
             self.tell_here(to.0, to.1, id, Line::col(Col::Blue, format!("⛵ {name} arrives by boat from {from}.")));
             self.look(id);
             self.save_progress(id);
-            self.status_all();
+            self.status_near(id, &[left, to]);
         }
     }
 

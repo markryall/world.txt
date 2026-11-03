@@ -229,7 +229,8 @@ impl Game {
                 self.finds[i].y = ny;
                 self.say1(id, Line::col(Col::Pink, format!("{} So close! The {} flutters off to the {dir}.", s.kind.icon(), s.name)));
             }
-            self.status_all();
+            let gone_to = self.finds.get(i).map_or((x, y), |f| (f.x, f.y));
+            self.status_near(id, &[(x, y), gone_to]);
             return Ok(());
         }
         if !self.collect(id, s)? {
@@ -239,7 +240,7 @@ impl Game {
         let verb = s.kind.verb();
         self.say1(id, Line::new().c(Col::Pink, format!("{} You {verb} ", s.kind.icon())).b(Col::Pink, nature::a(s.name)).c(Col::Pink, "."));
         self.tell_here(x, y, id, Line::col(Col::Pink, format!("{} {name} {verb}s {}.", s.kind.icon(), nature::a(s.name))));
-        self.status_all();
+        self.status_near(id, &[(x, y)]);
         Ok(())
     }
 
@@ -415,7 +416,7 @@ impl Game {
         self.world.add_thing(x, y, nature::a(s.name), action, trigger, &user, None)?;
         self.say1(id, Line::col(Col::Yellow, format!("{} You place {} here, just so.", s.kind.icon(), nature::a(s.name))));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("{} {name} places {} here.", s.kind.icon(), nature::a(s.name))));
-        self.status_all();
+        self.status_near(id, &[(x, y)]);
         Ok(())
     }
 

@@ -4,7 +4,8 @@ use super::db::{Db, ThingRow, TileRow};
 use super::rng;
 use super::terrain::Terrain;
 use super::weather::{Clock, Phase, Season, Sky, Weather};
-use crate::protocol::{Col, Line};
+use crate::protocol::{Col, Line, Span};
+use std::collections::HashSet;
 
 /// The whole archipelago: four islands, each in a 64x64 patch.
 pub const SIZE: i64 = 2 * super::islands::REGION;
@@ -481,38 +482,48 @@ impl World {
 
     /// A small coloured map centred on (cx, cy).
     pub fn minimap(&self, cx: i64, cy: i64, people: &[(i64, i64)], finds: &[(i64, i64)]) -> Vec<Line> {
-        let (rw, rh) = (7, 4);
+        let (rw, rh) = MINIMAP_REACH;
+        let people: HashSet<(i64, i64)> = people.iter().copied().collect();
         let mut out = Vec::new();
         for y in cy - rh..=cy + rh {
-            let mut line = Line::new();
+            // Neighbouring cells of one colour share a span, to keep it small.
+            let mut spans: Vec<Span> = Vec::new();
             for x in cx - rw..=cx + rw {
-                if x == cx && y == cy {
-                    line = line.b(Col::Magenta, "@");
+                let (g, c, b) = if x == cx && y == cy {
+                    ("@", Col::Magenta, true)
                 } else if people.contains(&(x, y)) {
-                    line = line.b(Col::White, "☺");
+                    ("☺", Col::White, true)
                 } else if self.homes.iter().any(|h| (h.x, h.y) == (x, y)) {
-                    line = line.b(Col::Magenta, "⌂");
+                    ("⌂", Col::Magenta, true)
                 } else if self.things_at(x, y).any(|t| t.is_board()) {
-                    line = line.b(Col::Yellow, "▣");
+                    ("▣", Col::Yellow, true)
                 } else if self.things_at(x, y).next().is_some() {
-                    line = line.c(Col::Yellow, "✦");
+                    ("✦", Col::Yellow, false)
                 } else if finds.contains(&(x, y)) {
-                    line = line.b(Col::Pink, "•");
+                    ("•", Col::Pink, true)
                 } else if !in_bounds(x, y) {
-                    line = line.c(Col::DeepBlue, "≈");
+                    ("≈", Col::DeepBlue, false)
                 } else {
                     let (g, c) = self.terrain(x, y).glyph();
-                    line = line.c(c, g);
-                }
-                if x != cx + rw {
-                    line = line.t(" ");
+                    (g, c, false)
+                };
+                let gap = if x != cx + rw { " " } else { "" };
+                match spans.last_mut() {
+                    Some(last) if last.c == c && last.b == b => {
+                        last.t.push_str(g);
+                        last.t.push_str(gap);
+                    }
+                    _ => spans.push(Span { t: format!("{g}{gap}"), c, b }),
                 }
             }
-            out.push(line);
+            out.push(Line(spans));
         }
         out
     }
 }
+
+/// How far the minimap sees: steps left and right, and up and down.
+pub const MINIMAP_REACH: (i64, i64) = (7, 4);
 
 /// A touch of the season, for descriptions.
 fn season_line(here: Terrain, season: Season) -> &'static str {

@@ -72,6 +72,8 @@ struct Player {
     ambient_quiet: u8,
     /// When each thing last did its thing for them, so a frog doesn't croak on and on.
     seen_acts: HashMap<i64, std::time::Instant>,
+    /// Their side panel is out of date, and goes with the next stride.
+    status_due: std::cell::Cell<bool>,
     /// The radio this browser has been told it can hear: (how loud, stream).
     radios: HashMap<i64, (f32, String)>,
 }
@@ -139,6 +141,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
                 game.update_radios();
                 game.jukes_tick();
                 game.cooking_tick();
+                game.flush_status();
             }
         }
     }
@@ -211,6 +214,7 @@ impl Game {
 
     fn status(&self, id: u64) {
         let Some(p) = self.players.get(&id) else { return };
+        p.status_due.set(false);
         let sky = self.world.weather.sky_at(p.x, p.y);
         let people: Vec<(i64, i64)> =
             self.players.iter().filter(|(pid, _)| **pid != id).map(|(_, o)| (o.x, o.y)).collect();
@@ -233,6 +237,29 @@ impl Game {
     fn status_all(&self) {
         for &id in self.players.keys() {
             self.status(id);
+        }
+    }
+
+    /// After `id` changes these spots: their own side panel now, and a fresh
+    /// one with the next stride for everyone else whose minimap shows them.
+    /// A step only changes the maps that can see it, and a crowd's steps
+    /// share one update each half second.
+    pub(super) fn status_near(&self, id: u64, spots: &[(i64, i64)]) {
+        let (rw, rh) = super::world::MINIMAP_REACH;
+        for (&pid, p) in &self.players {
+            if pid != id && spots.iter().any(|&(x, y)| (x - p.x).abs() <= rw && (y - p.y).abs() <= rh) {
+                p.status_due.set(true);
+            }
+        }
+        self.status(id);
+    }
+
+    /// Send the side panels that are due.
+    fn flush_status(&self) {
+        for (&id, p) in &self.players {
+            if p.status_due.get() {
+                self.status(id);
+            }
         }
     }
 
@@ -323,7 +350,7 @@ impl Game {
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         let full = super::names::full(&name, &user);
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new() });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
 
         self.send(
             id,
@@ -623,7 +650,7 @@ impl Game {
         }
         // Save where they are with every step, so a crash or power cut loses nothing.
         self.save_progress(id);
-        self.status_all();
+        self.status_near(id, &[(ox, oy), (nx, ny)]);
         Ok(())
     }
 
