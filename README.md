@@ -146,22 +146,18 @@ cloudflared tunnel run --url http://localhost:4040 world
    world.txt invite YourName --keeper
    ```
 
-7. **Keep the tunnel up after a restart** (optional): give `cloudflared` a config
-   file at `~/.cloudflared/config.yml`
+7. **Keep it up without a terminal** (macOS): from the world's folder,
 
-   ```yaml
-   tunnel: world
-   credentials-file: /Users/you/.cloudflared/<tunnel-id>.json   # printed by `tunnel create`
-   ingress:
-     - hostname: example.com
-       service: http://localhost:4040
-     - service: http_status:404
+   ```
+   world.txt service install --url https://example.com --tunnel world
    ```
 
-   then `cloudflared tunnel run world` uses it, and `cloudflared service install`
-   runs it in the background whenever the machine is on (see Cloudflare's
-   [run as a service](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/as-a-service/)
-   guide for your system). `world.txt serve` still needs to be running too.
+   runs the world and its tunnel in the background, starts them at every login
+   and brings them back if they fall over. `world.txt service status` checks on
+   them, logs are in `~/Library/Logs/world.txt/`, and `world.txt service uninstall`
+   stops them. Run `install` again after upgrading world.txt. (On Linux, a systemd
+   unit running `world.txt serve` and Cloudflare's own `cloudflared service install`
+   do the same job.)
 
 ### Inviting people
 

@@ -1,5 +1,5 @@
 name = "Keep the world up without a terminal"
-status = "todo"
+status = "done"
 description = "Right now serve and the tunnel only run while someone keeps a terminal open, so the island goes dark when it closes. 'world.txt service install' on macOS writes launchd agents for serve (in the world's folder, with WORLD_URL) and for the cloudflared tunnel, starts them at login and restarts them if they fall over; 'service uninstall' and 'service status' to match. Logs go somewhere findable."
 created_at = "2026-11-03T00:03:18.000000Z"
 updated_at = "2026-11-03T00:03:18.000000Z"

@@ -4,6 +4,7 @@ mod client;
 mod identity;
 mod protocol;
 mod server;
+mod service;
 
 use clap::{Parser, Subcommand};
 
@@ -123,6 +124,11 @@ enum Cmd {
         #[arg(long, default_value = "world.db")]
         db: String,
     },
+    /// Keep the world (and its tunnel) running in the background, from login (macOS).
+    Service {
+        #[command(subcommand)]
+        action: ServiceCmd,
+    },
     /// Send one command through a running bridge and print what comes back.
     Send {
         name: String,
@@ -132,6 +138,27 @@ enum Cmd {
         #[arg(long, default_value = "tmp/bridge")]
         dir: std::path::PathBuf,
     },
+}
+
+#[derive(Subcommand)]
+enum ServiceCmd {
+    /// Start the world now and at every login, restarting it if it falls over.
+    Install {
+        #[arg(long, default_value = "world.db")]
+        db: String,
+        /// The world's public address (e.g. https://world.example.com).
+        #[arg(long, env = "WORLD_URL")]
+        url: Option<String>,
+        #[arg(long, env = "WORLD_BACKUP_DIR")]
+        backup_dir: Option<std::path::PathBuf>,
+        /// Also run this named Cloudflare tunnel (e.g. world).
+        #[arg(long)]
+        tunnel: Option<String>,
+    },
+    /// Stop them and take them out of login.
+    Uninstall,
+    /// Are they running?
+    Status,
 }
 
 #[tokio::main]
@@ -157,6 +184,11 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Link { name, url, db } => server::link(&db, &name, url.as_deref()),
         Cmd::Promote { name, db } => server::promote(&db, &name),
         Cmd::BackfillJournal { db } => server::backfill_journal(&db),
+        Cmd::Service { action } => match action {
+            ServiceCmd::Install { db, url, backup_dir, tunnel } => service::install(service::Install { db, url, backup_dir, tunnel }),
+            ServiceCmd::Uninstall => service::uninstall(),
+            ServiceCmd::Status => service::status(),
+        },
         Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
     }
 }
