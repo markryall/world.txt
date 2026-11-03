@@ -295,7 +295,7 @@ impl Game {
             id,
             vec![
                 Line::new().b(Col::Magenta, "✨ world.txt ✨"),
-                Line::col(Col::Dim, "A small island with no battles, just vibes. Type 'help' if you're lost."),
+                Line::col(Col::Dim, "A small island with no battles, just bonhomie. Type 'help' if you're lost."),
                 Line::new(),
             ],
         );
@@ -1817,7 +1817,7 @@ fn help() -> Vec<Line> {
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune (hum together to jam!)"),
         h("make a music box / teach C E G / play", "a box that remembers your tune"),
-        h("sit / rest / dance / wave", "vibes"),
+        h("sit / rest / dance / wave", "a little bonhomie"),
         h("nickname Pip", "change what you're called (your username stays)"),
         h("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
         Line::col(Col::Pink, "shape the land"),

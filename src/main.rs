@@ -8,7 +8,7 @@ mod service;
 
 use clap::{Parser, Subcommand};
 
-/// world.txt — a cozy text world. No battles, just vibes.
+/// world.txt — a cozy text world. No battles, just bonhomie.
 #[derive(Parser)]
 #[command(name = "world.txt", version, about)]
 struct Cli {

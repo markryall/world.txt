@@ -1,7 +1,7 @@
 # world.txt ✨
 
 A small shared island made of text. You can wander, chat, dig ponds, plant trees,
-name places and make things. There are no battles, just vibes.
+name places and make things. There are no battles, just bonhomie.
 
 ```
 brew install markryall/tap/world-txt  # or: make install (builds ~/.local/bin/world.txt)
