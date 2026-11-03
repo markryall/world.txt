@@ -22,7 +22,40 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
 
-pub type ClientTx = UnboundedSender<ToClient>;
+/// Music waiting to go out to one listener before more is dropped: about
+/// five seconds' worth (a batch is 200ms).
+pub const MAX_AUDIO_QUEUED: usize = 25;
+
+/// A player's outgoing messages. Music is dropped for a listener who's fallen
+/// behind (a stalled connection), so it can't pile up in memory; everything
+/// else always goes.
+#[derive(Clone)]
+pub struct ClientTx {
+    tx: UnboundedSender<ToClient>,
+    audio_queued: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl ClientTx {
+    pub fn new(tx: UnboundedSender<ToClient>) -> ClientTx {
+        ClientTx { tx, audio_queued: Arc::default() }
+    }
+
+    pub fn send(&self, msg: ToClient) -> Result<(), mpsc::error::SendError<ToClient>> {
+        use std::sync::atomic::Ordering::Relaxed;
+        if matches!(msg, ToClient::Audio { .. }) {
+            if self.audio_queued.load(Relaxed) >= MAX_AUDIO_QUEUED {
+                return Ok(());
+            }
+            self.audio_queued.fetch_add(1, Relaxed);
+        }
+        self.tx.send(msg)
+    }
+
+    /// The writer sent a batch of music on.
+    fn audio_sent(&self) {
+        self.audio_queued.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
 
 pub enum Event {
     Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, tx: ClientTx },
@@ -88,13 +121,20 @@ async fn connection(
     }
     let ws = tokio_tungstenite::accept_async(stream).await?;
     let (mut sink, mut source) = ws.split();
-    let (tx, mut rx) = mpsc::unbounded_channel::<ToClient>();
+    let (raw_tx, mut rx) = mpsc::unbounded_channel::<ToClient>();
+    let tx = ClientTx::new(raw_tx);
+    let counter = tx.clone();
 
     let writer = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             let bye = matches!(msg, ToClient::Bye { .. });
+            let audio = matches!(msg, ToClient::Audio { .. });
             let json = serde_json::to_string(&msg).expect("serialise");
-            if sink.send(Message::Text(json.into())).await.is_err() || bye {
+            let sent = sink.send(Message::Text(json.into())).await;
+            if audio {
+                counter.audio_sent();
+            }
+            if sent.is_err() || bye {
                 break;
             }
         }
@@ -310,4 +350,30 @@ pub fn backfill_journal(db_path: &str) -> anyhow::Result<()> {
     let added = game::backfill_journal(&db, board)?;
     println!("📖 wrote {added} past discoveries into the Island Journal (earlier weeks are in its archive).");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn music_for_a_stalled_listener_is_dropped_but_words_still_go() {
+        let (raw, mut rx) = mpsc::unbounded_channel();
+        let tx = ClientTx::new(raw);
+        let audio = || ToClient::Audio { thing: 1, frames: vec!["AAAA".into()], gain: 1.0, title: None };
+        for _ in 0..MAX_AUDIO_QUEUED + 10 {
+            tx.send(audio()).unwrap();
+        }
+        tx.send(ToClient::Bye { reason: "still gets through".into() }).unwrap();
+        let mut queued = Vec::new();
+        while let Ok(m) = rx.try_recv() {
+            queued.push(m);
+        }
+        assert_eq!(queued.iter().filter(|m| matches!(m, ToClient::Audio { .. })).count(), MAX_AUDIO_QUEUED);
+        assert!(matches!(queued.last(), Some(ToClient::Bye { .. })));
+        // Once the writer catches up, music flows again.
+        tx.audio_sent();
+        tx.send(audio()).unwrap();
+        assert!(matches!(rx.try_recv(), Ok(ToClient::Audio { .. })));
+    }
 }
