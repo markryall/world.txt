@@ -18,6 +18,7 @@
   #log { overflow-y: auto; padding: 14px 16px; white-space: pre-wrap; word-wrap: break-word; }
   #log .ln { min-height: 1.45em; border-radius: 4px; }
   #log .ln:hover { background: var(--panel); }
+  #log .ln.was { opacity: 0.7; }
   #side { background: var(--panel); border-left: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
   #place { color: var(--magenta); font-weight: bold; }
   #map { font-size: 16px; line-height: 1.15; white-space: pre; text-align: center; padding: 6px 0; }
@@ -169,20 +170,45 @@ const log = $('#log');
 let ws, sky = '', audio, soundOn = false, rain;
 const typed = []; let hist = 0;
 
-function addLines(lines) {
+// The recent log is kept on this device (per world), so a refresh or a
+// restart picks up where you were instead of starting blank.
+const LOG = 'world.log';
+const LOG_KEEP = 300;
+let kept = [], keepTimer = null;
+
+function addLines(lines, when, replay) {
   const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const at = when || Date.now();
   for (const line of lines) {
     const div = document.createElement('div');
     div.className = 'ln';
     // When it happened, on hover.
-    div.title = new Date().toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    div.title = new Date(at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
     div.appendChild(paintLine(line));
     log.appendChild(div);
+    if (replay) continue;
+    kept.push([at, line]);
     const tune = line.map((s) => s.t).join('').match(/♪ (.+) ♪/);
     if (tune) playTune(tune[1]);
   }
   while (log.childNodes.length > 1000) log.removeChild(log.firstChild);
   if (stick) log.scrollTop = log.scrollHeight;
+  if (!replay && !keepTimer) keepTimer = setTimeout(keepLog, 1000);
+}
+
+function keepLog() {
+  keepTimer = null;
+  if (kept.length > LOG_KEEP) kept = kept.slice(-LOG_KEEP);
+  store(LOG, JSON.stringify(kept));
+}
+
+// What was on screen last time, faded a little, with a gap before what's new.
+function restoreLog() {
+  try { kept = JSON.parse(stored(LOG) || '[]').filter((e) => Array.isArray(e) && Array.isArray(e[1])); } catch { kept = []; }
+  if (!kept.length) return;
+  for (const [at, line] of kept) addLines([line], at, true);
+  log.querySelectorAll('.ln').forEach((d) => d.classList.add('was'));
+  addLines([[{ t: '· · ·', c: 'dim' }]], Date.now(), true);
 }
 
 function paintLine(line) {
@@ -252,12 +278,34 @@ function start() {
   $('#cmd').focus();
 }
 
+// Staying connected: when the connection drops without the world saying
+// goodbye (a restart, a redeploy, a phone waking up), wait a moment and come
+// back in with this device's token, keeping everything on screen.
+let byeSeen = false, restarting = false, retries = 0, retryTimer = null, lostSaid = false;
+
+function lost() {
+  hostStop();
+  jukeStop();
+  for (const thing of Object.keys(listening)) unhear(thing);
+  if (byeSeen || !stored('world.token')) {
+    addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
+    return;
+  }
+  if (!lostSaid && !restarting) addLines([[{ t: '✧ The world goes quiet for a moment. Finding your way back…', c: 'dim' }]]);
+  lostSaid = true;
+  const wait = restarting ? 2500 : Math.min(15000, 1000 * 2 ** retries);
+  retries++;
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(connect, wait);
+}
+
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  byeSeen = false;
   ws = new WebSocket(`${proto}://${location.host}/`);
   ws.onopen = () => ws.send(JSON.stringify({
     // A device token for this world wins: they've been here before.
-    type: 'hello', invite, token: invite ? null : stored('world.token'),
+    type: 'hello', invite, token: invite ? null : stored('world.token'), back: lostSaid || restarting,
     passport: invite || stored('world.token') ? null : passport,
   }));
   ws.onmessage = (e) => {
@@ -277,13 +325,20 @@ function connect() {
     else if (m.type === 'travel') {
       // Off to another world (or home): row there in a moment.
       setTimeout(() => { location.href = m.url; }, 1800);
+    } else if (m.type === 'restarting') {
+      restarting = true;
+      addLines([[{ t: '🌙 The world is being tidied up. Back in a moment…', c: 'magenta' }]]);
     } else if (m.type === 'welcome') {
+      if (lostSaid || restarting) addLines([[{ t: '✨ And you\'re back.', c: 'magenta' }]]);
+      lostSaid = restarting = false;
+      retries = 0;
       if (m.token) store('world.token', m.token);
       // The invite or passport is used up: tidy it out of the address bar.
       invite = null;
       passport = null;
       history.replaceState(null, '', location.pathname);
     } else if (m.type === 'bye') {
+      byeSeen = true;
       if (m.reason.includes('🛂')) {
         showJoin(m.reason);
       } else if (invite && m.reason.includes('invite') && stored('world.token')) {
@@ -293,7 +348,7 @@ function connect() {
         history.replaceState(null, '', location.pathname);
         connect();
       } else if (m.reason.includes('invite') || m.reason.includes('signed in')) {
-        if (m.reason.includes('signed in')) store('world.token', null);
+        if (m.reason.includes('signed in')) { store('world.token', null); store(LOG, null); kept = []; }
         showJoin(m.reason);
       } else {
         addLines([[{ t: m.reason, c: 'magenta' }]]);
@@ -302,7 +357,7 @@ function connect() {
   };
   ws.onclose = (e) => {
     // A connection we've already replaced (signing in again) can go quietly.
-    if (e.target === ws) addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
+    if (e.target === ws) lost();
   };
 }
 
@@ -427,7 +482,7 @@ function send(text) {
 // An invite waits for a real click: link previews (iMessage, mail scanners)
 // load the page and run its script, and would use the one-use link up.
 if (invite) showJoin("You've been invited 💌", true);
-else if (passport || stored('world.token')) start();
+else if (passport || stored('world.token')) { restoreLog(); start(); }
 else showJoin('world.txt is invite-only. Open the magic link an island keeper sent you! 💌');
 
 // Command history: kept on this device (per world), ↑/↓ to step through it,

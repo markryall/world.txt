@@ -93,6 +93,8 @@ pub enum BoardMode {
 pub enum ToClient {
     /// Lines appended to the scrolling log.
     Lines { lines: Vec<Line> },
+    /// The world is restarting (a redeploy): reconnect in a moment.
+    Restarting,
     /// The side panel: minimap and status.
     Status {
         place: String,
@@ -182,6 +184,10 @@ pub enum ToServer {
         /// A passport from another world, for visiting.
         #[serde(default)]
         passport: Option<String>,
+        /// Coming straight back after the connection dropped (a restart, a
+        /// phone waking up), so there's no need to announce it.
+        #[serde(default)]
+        back: bool,
     },
     Cmd { text: String },
     /// Music for the gramophone this browser is playing: Opus frames (base64),

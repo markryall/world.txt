@@ -293,8 +293,11 @@ deploy/fly-deploy all       # every world in deploy/fly/
 
 Each deploy builds the image (on Fly's own builders, so Docker isn't needed
 locally), pushes it to Fly's registry and swaps that world's machine over. With
-one machine and a volume, that's a few seconds' gap: people see the world fade
-and refresh to come back in. Deploy when the island is quiet.
+one machine and a volume, that's a few seconds' gap. The world tells everyone
+it's being tidied up, and browsers wait and come straight back in on their own,
+keeping what was on screen (the terminal client asks you to run `play` again).
+Gramophone songs stop and need playing again, so it's still kindest to deploy
+when the island is quiet.
 
 ### Keeper chores on Fly
 

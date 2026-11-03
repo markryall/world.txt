@@ -2,6 +2,14 @@
 
 ## 0.2.1 (2026-11-03)
 
+- **Restarts and dropped connections don't throw you out any more.** When the
+  world restarts (say, for an update) it says so, and the browser waits and
+  comes back in by itself, quietly, keeping everything on screen. A phone
+  waking up or a wobbly connection does the same. The last 300 lines are also
+  kept on your device, so even a refresh picks up where you were.
+- A connection that falls far behind (a stalled phone, a rush of arrivals) can
+  no longer run the whole world out of memory: its side panels are skipped
+  until it catches up, and past a point it's let go to reconnect afresh.
 - `describe` puts your own words on a spot at your home, which everyone who
   looks there sees (`describe` on its own puts the land's back).
 - Much lighter on the server when lots of people are about: a step only

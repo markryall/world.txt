@@ -95,7 +95,7 @@ pub async fn run(name: String, server: &str, dir: PathBuf, invite: Option<String
                         let _ = log.flush();
                     }
                     // Sound is for browsers.
-                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. }) | Err(_) => {}
+                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. } | ToClient::Restarting) | Err(_) => {}
                 }
             }
             Some(cmd) = cmd_rx.recv() => {

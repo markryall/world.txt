@@ -26,39 +26,73 @@ use tokio_tungstenite::tungstenite::Message;
 /// five seconds' worth (a batch is 200ms).
 pub const MAX_AUDIO_QUEUED: usize = 25;
 
-/// A player's outgoing messages. Music is dropped for a listener who's fallen
-/// behind (a stalled connection), so it can't pile up in memory; everything
-/// else always goes.
+/// A player's outgoing messages, with limits so a connection that's fallen
+/// behind (a phone gone to sleep, a slow network, a rush of arrivals) can't pile
+/// messages up in memory until the whole world runs out:
+/// - music past a few seconds' worth is dropped;
+/// - side panels are skipped once a few dozen messages are waiting (a fresh
+///   one follows within a tick anyway);
+/// - past [`MAX_QUEUED`], the connection is closed and its queue let go. The
+///   browser reconnects on its own and catches up from the start.
 #[derive(Clone)]
 pub struct ClientTx {
     tx: UnboundedSender<ToClient>,
     audio_queued: Arc<std::sync::atomic::AtomicUsize>,
+    queued: Arc<std::sync::atomic::AtomicUsize>,
+    swamped: Arc<std::sync::atomic::AtomicBool>,
 }
+
+/// Messages waiting for one connection before side panels are skipped.
+pub const STATUS_SKIP_QUEUED: usize = 50;
+/// Messages waiting for one connection before it's let go.
+pub const MAX_QUEUED: usize = 500;
 
 impl ClientTx {
     pub fn new(tx: UnboundedSender<ToClient>) -> ClientTx {
-        ClientTx { tx, audio_queued: Arc::default() }
+        ClientTx { tx, audio_queued: Arc::default(), queued: Arc::default(), swamped: Arc::default() }
     }
 
     pub fn send(&self, msg: ToClient) -> Result<(), mpsc::error::SendError<ToClient>> {
         use std::sync::atomic::Ordering::Relaxed;
-        if matches!(msg, ToClient::Audio { .. }) {
-            if self.audio_queued.load(Relaxed) >= MAX_AUDIO_QUEUED {
-                return Ok(());
-            }
-            self.audio_queued.fetch_add(1, Relaxed);
+        if self.swamped.load(Relaxed) {
+            return Ok(());
         }
+        let queued = self.queued.load(Relaxed);
+        if queued >= MAX_QUEUED {
+            self.swamped.store(true, Relaxed);
+            return Ok(());
+        }
+        match msg {
+            ToClient::Audio { .. } => {
+                if self.audio_queued.load(Relaxed) >= MAX_AUDIO_QUEUED {
+                    return Ok(());
+                }
+                self.audio_queued.fetch_add(1, Relaxed);
+            }
+            ToClient::Status { .. } if queued >= STATUS_SKIP_QUEUED => return Ok(()),
+            _ => {}
+        }
+        self.queued.fetch_add(1, Relaxed);
         self.tx.send(msg)
     }
 
-    /// The writer sent a batch of music on.
-    fn audio_sent(&self) {
-        self.audio_queued.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    /// The writer took a message off the queue.
+    fn taken(&self, msg: &ToClient) {
+        use std::sync::atomic::Ordering::Relaxed;
+        self.queued.fetch_sub(1, Relaxed);
+        if matches!(msg, ToClient::Audio { .. }) {
+            self.audio_queued.fetch_sub(1, Relaxed);
+        }
+    }
+
+    /// Fallen too far behind: time to let this connection go.
+    fn swamped(&self) -> bool {
+        self.swamped.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
 pub enum Event {
-    Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, tx: ClientTx },
+    Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, back: bool, tx: ClientTx },
     /// Someone from another world, with a checked passport.
     Visit { id: u64, passport: federation::Passport, tx: ClientTx },
     Cmd { id: u64, text: String },
@@ -70,6 +104,8 @@ pub enum Event {
     /// What a radio's on, looked up elsewhere: None if nothing's known.
     RadioNews { thing: i64, title: Option<String> },
     Leave { id: u64 },
+    /// The server's been asked to stop (a redeploy): say so, then go.
+    Shutdown,
 }
 
 pub async fn run(
@@ -97,6 +133,16 @@ pub async fn run(
         tokio::spawn(backup::run_daily(db_path.to_string(), backup_dir, keep_backups));
     }
 
+    // Stopping (Ctrl-C, or a host like Fly.io redeploying): tell everyone it's
+    // only for a moment, so their browsers wait and reconnect.
+    {
+        let events = events_tx.clone();
+        tokio::spawn(async move {
+            stopping().await;
+            let _ = events.send(Event::Shutdown);
+        });
+    }
+
     let listener = TcpListener::bind(addr).await?;
     println!("🌍 world.txt is open: browser http://{addr}  ·  terminal ws://{addr}  (db: {db_path})");
     println!("💌 invite-only: world.txt invite <Name> makes an account and its magic link");
@@ -113,6 +159,21 @@ pub async fn run(
             }
         });
     }
+}
+
+/// Waits for Ctrl-C (SIGINT) or SIGTERM.
+async fn stopping() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut term = signal(SignalKind::terminate()).expect("SIGTERM handler");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = term.recv() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = tokio::signal::ctrl_c().await;
 }
 
 async fn connection(
@@ -132,13 +193,14 @@ async fn connection(
 
     let writer = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
+            counter.taken(&msg);
+            if counter.swamped() {
+                eprintln!("connection {id}: fell too far behind, letting it go");
+                break;
+            }
             let bye = matches!(msg, ToClient::Bye { .. });
-            let audio = matches!(msg, ToClient::Audio { .. });
             let json = serde_json::to_string(&msg).expect("serialise");
             let sent = sink.send(Message::Text(json.into())).await;
-            if audio {
-                counter.audio_sent();
-            }
             if sent.is_err() || bye {
                 break;
             }
@@ -174,9 +236,9 @@ async fn connection(
                     }
                 }
             }
-            ToServer::Hello { bot, invite, token, .. } if !joined => {
+            ToServer::Hello { bot, invite, token, back, .. } if !joined => {
                 joined = true;
-                events.send(Event::Join { id, bot, invite, token, tx: tx.clone() })?;
+                events.send(Event::Join { id, bot, invite, token, back, tx: tx.clone() })?;
             }
             ToServer::Cmd { text } if joined => {
                 events.send(Event::Cmd { id, text })?;
@@ -427,8 +489,54 @@ mod tests {
         assert_eq!(queued.iter().filter(|m| matches!(m, ToClient::Audio { .. })).count(), MAX_AUDIO_QUEUED);
         assert!(matches!(queued.last(), Some(ToClient::Bye { .. })));
         // Once the writer catches up, music flows again.
-        tx.audio_sent();
+        for m in &queued {
+            tx.taken(m);
+        }
         tx.send(audio()).unwrap();
         assert!(matches!(rx.try_recv(), Ok(ToClient::Audio { .. })));
+    }
+
+    fn status() -> ToClient {
+        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1 }
+    }
+    fn words() -> ToClient {
+        ToClient::Lines { lines: vec![] }
+    }
+
+    #[test]
+    fn side_panels_are_skipped_for_someone_behind_but_words_still_go() {
+        let (raw, mut rx) = mpsc::unbounded_channel();
+        let tx = ClientTx::new(raw);
+        for _ in 0..STATUS_SKIP_QUEUED {
+            tx.send(words()).unwrap();
+        }
+        tx.send(status()).unwrap();
+        tx.send(words()).unwrap();
+        let mut queued = Vec::new();
+        while let Ok(m) = rx.try_recv() {
+            queued.push(m);
+        }
+        assert_eq!(queued.len(), STATUS_SKIP_QUEUED + 1);
+        assert!(queued.iter().all(|m| matches!(m, ToClient::Lines { .. })));
+        for m in &queued {
+            tx.taken(m);
+        }
+        tx.send(status()).unwrap();
+        assert!(matches!(rx.try_recv(), Ok(ToClient::Status { .. })));
+    }
+
+    #[test]
+    fn a_connection_hopelessly_behind_is_let_go() {
+        let (raw, mut rx) = mpsc::unbounded_channel();
+        let tx = ClientTx::new(raw);
+        for _ in 0..MAX_QUEUED + 100 {
+            tx.send(words()).unwrap();
+        }
+        assert!(tx.swamped());
+        let mut n = 0;
+        while rx.try_recv().is_ok() {
+            n += 1;
+        }
+        assert_eq!(n, MAX_QUEUED, "nothing more is queued once it's swamped");
     }
 }

@@ -152,11 +152,12 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
 impl Game {
     fn handle(&mut self, ev: Event) {
         match ev {
-            Event::Join { id, bot, invite, token, tx } => self.join(id, bot, invite, token, tx),
+            Event::Join { id, bot, invite, token, back, tx } => self.join(id, bot, invite, token, back, tx),
             Event::Visit { id, passport, tx } => self.visit(id, passport, tx),
             Event::Leave { id } => self.leave(id),
             Event::Audio { id, frames, title } => self.audio(id, frames, title),
             Event::RadioNews { thing, title } => self.radio_news(thing, title),
+            Event::Shutdown => self.shutdown(),
             Event::Queue { id, thing, songs } => self.queue_songs(id, thing, songs),
             Event::TrackDone { id, thing, key } => self.track_done(id, thing, &key),
             Event::Cmd { id, text } => {
@@ -173,6 +174,22 @@ impl Game {
                 }
             }
         }
+    }
+
+    /// The server's stopping (usually a redeploy). Everyone's place is already
+    /// saved with every step; say goodbye in a way browsers know to wait out,
+    /// give the messages a moment to go, then stop.
+    fn shutdown(&mut self) {
+        println!("🌙 stopping: {} here", self.players.len());
+        for p in self.players.values() {
+            let _ = p.tx.send(ToClient::Restarting);
+        }
+        // Wait without blocking: the connections' writers may be queued on
+        // this very thread, and they're what carry the goodbye out.
+        tokio::spawn(async {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            std::process::exit(0);
+        });
     }
 
     // ---- sending -------------------------------------------------------
@@ -278,7 +295,7 @@ impl Game {
 
     // ---- arriving and leaving -----------------------------------------
 
-    fn join(&mut self, id: u64, bot: bool, invite: Option<String>, token: Option<String>, tx: ClientTx) {
+    fn join(&mut self, id: u64, bot: bool, invite: Option<String>, token: Option<String>, back: bool, tx: ClientTx) {
         let bye = |reason: &str| {
             let _ = tx.send(ToClient::Bye { reason: reason.to_string() });
         };
@@ -310,11 +327,13 @@ impl Game {
             return;
         };
         let key_hash = token.as_deref().or(new_token.as_deref()).map(super::names::hash);
-        self.enter(id, user, bot, new_token, key_hash, tx);
+        self.enter(id, user, bot, new_token, key_hash, back, tx);
     }
 
     /// Someone signed in (or a visitor let in) arrives on the island.
-    fn enter(&mut self, id: u64, user: String, bot: bool, new_token: Option<String>, key_hash: Option<String>, tx: ClientTx) {
+    /// `back`: coming straight back after a dropped connection, which goes
+    /// unannounced (after a redeploy, everyone is).
+    fn enter(&mut self, id: u64, user: String, bot: bool, new_token: Option<String>, key_hash: Option<String>, back: bool, tx: ClientTx) {
         let bye = |reason: &str| {
             let _ = tx.send(ToClient::Bye { reason: reason.to_string() });
         };
@@ -376,8 +395,13 @@ impl Game {
             self.say1(id, Line::new().b(Col::Yellow, format!("{} {}", f.icon, f.greeting)));
         }
         self.deliver_mail(id);
+        if first_time {
+            // They're here now: a dropped connection before their first step
+            // shouldn't make them new all over again.
+            self.save_progress(id);
+        }
         for (&pid, p) in &self.players {
-            if pid != id {
+            if pid != id && !back {
                 let line = if p.x == x && p.y == y {
                     Line::new().b(Col::Cyan, &name).c(Col::Cyan, " appears, blinking, as if from a dream.")
                 } else if first_time {

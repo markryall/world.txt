@@ -79,6 +79,9 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                                 if let ToClient::Bye { reason } = msg { st.closed = Some(reason); }
                             }
                             Ok(msg @ ToClient::Welcome { .. }) => crate::identity::on_sign_in("player", server, &msg),
+                            Ok(ToClient::Restarting) => {
+                                st.closed = Some("🌙 The world is restarting, just for a moment. Run world.txt play again in a few seconds.".into());
+                            }
                             // Sound is for browsers.
                             Ok(ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. }) | Err(_) => {}
                         }

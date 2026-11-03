@@ -62,7 +62,7 @@ impl Game {
             return;
         }
         let hash = names::hash(&token);
-        self.enter(id, name.clone(), false, Some(token), Some(hash), tx);
+        self.enter(id, name.clone(), false, Some(token), Some(hash), false, tx);
         self.say1(id, Line::col(Col::Blue, format!("🛂 You're a visitor here. When you're ready to go back to {}: go dock, then sail home.", federation::host(&p.home))));
     }
 
