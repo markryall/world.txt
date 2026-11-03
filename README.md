@@ -31,7 +31,7 @@ someone's devices (a lost iPad: then `link Sam` for a fresh start), and `users`
 to see everyone with their devices and when they were last seen. `invites` shows
 recent magic links as waiting, used or expired, and `revoke Sam` cancels Sam's
 unused ones (a link sent to the wrong person). Old accounts from before nicknames
-can be folded into someone's account with `fold Mark into dappled-lamb-80`
+can be folded into someone's account with `fold Poppy into sunny-otter-42`
 (usernames, from `users`): their satchel, journal, things, notes and mail move
 across. When a name could mean more than one account, commands ask for the
 username instead. On the server's machine, `world.txt promote Lu` always works,
@@ -224,28 +224,44 @@ exposed to the internet.
 
 A laptop world goes dark whenever the laptop sleeps. [Fly.io](https://fly.io)
 keeps it up on one small always-on machine for a couple of dollars a month,
-with the world on a volume. The repo has what it needs: `Dockerfile`,
-`fly.toml` and `deploy/fly-start.sh`.
+with the world on a volume. The repo has what it needs: a `Dockerfile`,
+`deploy/fly-start.sh`, a settings template in `deploy/fly/example.toml` and
+`deploy/fly-deploy` to deploy with.
 
-### Setting it up (once)
+Each world is its own Fly app, with its own settings file in `deploy/fly/`
+(e.g. `deploy/fly/home.toml`). Those files are ignored by git, so your app
+names and addresses stay on your machine.
+
+### Setting up a world (once per world)
 
 1. Install `flyctl` (`brew install flyctl`) and `fly auth login`.
-2. In `fly.toml`, set `app` to a name of your own and `WORLD_URL` to your
-   world's address. `primary_region` is Sydney; pick one near your people.
-3. Make the app and its volume, then deploy:
+2. Copy the template and fill it in: `app` (a name of your own, unique on Fly),
+   `primary_region` (one near your people) and `WORLD_URL` (the world's address).
 
    ```
-   fly apps create <your-app>
-   fly volumes create world_data --size 1 --region syd
-   fly deploy
+   cp deploy/fly/example.toml deploy/fly/home.toml
    ```
 
-   That starts a fresh, empty world. `curl https://<your-app>.fly.dev/.well-known/world.txt`
+3. Make the app and its volume, in the same region, then deploy:
+
+   ```
+   fly apps create <app>                 # add --org <org> to bill it to an organisation
+   fly volumes create world_data --size 1 --region <region> --app <app>
+   deploy/fly-deploy home
+   ```
+
+   That starts a fresh, empty world. `curl https://<app>.fly.dev/.well-known/world.txt`
    to check it's up.
-4. **Your address:** `fly certs add home.example.com`, then in your DNS point
-   `home.example.com` at `<your-app>.fly.dev` with a CNAME (on Cloudflare, set
-   it to **DNS only**, the grey cloud, and remove the tunnel's record for that
-   name). `fly certs show home.example.com` says when the certificate is ready.
+4. **Its address:** `fly certs add world.example.com --app <app>`, then in your
+   DNS point `world.example.com` at `<app>.fly.dev` with a CNAME (on Cloudflare,
+   set it to **DNS only**, the grey cloud, and remove any tunnel record for that
+   name). `fly certs show world.example.com --app <app>` says when it's ready.
+5. **Make yourself a keeper:** `fly ssh console --app <app> -C "world.txt invite YourName --keeper"`
+
+**More worlds** are the same steps with another settings file, app, volume and
+address (say `deploy/fly/garden.toml` for `garden.example.com`). Each has its own
+machine, volume, identity, accounts and backups, so they never share anything,
+and a deploy only bounces the world it's for.
 
 ### Bringing an existing world across
 
@@ -259,20 +275,25 @@ their device tokens live in `world.db`, along with the world's identity key.
    in `/data/replaced/`:
 
    ```
-   fly ssh sftp shell
+   fly ssh sftp shell --app <app>
    » put /tmp/world-move.db /data/import.db
-   fly machine restart
+   fly machine restart --app <app>
    ```
 
-4. Check `curl https://home.example.com/.well-known/world.txt` shows the same
+4. Check `curl https://world.example.com/.well-known/world.txt` shows the same
    `public_key` as before.
 
 ### Deploying changes
 
-`fly deploy` from the repo builds the image (on Fly's own builders, so Docker
-isn't needed locally), pushes it to Fly's registry and swaps the machine over.
-With one machine and a volume, that's a few seconds' gap: people see the world
-fade and refresh to come back in. Deploy when the island is quiet.
+```
+deploy/fly-deploy home      # one world
+deploy/fly-deploy all       # every world in deploy/fly/
+```
+
+Each deploy builds the image (on Fly's own builders, so Docker isn't needed
+locally), pushes it to Fly's registry and swaps that world's machine over. With
+one machine and a volume, that's a few seconds' gap: people see the world fade
+and refresh to come back in. Deploy when the island is quiet.
 
 ### Keeper chores on Fly
 
@@ -280,15 +301,15 @@ Commands run on the machine find the world on their own (`WORLD_DB` and
 `WORLD_URL` are set there):
 
 ```
-fly ssh console -C "world.txt invite Sam"
-fly ssh console -C "world.txt invites"
-fly ssh console -C "world.txt rename 'Willow Bank'"   # then fly machine restart
-fly logs                                            # what the world is saying
+fly ssh console --app <app> -C "world.txt invite Sam"
+fly ssh console --app <app> -C "world.txt invites"
+fly ssh console --app <app> -C "world.txt rename 'Willow Bank'"   # then fly machine restart
+fly logs --app <app>                                            # what the world is saying
 ```
 
 **Backups** land in `/data/backups/`, on the same volume as the world, and Fly
 also snapshots volumes daily. To keep a copy off Fly too, pull one down now and
-then: `fly ssh sftp get /data/backups/world-<date>.db`.
+then: `fly ssh sftp get /data/backups/world-<date>.db --app <app>`.
 
 ## In the world
 

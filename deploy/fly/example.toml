@@ -1,15 +1,16 @@
 # world.txt on Fly.io: one small machine that never sleeps, with the world on
 # a volume. See "Hosting on Fly.io" in the README.
 #
-# Change `app` to your own app's name, and WORLD_URL to your world's address.
+# Copy this to deploy/fly/<world>.toml (e.g. home.toml; those stay out of git)
+# and fill in your app's name, a region near your people and your world's address.
 
-app = "world-txt-home"
+app = "world-txt-yours"
 primary_region = "syd"
 
 [build]
 
 [env]
-  WORLD_URL = "https://home.world-txt.com"
+  WORLD_URL = "https://world.example.com"
 
 # The world, its backups and anything it replaced live here.
 [mounts]

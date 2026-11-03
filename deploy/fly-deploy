@@ -1,0 +1,17 @@
+#!/bin/sh
+# Deploy a world to Fly.io: deploy/fly-deploy <world> uses deploy/fly/<world>.toml;
+# deploy/fly-deploy all deploys every world you've set up. Each deploy bounces
+# that world for a few seconds, so pick a quiet moment.
+set -e
+cd "$(dirname "$0")/.."
+worlds() { for f in deploy/fly/*.toml; do n=$(basename "$f" .toml); [ "$n" = example ] || echo "$n"; done; }
+case "${1:-}" in
+  "") echo "usage: deploy/fly-deploy <world>|all   (worlds: $(worlds | tr '\n' ' '))" >&2; exit 2 ;;
+  all) set -- $(worlds) ;;
+esac
+for w in "$@"; do
+  cfg="deploy/fly/$w.toml"
+  [ -f "$cfg" ] || { echo "no $cfg (copy deploy/fly/example.toml to make one)" >&2; exit 1; }
+  echo "🚀 deploying $w"
+  fly deploy . --config "$cfg"
+done
