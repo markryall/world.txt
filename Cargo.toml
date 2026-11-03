@@ -1,6 +1,6 @@
 [package]
 name = "world-txt"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT"
 description = "A cozy multiplayer text world: wander, chat, garden and craft on a shared island. No battles, just bonhomie."
