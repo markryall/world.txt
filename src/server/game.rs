@@ -292,9 +292,12 @@ impl Game {
         let now = super::accounts::now();
         let name = self.world.db.nickname(&user).unwrap_or_else(|| user.clone());
         self.world.nicks.insert(user.clone(), name.clone());
-        if self.players.values().any(|p| p.user == user) {
-            bye(&format!("{name} is already here (on another device?)."));
-            return;
+        // Already here: the newest arrival wins. The old one is often a phone
+        // or tab gone to sleep, whose connection the server can't yet tell is
+        // dead, and turning away the refresh would leave them locked out.
+        if let Some((&old, p)) = self.players.iter().find(|(_, p)| p.user == user) {
+            let _ = p.tx.send(ToClient::Bye { reason: "👋 You've wandered in from another window or device, so this one has gone quiet.".to_string() });
+            self.leave(old);
         }
         if !self.is_keeper(&user) {
             if let Some(until) = self.world.db.banned_until(&user, key_hash.as_deref(), now) {
