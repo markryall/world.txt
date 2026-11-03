@@ -14,8 +14,9 @@ world.txt play --invite <link>       # or the terminal client (just `world.txt p
 server's machine with `world.txt invite`), which prints a **magic link**. Opening
 it signs that device in for good: the link is used up, and the browser (or
 terminal) keeps a device token instead, so next time it just opens. Links work
-once and expire after 7 days. For someone's new device, a keeper makes a fresh
-link (`link Poppy` in the world, or `world.txt link Poppy`); their other devices
+once and expire after 7 days. For a new device of your own, type `link me` in
+the world and open the link it gives you there. A keeper can also make one for
+someone (`link Poppy` in the world, or `world.txt link Poppy`). Other devices
 keep working. In the world, keepers type `invite Poppy` to make an account for
 someone new. Pass `--url https://your.address` (or `WORLD_URL`) to `serve` and
 `invite` so links come out whole; otherwise the browser fills in its own address.

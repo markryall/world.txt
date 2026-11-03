@@ -1178,8 +1178,13 @@ impl Game {
 
     /// Keepers: `link Poppy` makes a new magic link for someone's next device.
     fn cmd_new_link(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
-        if !self.is_keeper(&self.user(id)) {
-            self.say1(id, Line::plain("Only island keepers can make magic links."));
+        let me = self.user(id);
+        let target = name.trim().to_lowercase();
+        if target.is_empty() || target == "me" || target == "myself" || target == "my device" || target == "new device" {
+            return self.cmd_link_me(id, &me);
+        }
+        if !self.is_keeper(&me) {
+            self.say1(id, Line::plain("Only island keepers can make links for other people. For your own new device: link me"));
             return Ok(());
         }
         if self.world.db.matching_users(name)?.is_empty() {
@@ -1190,6 +1195,25 @@ impl Game {
         let token = super::accounts::issue_invite(&self.world.db, &user)?;
         let lines = self.link_line(&self.world.nick(&user), &user, &token);
         self.send(id, lines);
+        Ok(())
+    }
+
+    /// `link me`: a magic link for your own new device. You're already signed
+    /// in to ask, so it can't get anyone into an account they couldn't already.
+    fn cmd_link_me(&mut self, id: u64, me: &str) -> anyhow::Result<()> {
+        if me.contains('@') {
+            self.say1(id, Line::plain("You're visiting from another world: on a new device, sign in at home and sail over from there."));
+            return Ok(());
+        }
+        let token = super::accounts::issue_invite(&self.world.db, me)?;
+        self.send(
+            id,
+            vec![
+                Line::new().b(Col::Magenta, "💌 A magic link for your new device").c(Col::Dim, format!(" (one use, within {} days):", super::accounts::INVITE_DAYS)),
+                Line::new().t("   ").b(Col::Yellow, super::accounts::link(self.url.as_deref(), &token)),
+                Line::col(Col::Dim, "   Open it on your phone, laptop or tablet, and you'll be you there too. Keep it to yourself: whoever opens it first becomes you."),
+            ],
+        );
         Ok(())
     }
 
@@ -1937,6 +1961,7 @@ const HELP: &[HelpTopic] = &[
             ("chat hi everyone  (@all)", "everyone in the world hears"),
             ("shout hello", "carries a long way"),
             ("nickname Pip", "change what you're called (your username stays)"),
+            ("link me", "a magic link to sign in on another device of yours"),
             ("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
         ],
         footer: None,
@@ -2054,7 +2079,7 @@ const HELP: &[HelpTopic] = &[
         keepers: true,
         items: &[
             ("invite Poppy", "make an account for someone new, and get their magic link"),
-            ("link Poppy", "a new magic link for someone's new device"),
+            ("link Poppy", "a new magic link for someone's new device (anyone can: link me)"),
             ("invites / revoke Sam", "see recent magic links, or cancel someone's unused ones"),
             ("users", "everyone, with their devices"),
             ("kick Sam [minutes] / unkick Sam", "send someone off for a break (30 min)"),

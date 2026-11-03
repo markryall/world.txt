@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `link me` gives you a magic link for your own new device (phone, laptop,
+  tablet), so you don't need a keeper for it. Keepers can still `link Poppy`.
+- Arriving again takes over from your old connection: a phone or tab that's
+  gone to sleep no longer locks you out with "already here".
+
 ## 0.2.0 (2026-11-03)
 
 Music, cooking, and a world that stays up on its own.
