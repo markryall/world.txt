@@ -102,6 +102,9 @@ impl Db {
                  host TEXT PRIMARY KEY, by TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS used_passports (
                  nonce TEXT PRIMARY KEY, expires INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS stations (
+                 name TEXT PRIMARY KEY COLLATE NOCASE, url TEXT NOT NULL, guide TEXT,
+                 by TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
                  PRIMARY KEY (player, species));",
@@ -199,6 +202,29 @@ impl Db {
         tx.execute("DELETE FROM players WHERE name = ?1", [old])?;
         tx.commit()?;
         Ok(())
+    }
+
+    // ---- radio stations ----------------------------------------------------
+
+    /// Add a station to the world's list (or change its stream and guide).
+    pub fn set_station(&self, name: &str, url: &str, guide: Option<&str>, by: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO stations (name, url, guide, by, at) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (name) DO UPDATE SET name = excluded.name, url = excluded.url, guide = excluded.guide, by = excluded.by, at = excluded.at",
+            params![name, url, guide, by, at],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_station(&self, name: &str) -> anyhow::Result<bool> {
+        Ok(self.conn.execute("DELETE FROM stations WHERE name = ?1", [name.trim()])? > 0)
+    }
+
+    /// The world's stations: (name, stream, guide), by name.
+    pub fn stations(&self) -> anyhow::Result<Vec<(String, String, Option<String>)>> {
+        let mut stmt = self.conn.prepare("SELECT name, url, guide FROM stations ORDER BY name COLLATE NOCASE")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     // ---- invites and devices --------------------------------------------------
@@ -879,6 +905,16 @@ mod tests {
         assert_eq!(db.take_mail("sunny-otter-42").unwrap().len(), 1);
         assert!(db.is_keeper("sunny-otter-42"), "keeping keeper powers from the old account");
         assert!(db.satchel("Poppy").unwrap().is_empty());
+    }
+
+    #[test]
+    fn stations_are_kept_by_name_whatever_the_case() {
+        let db = Db::open(":memory:").unwrap();
+        db.set_station("Night Owl FM", "https://owl.example/live", None, "u", 1).unwrap();
+        db.set_station("night owl fm", "https://owl.example/new", Some("https://owl.example/guide"), "u", 2).unwrap();
+        assert_eq!(db.stations().unwrap(), vec![("night owl fm".into(), "https://owl.example/new".into(), Some("https://owl.example/guide".into()))]);
+        assert!(db.remove_station("NIGHT OWL FM").unwrap());
+        assert!(db.stations().unwrap().is_empty());
     }
 
     #[test]

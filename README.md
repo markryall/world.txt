@@ -338,11 +338,12 @@ Progress is saved by name, so returning visitors never see it again
   to: `add songs` picks songs from your computer (only their titles go to the
   world), and it plays one song per person, taking turns, each streamed from its
   owner's browser when their turn comes (`jukebox` shows the queue, `skip`,
-  `unqueue`). Keep your tab open until your turn. `make a radio` and `tune radio https://…` plays
-  an internet radio station the same way (`radio off`), and says what's
-  playing when the stream does; for stations whose stream doesn't, `radio guide
-  https://…` points it at a programme guide in AirNet's format, to say what show
-  is on air instead. Sound makers must be more
+  `unqueue`). Keep your tab open until your turn. `make a radio` and `tune radio <station>` plays
+  one of the island's radio stations the same way (`radio off`); `stations`
+  lists them, and part of a name will do. Island keepers choose the stations:
+  `station add Night Owl FM https://… [guide https://…]` and `station remove`.
+  Radios say what's playing when the stream does, or, with a guide (AirNet's
+  format, used by many community stations), what show is on air. Sound makers must be more
   than ten steps apart, and you only ever hear the nearest, never two at once.
   Browser only, with the sound on; playing a gramophone needs a browser with
   WebCodecs (Chrome, Edge, recent Safari and Firefox).

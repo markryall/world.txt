@@ -458,6 +458,8 @@ impl Game {
             "play" | "wind" if self.has_gramophone_here(id) && !self.has_music_box_here(id) => return self.cmd_play_music(id),
             "play" | "wind" => return self.cmd_play(id),
             "tune" => return self.cmd_tune(id, rest),
+            "stations" => return self.cmd_stations(id),
+            "station" => return self.cmd_station(id, rest),
             "cook" | "bake" | "brew" | "grill" | "roast" | "toast" => return self.cmd_cook(id, rest),
             "eat" | "drink" | "sip" | "nibble" => return self.cmd_eat(id, rest),
             "serve" => return self.cmd_serve(id, rest),
@@ -466,9 +468,6 @@ impl Game {
             "skip" if rest.is_empty() && self.juke_skippable(id) => return self.cmd_skip_song(id),
             "unqueue" => return self.cmd_unqueue(id),
             "radio" if rest.trim() == "off" => return self.cmd_radio_off(id),
-            "radio" if rest.trim_start().starts_with("guide") => {
-                return self.cmd_radio_guide(id, rest.trim_start().trim_start_matches("guide"));
-            }
             "radio" if self.has_radio_here(id) => return self.cmd_tune(id, rest),
             "join" | "visit" => return self.cmd_join(id, rest),
             "stop" if rest.starts_with("music") || rest.starts_with("the music") => return self.cmd_stop_music(id),
@@ -1097,7 +1096,7 @@ impl Game {
             } else if gramophone::is_gramophone(&name) {
                 (gramophone::kind(), "Stand here and 'play music' to play songs from your computer for everyone nearby.")
             } else {
-                (radio::kind(), "Tune it to a station's stream: tune radio https://…")
+                (radio::kind(), "Tune it to one of the island's stations: tune radio <station> ('stations' lists them)")
             };
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(kind))?;
             self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, format!(". {how}")));
@@ -1949,8 +1948,8 @@ const HELP: &[HelpTopic] = &[
             ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
             ("make a jukebox / add songs / jukebox", "everyone adds songs from their computer; it plays one each, taking turns"),
             ("skip / unqueue", "skip your song (keepers: any), or take yours out of the queue"),
-            ("make a radio / tune radio https://… / radio off", "an internet radio station for everyone nearby"),
-            ("radio guide https://…", "where it finds what's on air, if its stream doesn't say"),
+            ("make a radio / tune radio <station> / radio off", "play one of the island's radio stations for everyone nearby"),
+            ("stations", "the island's radio stations (keepers choose them)"),
         ],
         footer: Some("Turn the sound on (🔊 in the browser) to hear them. Gramophones and radios carry five steps, and you only ever hear the nearest."),
     },
@@ -2062,6 +2061,7 @@ const HELP: &[HelpTopic] = &[
             ("visitors / admit / turn away", "people sailing in from other worlds"),
             ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
             ("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
+            ("station add Night Owl FM https://… [guide https://…]", "add a radio station anyone can tune to (station remove)"),
         ],
         footer: None,
     },

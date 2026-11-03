@@ -55,6 +55,13 @@ pub fn clean_stream(raw: &str) -> Result<String, &'static str> {
     Ok(url.to_string())
 }
 
+/// A station's name fit to show and type: letters, numbers, spaces and a
+/// little punctuation.
+pub fn clean_station_name(raw: &str) -> String {
+    let kept: String = raw.chars().filter(|c| c.is_alphanumeric() || " -'.&".contains(*c)).take(30).collect();
+    kept.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// Just the station's address, for saying what's on.
 pub fn station(url: &str) -> &str {
     url.trim_start_matches("https://").split(['/', '?', ':']).next().unwrap_or(url)
@@ -84,24 +91,35 @@ impl Game {
             self.say1(id, Line::plain("There's no radio here to tune. Try 'make a radio'!"));
             return Ok(());
         };
-        let user = self.user(id);
-        if self.world.things[i].maker != user && !self.is_keeper(&user) {
-            let maker = self.world.nick(&self.world.things[i].maker);
-            self.say1(id, Line::plain(format!("That's {maker}'s radio, so only {maker} can tune it. Have a listen though!")));
+        let raw = rest.trim().strip_prefix("radio").unwrap_or(rest.trim()).trim();
+        let raw = raw.strip_prefix("to ").unwrap_or(raw).trim().to_lowercase();
+        // Radios only play the world's own stations, which keepers choose.
+        let stations = self.world.db.stations()?;
+        let names: Vec<&str> = stations.iter().map(|(n, _, _)| n.as_str()).collect();
+        let exact = stations.iter().find(|(n, _, _)| n.to_lowercase() == raw);
+        let partly: Vec<_> = stations.iter().filter(|(n, _, _)| !raw.is_empty() && n.to_lowercase().contains(&raw)).collect();
+        let Some((_, url, guide)) = exact.or(if partly.len() == 1 { partly.first().copied() } else { None }) else {
+            let msg = if names.is_empty() {
+                "There are no stations yet. Island keepers can add some: station add Night Owl FM https://…".to_string()
+            } else if raw.is_empty() || partly.is_empty() {
+                format!("Tune it to one of the island's stations: {}.", names.join(", "))
+            } else {
+                let maybe: Vec<&str> = partly.iter().map(|(n, _, _)| n.as_str()).collect();
+                format!("Which one? {}.", maybe.join(", "))
+            };
+            self.say1(id, Line::plain(msg));
             return Ok(());
-        }
-        let raw = rest.trim().strip_prefix("radio").unwrap_or(rest.trim()).trim().strip_prefix("to").unwrap_or_default().trim();
-        let raw = if raw.is_empty() { rest.trim().trim_start_matches("radio").trim() } else { raw };
-        let url = match clean_stream(raw) {
-            Ok(u) => u,
-            Err(why) => {
-                self.say1(id, Line::plain(why));
-                return Ok(());
-            }
         };
+        let (url, guide) = (url.clone(), guide.clone());
         let thing = self.world.things[i].id;
         self.world.db.set_meta(&meta_key(thing), &url)?;
-        let on = station(&url).to_string();
+        // A station brings its own programme guide along (or none).
+        self.world.db.set_meta(&guide_key(thing), guide.as_deref().unwrap_or(""))?;
+        match &guide {
+            Some(g) => self.radio_guides.insert(thing, g.clone()),
+            None => self.radio_guides.remove(&thing),
+        };
+        let on = self.station_label(&url);
         self.radios.insert(thing, url);
         self.radio_news.remove(&thing);
         self.say1(id, Line::new().c(Col::Pink, "📻 You tune the radio to ").b(Col::Pink, on.clone()).c(Col::Pink, ". Everyone nearby with sound on can hear it."));
@@ -129,6 +147,79 @@ impl Game {
         Ok(())
     }
 
+    /// What to call a stream: its station's name, if it's one of the world's.
+    pub(super) fn station_label(&self, url: &str) -> String {
+        self.world
+            .db
+            .stations()
+            .ok()
+            .and_then(|s| s.into_iter().find(|(_, u, _)| u == url).map(|(n, _, _)| n))
+            .unwrap_or_else(|| station(url).to_string())
+    }
+
+    /// `stations`: the world's radio stations.
+    pub(super) fn cmd_stations(&mut self, id: u64) -> anyhow::Result<()> {
+        let list = self.world.db.stations()?;
+        let mut lines = vec![Line::new().b(Col::Magenta, "📻 Radio stations")];
+        if list.is_empty() {
+            lines.push(Line::col(Col::Dim, "  None yet. Keepers can add some: station add Night Owl FM https://…"));
+        }
+        for (name, url, guide) in &list {
+            let extra = if guide.is_some() { " · says what's on" } else { "" };
+            lines.push(Line::new().t("  ").b(Col::Cyan, name).c(Col::Dim, format!("  {}{extra}", station(url))));
+        }
+        if !list.is_empty() {
+            lines.push(Line::col(Col::Dim, "  At a radio: tune radio <station>"));
+        }
+        self.send(id, lines);
+        Ok(())
+    }
+
+    /// Keepers: `station add Night Owl FM https://… [guide https://…]`, `station remove Night Owl FM`.
+    pub(super) fn cmd_station(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        let rest = rest.trim();
+        let (verb, args) = rest.split_once(char::is_whitespace).map_or((rest, ""), |(v, a)| (v, a.trim()));
+        if !matches!(verb, "add" | "remove" | "rm" | "delete") {
+            return self.cmd_stations(id);
+        }
+        if !self.is_keeper(&self.user(id)) {
+            self.say1(id, Line::plain("Only island keepers can change the station list. Anyone can tune to them, though!"));
+            return Ok(());
+        }
+        if verb != "add" {
+            let name = clean_station_name(args);
+            let msg = if self.world.db.remove_station(&name)? { format!("📻 {name} is off the list.") } else { format!("There's no station called '{name}'.") };
+            self.say1(id, Line::col(Col::Dim, msg));
+            return Ok(());
+        }
+        // The name is everything before the stream's address.
+        let Some(at) = args.find("https://").or_else(|| args.find("http://")) else {
+            self.say1(id, Line::plain("Add which station? e.g. 'station add Night Owl FM https://stream.example.com/live' (and 'guide https://…' after it, for a programme guide)"));
+            return Ok(());
+        };
+        let name = clean_station_name(&args[..at]);
+        let mut after = args[at..].split_whitespace();
+        let url = after.next().unwrap_or_default();
+        let guide = match (after.next(), after.next()) {
+            (Some("guide"), Some(g)) => Some(g),
+            _ => None,
+        };
+        if name.is_empty() {
+            self.say1(id, Line::plain("Give it a name first, e.g. 'station add Night Owl FM https://…'"));
+            return Ok(());
+        }
+        let (url, guide) = match (clean_stream(url), guide.map(clean_stream).transpose()) {
+            (Ok(u), Ok(g)) => (u, g),
+            (Err(why), _) | (_, Err(why)) => {
+                self.say1(id, Line::plain(why));
+                return Ok(());
+            }
+        };
+        self.world.db.set_station(&name, &url, guide.as_deref(), &self.user(id), super::super::accounts::now())?;
+        self.say1(id, Line::col(Col::Green, format!("📻 {name} is on the list. Anyone can 'tune radio {name}' at a radio now.")));
+        Ok(())
+    }
+
     /// A radio was unmade.
     pub(super) fn forget_radio(&mut self, thing: i64) {
         if self.radios.remove(&thing).is_some() {
@@ -138,42 +229,6 @@ impl Game {
             let _ = self.world.db.set_meta(&guide_key(thing), "");
         }
         self.radio_news.remove(&thing);
-    }
-
-    /// `radio guide https://…` (or `radio guide off`): where to find what's on
-    /// air, for stations whose stream doesn't say (its maker, or a keeper).
-    pub(super) fn cmd_radio_guide(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
-        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
-        let Some(i) = self.radio_here(x, y) else {
-            self.say1(id, Line::plain("There's no radio here."));
-            return Ok(());
-        };
-        let user = self.user(id);
-        if self.world.things[i].maker != user && !self.is_keeper(&user) {
-            self.say1(id, Line::plain("Only its maker (or a keeper) can do that."));
-            return Ok(());
-        }
-        let thing = self.world.things[i].id;
-        let arg = rest.trim();
-        if arg == "off" {
-            self.radio_guides.remove(&thing);
-            self.world.db.set_meta(&guide_key(thing), "")?;
-            self.radio_news.remove(&thing);
-            self.say1(id, Line::col(Col::Dim, "📻 The radio forgets its programme guide."));
-            return Ok(());
-        }
-        let url = match clean_stream(arg) {
-            Ok(u) => u,
-            Err(_) => {
-                self.say1(id, Line::plain("Give it a programme guide's https:// address (AirNet's format), e.g. 'radio guide https://airnet.org.au/rest/stations/<station>/guides/<channel>'. 'radio guide off' forgets it."));
-                return Ok(());
-            }
-        };
-        self.world.db.set_meta(&guide_key(thing), &url)?;
-        self.radio_guides.insert(thing, url);
-        self.radio_news.remove(&thing);
-        self.say1(id, Line::col(Col::Pink, "📻 The radio will say what's on air, when its stream doesn't."));
-        Ok(())
     }
 
     /// Look for what's on any radio someone's listening to, now and then.
@@ -229,6 +284,7 @@ impl Game {
             .filter_map(|(id, url)| self.world.things.iter().find(|t| t.id == *id).map(|t| (*id, (t.x, t.y, url.clone()))))
             .collect();
         let news = &self.radio_news;
+        let labels: HashMap<i64, String> = radios.iter().map(|(id, (_, _, url))| (*id, self.station_label(url))).collect();
         for (pid, p) in self.players.iter_mut().filter(|(_, p)| !p.bot) {
             let mut hearing: HashMap<i64, (f32, String)> = HashMap::new();
             if let Some((id, (x, y, url))) = heard[pid].and_then(|id| radios.get(&id).map(|r| (id, r))) {
@@ -240,7 +296,7 @@ impl Game {
                 if p.radios.get(id) != Some(&(*gain, url.clone())) {
                     if p.radios.get(id).is_none_or(|(_, u)| u != url) {
                         let on = news.get(id).and_then(|n| n.title.as_deref()).map(|t| format!(" {t}")).unwrap_or_default();
-                        let line = Line::col(Col::Pink, format!("📻 A radio nearby is playing {}.{on}", station(url)));
+                        let line = Line::col(Col::Pink, format!("📻 A radio nearby is playing {}.{on}", labels[id]));
                         let _ = p.tx.send(ToClient::Lines { lines: vec![line] });
                     }
                     let _ = p.tx.send(ToClient::Radio { thing: *id, url: Some(url.clone()), gain: *gain });
