@@ -152,7 +152,7 @@
 const $ = (s) => document.querySelector(s);
 const log = $('#log');
 let ws, sky = '', audio, soundOn = false, rain;
-const history = []; let hist = 0;
+const typed = []; let hist = 0;
 
 function addLines(lines) {
   const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
@@ -261,6 +261,12 @@ function connect() {
     } else if (m.type === 'bye') {
       if (m.reason.includes('🛂')) {
         showJoin(m.reason);
+      } else if (invite && m.reason.includes('invite') && stored('world.token')) {
+        // An old link left in the address bar, but this device is already
+        // signed in: drop the link and come in with the device's token.
+        invite = null;
+        history.replaceState(null, '', location.pathname);
+        connect();
       } else if (m.reason.includes('invite') || m.reason.includes('signed in')) {
         if (m.reason.includes('signed in')) store('world.token', null);
         showJoin(m.reason);
@@ -269,7 +275,10 @@ function connect() {
       }
     }
   };
-  ws.onclose = () => addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
+  ws.onclose = (e) => {
+    // A connection we've already replaced (signing in again) can go quietly.
+    if (e.target === ws) addLines([[{ t: '✧ The world fades. Refresh to wander back in.', c: 'dim' }]]);
+  };
 }
 
 // ---- noticeboards ------------------------------------------------------
@@ -400,13 +409,13 @@ $('#input').onsubmit = (e) => {
   e.preventDefault();
   const text = $('#cmd').value;
   if (!text.trim()) return;
-  history.push(text); hist = history.length;
+  typed.push(text); hist = typed.length;
   send(text);
   $('#cmd').value = '';
 };
 $('#cmd').onkeydown = (e) => {
-  if (e.key === 'ArrowUp' && hist > 0) { hist--; $('#cmd').value = history[hist]; e.preventDefault(); }
-  if (e.key === 'ArrowDown') { hist = Math.min(history.length, hist + 1); $('#cmd').value = history[hist] || ''; e.preventDefault(); }
+  if (e.key === 'ArrowUp' && hist > 0) { hist--; $('#cmd').value = typed[hist]; e.preventDefault(); }
+  if (e.key === 'ArrowDown') { hist = Math.min(typed.length, hist + 1); $('#cmd').value = typed[hist] || ''; e.preventDefault(); }
 };
 document.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => send(b.dataset.c));
 
