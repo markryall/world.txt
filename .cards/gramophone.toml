@@ -1,0 +1,7 @@
+name = "Gramophones and radios"
+status = "done"
+description = "Play real music from your own computer through a place in the world. 'make a gramophone', stand by it and 'play music', then pick songs from your files in the browser: they play for everyone nearby, loudest at the gramophone and fading away over a few steps, so you can wander in and out of earshot. The playing browser encodes the songs (Opus, via WebCodecs) and sends them over the world's connection; the server only passes them on to people in earshot, never keeps them. 'stop music' ends it, and so does the player leaving. Browser only (terminal players get a line saying what's playing). Radios ('make a radio', 'tune radio https://…') play an internet station the same way, straight from the station. Sound makers must be more than ten steps apart, and you only hear the nearest: never two songs at once. Later: share a tab's sound instead of files."
+created_at = "2026-11-03T04:00:55.000000Z"
+updated_at = "2026-11-03T04:00:55.000000Z"
+tags = ["belonging"]
+priority = "medium"

@@ -332,6 +332,13 @@ Progress is saved by name, so returning visitors never see it again
 - `make a music box`, then `teach C E G E C` (only its maker can) and `play`; it also
   plays now and then when people are near. Two people humming at the same spot
   are told they're making music together. In the browser, tunes play as real notes.
+- `make a gramophone`, stand by it and `play music`, then choose songs from your
+  computer: everyone nearby hears them, loudest beside it and fading over five
+  steps (`stop music` to stop). `make a radio` and `tune radio https://…` plays
+  an internet radio station the same way (`radio off`). Sound makers must be more
+  than ten steps apart, and you only ever hear the nearest, never two at once.
+  Browser only, with the sound on; playing a gramophone needs a browser with
+  WebCodecs (Chrome, Edge, recent Safari and Firefox).
 
 Clouds drift across the island on the wind, and a whole day passes in 24 minutes.
 

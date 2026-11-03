@@ -39,6 +39,10 @@ pub fn clean_tune(raw: &str) -> String {
 }
 
 impl Game {
+    pub(super) fn has_music_box_here(&self, id: u64) -> bool {
+        self.players.get(&id).is_some_and(|p| self.music_box_here(p.x, p.y).is_some())
+    }
+
     fn music_box_here(&self, x: i64, y: i64) -> Option<usize> {
         self.world.things.iter().position(|t| t.x == x && t.y == y && t.kind.as_deref() == Some(MUSIC_KIND))
     }

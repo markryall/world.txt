@@ -7,8 +7,10 @@ mod companions;
 mod craft;
 mod events;
 mod gather;
+mod gramophone;
 mod homes;
 mod music;
+mod radio;
 mod sailing;
 mod travel;
 mod visitors;
@@ -65,6 +67,8 @@ struct Player {
     /// Scenery lines since they last did anything: someone who's stepped away
     /// shouldn't come back to a screenful of birdsong.
     ambient_quiet: u8,
+    /// The radio this browser has been told it can hear: (how loud, stream).
+    radios: HashMap<i64, (f32, String)>,
 }
 
 impl Player {
@@ -92,11 +96,16 @@ struct Game {
     wild: Vec<companions::Wild>,
     /// Who last hummed where, for noticing a jam.
     last_hum: HashMap<(i64, i64), (String, std::time::Instant)>,
+    /// Gramophones playing music from someone's browser, by thing id.
+    spins: HashMap<i64, gramophone::Spin>,
+    /// Radios and the stream each is tuned to, by thing id.
+    radios: HashMap<i64, String>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new() };
+    game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
     }
@@ -112,6 +121,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, url: Option
             _ = stride.tick() => {
                 game.step_travellers();
                 game.row_boats();
+                game.update_radios();
             }
         }
     }
@@ -123,6 +133,7 @@ impl Game {
             Event::Join { id, bot, invite, token, tx } => self.join(id, bot, invite, token, tx),
             Event::Visit { id, passport, tx } => self.visit(id, passport, tx),
             Event::Leave { id } => self.leave(id),
+            Event::Audio { id, frames, title } => self.audio(id, frames, title),
             Event::Cmd { id, text } => {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.ambient_quiet = 0;
@@ -289,7 +300,7 @@ impl Game {
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         let full = super::names::full(&name, &user);
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0 });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new() });
 
         self.send(
             id,
@@ -332,6 +343,7 @@ impl Game {
         if self.waiting.remove(&id).is_some() {
             return; // a visitor who gave up waiting
         }
+        self.stop_spins_by(id);
         let Some(p) = self.players.remove(&id) else { return };
         if p.bot {
             // Residents keep no position or progress.
@@ -417,8 +429,16 @@ impl Game {
             "dismiss" => return self.cmd_let_go(id),
             "let" if rest.trim_start().starts_with("go") => return self.cmd_let_go(id),
             "teach" => return self.cmd_teach(id, rest),
+            "play" | "wind" if rest.starts_with("music") || rest.starts_with("songs") || rest.starts_with("records") => {
+                return self.cmd_play_music(id);
+            }
+            "play" | "wind" if self.has_gramophone_here(id) && !self.has_music_box_here(id) => return self.cmd_play_music(id),
             "play" | "wind" => return self.cmd_play(id),
+            "tune" => return self.cmd_tune(id, rest),
+            "radio" if rest.trim() == "off" => return self.cmd_radio_off(id),
+            "radio" if self.has_radio_here(id) => return self.cmd_tune(id, rest),
             "join" | "visit" => return self.cmd_join(id, rest),
+            "stop" if rest.starts_with("music") || rest.starts_with("the music") => return self.cmd_stop_music(id),
             "stop" => self.stop_travelling(id, true),
             "map" | "m" => {
                 if let Some(p) = self.players.get(&id) {
@@ -1034,6 +1054,24 @@ impl Game {
             return Ok(());
         }
         let (name, action, trigger) = parse_make(text);
+        if gramophone::is_gramophone(&name) || radio::is_radio(&name) {
+            if let Some(other) = self.sound_too_close(x, y, None) {
+                self.say1(id, Line::plain(format!("{} is too close: two songs at once would be a muddle. Try ten or so steps further away.", capitalise(&the(&other)))));
+                return Ok(());
+            }
+            let gramo = gramophone::is_gramophone(&name);
+            let kind = if gramo { gramophone::kind() } else { radio::kind() };
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(kind))?;
+            let how = if gramo {
+                "Stand here and 'play music' to play songs from your computer for everyone nearby."
+            } else {
+                "Tune it to a station's stream: tune radio https://…"
+            };
+            self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, format!(". {how}")));
+            self.tell_here(x, y, id, Line::col(Col::Pink, format!("🎶 {who} makes {name}.")));
+            self.status_all();
+            return Ok(());
+        }
         if music::is_music_box(&name) {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(music::music_kind()))?;
             self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach C E G E C"));
@@ -1471,6 +1509,8 @@ impl Game {
             }
             Some(i) if !what.is_empty() => {
                 let t = self.world.remove_thing(i, &self.user(id))?;
+                self.stop_spin(t.id);
+                self.forget_radio(t.id);
                 self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
                 self.say1(id, Line::col(Col::Dim, "(changed your mind? type undo)"));
                 self.tell_here(x, y, id, Line::col(Col::Dim, format!("{who} unmakes {}.", t.name)));
@@ -1503,6 +1543,12 @@ impl Game {
             return Ok(());
         }
         let name = self.world.things[i].name.clone();
+        if gramophone::makes_sound(self.world.things[i].kind.as_deref()) {
+            if let Some(other) = self.sound_too_close(x + dx, y + dy, Some(self.world.things[i].id)) {
+                self.say1(id, Line::plain(format!("That would put it too close to {}: two songs at once would be a muddle.", the(&other))));
+                return Ok(());
+            }
+        }
         self.world.move_thing(i, x + dx, y + dy)?;
         self.say1(id, Line::plain(format!("You push {} off to the {long}.", the(&name))));
         self.tell_here(x, y, id, Line::plain(format!("{who} pushes {} off to the {long}.", the(&name))));
@@ -1817,6 +1863,8 @@ fn help() -> Vec<Line> {
         h("shout hello", "carries a long way"),
         h("hum C E G", "a little tune (hum together to jam!)"),
         h("make a music box / teach C E G / play", "a box that remembers your tune"),
+        h("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby (browser)"),
+        h("make a radio / tune radio https://… / radio off", "an internet radio station for everyone nearby (browser)"),
         h("sit / rest / dance / wave", "a little bonhomie"),
         h("nickname Pip", "change what you're called (your username stays)"),
         h("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),

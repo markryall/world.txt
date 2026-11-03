@@ -43,6 +43,12 @@
   #hint { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel);
     border-top: 1px solid var(--line); color: var(--yellow); font-weight: bold; cursor: pointer; }
   #hint.on { display: flex; animation: glow 2s ease-in-out infinite; }
+  #gramo { display: none; align-items: center; gap: 10px; padding: 8px 14px; background: var(--panel);
+    border-top: 1px solid var(--line); color: var(--pink); font-size: 14px; }
+  #gramo.on { display: flex; }
+  #gramo-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #gramo label, #gramo button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--bg); color: var(--fg); white-space: nowrap; }
   #hint .go { margin-left: auto; background: var(--yellow); color: var(--bg); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
   #hint .skip { color: var(--dim); font-weight: normal; font-size: 12px; text-decoration: underline; }
   @keyframes glow { 50% { background: #2a2333; } }
@@ -124,6 +130,11 @@
   <button data-c="plant flowers">🌼 plant</button><button data-c="fish">🎣 fish</button>
   <button data-prefill="chat ">📣 chat</button><button data-c="who">who</button>
   <button data-c="read">📌 read</button><button data-c="map">🗺 map</button><button data-c="look">👀 look</button><button data-c="help">help</button>
+</div>
+<div id="gramo">
+  <span id="gramo-msg">🎶 Choose some songs to play on the gramophone</span>
+  <label>🎵 choose songs<input id="gramo-files" type="file" accept="audio/*" multiple hidden></label>
+  <button id="gramo-stop" type="button">⏹ stop</button>
 </div>
 <form id="input" autocomplete="off">
   <input id="cmd" placeholder="say hi, dig, make a frog that croaks when it rains…" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
@@ -252,6 +263,11 @@ function connect() {
     else if (m.type === 'status') status(m);
     else if (m.type === 'hint') hint(m);
     else if (m.type === 'board') board(m);
+    else if (m.type === 'spin_start') hostStart(m.thing);
+    else if (m.type === 'spin_stop') hostStop();
+    else if (m.type === 'audio') hear(m);
+    else if (m.type === 'audio_end') unhear(m.thing);
+    else if (m.type === 'radio') tuneIn(m);
     else if (m.type === 'travel') {
       // Off to another world (or home): row there in a moment.
       setTimeout(() => { location.href = m.url; }, 1800);
@@ -442,6 +458,192 @@ if (window.visualViewport) {
 }
 document.querySelectorAll('[data-prefill]').forEach((b) => b.onclick = () => prefill(b.dataset.prefill));
 
+// ---- gramophones and radios ---------------------------------------------
+// Someone near a gramophone hears songs from another player's computer: the
+// player's browser encodes them (Opus, 20ms frames) and the world passes them
+// on with how loud they are where you stand. Radios are simpler: the world
+// says which stream is in earshot and how loud, and the browser plays it.
+// Either way, the world makes sure you only ever hear one at a time.
+
+const b64 = (bytes) => { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s); };
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const told = new Set();
+function tellOnce(key, text) {
+  if (told.has(key)) return;
+  told.add(key);
+  addLines([[{ t: text, c: 'pink' }]]);
+}
+
+// Playing: this browser is the gramophone's record player.
+const FRAME = 960; // 20ms at 48kHz
+const TAP = `class Tap extends AudioWorkletProcessor {
+  process(inputs, outputs) {
+    const i = inputs[0], o = outputs[0];
+    if (i.length) {
+      for (let c = 0; c < o.length; c++) o[c].set(i[Math.min(c, i.length - 1)]);
+      this.port.postMessage([i[0].slice(), (i[1] || i[0]).slice()]);
+    }
+    return true;
+  }
+}
+registerProcessor('tap', Tap);`;
+const gramo = { thing: null, ctx: null, el: null, encoder: null, timer: null, files: [], idx: 0, ts: 0, pending: [], title: null,
+  accL: new Float32Array(FRAME), accR: new Float32Array(FRAME), accN: 0 };
+
+function hostStart(thing) {
+  gramo.thing = thing;
+  $('#gramo').classList.add('on');
+  $('#gramo-msg').textContent = 'AudioEncoder' in window
+    ? '🎶 Choose some songs to play on the gramophone'
+    : "🎶 This browser can't play to a gramophone yet. Chrome can!";
+}
+
+async function hostPlay(files) {
+  if (!files.length || !('AudioEncoder' in window)) return;
+  gramo.files = [...files];
+  gramo.idx = 0;
+  try {
+    if (!gramo.ctx) {
+      const ctx = new AudioContext({ sampleRate: 48000 });
+      await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAP], { type: 'application/javascript' })));
+      const el = new Audio();
+      el.onended = () => { gramo.idx = (gramo.idx + 1) % gramo.files.length; playTrack(); };
+      const tap = new AudioWorkletNode(ctx, 'tap', { outputChannelCount: [2] });
+      ctx.createMediaElementSource(el).connect(tap).connect(ctx.destination);
+      tap.port.onmessage = (e) => encode(e.data);
+      const encoder = new AudioEncoder({
+        output: (chunk) => { const b = new Uint8Array(chunk.byteLength); chunk.copyTo(b); gramo.pending.push(b64(b)); },
+        error: (e) => { $('#gramo-msg').textContent = `🎶 Couldn't play that: ${e.message}`; },
+      });
+      encoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 96000 });
+      Object.assign(gramo, { ctx, el, encoder, timer: setInterval(sendAudio, 200) });
+    }
+    await gramo.ctx.resume();
+    playTrack();
+  } catch (e) {
+    $('#gramo-msg').textContent = `🎶 Couldn't start the gramophone: ${e.message}`;
+  }
+}
+
+function playTrack() {
+  const f = gramo.files[gramo.idx];
+  if (!f) return;
+  if (gramo.el.src) URL.revokeObjectURL(gramo.el.src);
+  gramo.el.src = URL.createObjectURL(f);
+  gramo.title = f.name.replace(/\.[^.]+$/, '');
+  $('#gramo-msg').textContent = `🎶 Playing ${gramo.title}`;
+  gramo.el.play().catch(() => {});
+}
+
+// Gather the tapped sound into 20ms frames for the encoder.
+function encode([l, r]) {
+  if (!gramo.encoder || gramo.encoder.state !== 'configured') return;
+  for (let off = 0; off < l.length;) {
+    const n = Math.min(FRAME - gramo.accN, l.length - off);
+    gramo.accL.set(l.subarray(off, off + n), gramo.accN);
+    gramo.accR.set(r.subarray(off, off + n), gramo.accN);
+    gramo.accN += n; off += n;
+    if (gramo.accN === FRAME) {
+      const data = new Float32Array(FRAME * 2);
+      data.set(gramo.accL, 0); data.set(gramo.accR, FRAME);
+      const frame = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: FRAME, numberOfChannels: 2, timestamp: gramo.ts, data });
+      gramo.ts += 20000;
+      gramo.encoder.encode(frame);
+      frame.close();
+      gramo.accN = 0;
+    }
+  }
+}
+
+function sendAudio() {
+  if (!gramo.pending.length || !ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({ type: 'audio', frames: gramo.pending.splice(0, 50), title: gramo.title }));
+}
+
+function hostStop() {
+  clearInterval(gramo.timer);
+  try { gramo.encoder?.close(); } catch {}
+  gramo.el?.pause();
+  gramo.ctx?.close();
+  Object.assign(gramo, { thing: null, ctx: null, el: null, encoder: null, timer: null, files: [], pending: [], title: null, accN: 0 });
+  $('#gramo').classList.remove('on');
+  $('#gramo-files').value = '';
+}
+
+$('#gramo-files').onchange = (e) => hostPlay(e.target.files);
+$('#gramo-stop').onclick = () => send('stop music');
+
+// Listening: frames from a gramophone in earshot, played a moment behind.
+const listening = {};
+function hear(m) {
+  if (!('AudioDecoder' in window)) return tellOnce('nodecoder', "🎶 There's music nearby, but this browser can't play it yet.");
+  if (!soundOn || !audio) return tellOnce('soundoff', '🎶 There\'s music playing nearby. Turn the sound on (🔇 above the map) to hear it.');
+  let l = listening[m.thing];
+  if (!l) {
+    const gain = audio.createGain();
+    gain.gain.value = 0;
+    gain.connect(audio.destination);
+    l = listening[m.thing] = { gain, next: 0, ts: 0 };
+    l.dec = new AudioDecoder({ output: (frame) => playFrame(l, frame), error: () => {} });
+    l.dec.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2 });
+  }
+  l.gain.gain.setTargetAtTime(m.gain * 0.8, audio.currentTime, 0.4);
+  for (const f of m.frames) {
+    l.dec.decode(new EncodedAudioChunk({ type: 'key', timestamp: l.ts, data: unb64(f) }));
+    l.ts += 20000;
+  }
+}
+
+function playFrame(l, frame) {
+  const buf = audio.createBuffer(frame.numberOfChannels, frame.numberOfFrames, frame.sampleRate);
+  for (let c = 0; c < frame.numberOfChannels; c++) {
+    const ch = new Float32Array(frame.numberOfFrames);
+    frame.copyTo(ch, { planeIndex: c, format: 'f32-planar' });
+    buf.copyToChannel(ch, c);
+  }
+  frame.close();
+  // A little behind, so the network's wobbles don't make gaps; start afresh after one.
+  const now = audio.currentTime;
+  if (l.next < now + 0.05) l.next = now + 0.4;
+  const src = audio.createBufferSource();
+  src.buffer = buf;
+  src.connect(l.gain);
+  src.start(l.next);
+  l.next += buf.duration;
+}
+
+function unhear(thing) {
+  const l = listening[thing];
+  if (!l) return;
+  delete listening[thing];
+  l.gain.gain.setTargetAtTime(0, audio.currentTime, 0.3);
+  try { l.dec.close(); } catch {}
+  setTimeout(() => l.gain.disconnect(), 2000);
+}
+
+// Radios: the station's own stream, at a volume for how near you are.
+const radios = {};
+function playRadio(el) {
+  el.volume = Math.max(0, Math.min(1, +el.dataset.gain * 0.8));
+  if (el.paused) el.play().catch(() => {});
+}
+function tuneIn(m) {
+  let el = radios[m.thing];
+  if (!m.url) {
+    if (el) { el.pause(); el.removeAttribute('src'); el.load(); delete radios[m.thing]; }
+    return;
+  }
+  if (!el || el.dataset.url !== m.url) {
+    if (el) el.pause();
+    el = radios[m.thing] = new Audio();
+    el.dataset.url = m.url;
+    el.src = m.url;
+  }
+  el.dataset.gain = m.gain;
+  if (soundOn) playRadio(el);
+  else tellOnce('soundoff', '📻 There\'s a radio playing nearby. Turn the sound on (🔇 above the map) to hear it.');
+}
+
 // Keep the command box ready. A click anywhere else hands focus back to it,
 // and so does just starting to type, unless something else wants the keys
 // (the join screen, a noticeboard, a box of its own) or text is being selected.
@@ -471,6 +673,8 @@ $('#sound').onclick = () => {
   if (soundOn && !audio) audio = new (window.AudioContext || window.webkitAudioContext)();
   if (audio) audio.resume();
   updateRain();
+  for (const el of Object.values(radios)) soundOn ? playRadio(el) : el.pause();
+  if (!soundOn) for (const t of Object.keys(listening)) unhear(t);
 };
 
 const SEMI = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };

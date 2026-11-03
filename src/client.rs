@@ -79,7 +79,8 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                                 if let ToClient::Bye { reason } = msg { st.closed = Some(reason); }
                             }
                             Ok(msg @ ToClient::Welcome { .. }) => crate::identity::on_sign_in("player", server, &msg),
-                            Err(_) => {}
+                            // Sound is for browsers.
+                            Ok(ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. }) | Err(_) => {}
                         }
                     }
                     Some(Ok(_)) => {}

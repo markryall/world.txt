@@ -136,6 +136,17 @@ pub enum ToClient {
     },
     /// Connection refused (e.g. name taken).
     Bye { reason: String },
+    /// You're playing music on this gramophone: start sending it (browser).
+    SpinStart { thing: i64 },
+    /// Stop sending music for this gramophone.
+    SpinStop { thing: i64 },
+    /// Music from a gramophone in earshot: Opus frames (base64), and how loud
+    /// it is where you stand (0 to 1).
+    Audio { thing: i64, frames: Vec<String>, gain: f32, title: Option<String> },
+    /// That gramophone has stopped.
+    AudioEnd { thing: i64 },
+    /// A radio you can hear (url and how loud), or can't any more (no url).
+    Radio { thing: i64, url: Option<String>, gain: f32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,6 +170,13 @@ pub enum ToServer {
         passport: Option<String>,
     },
     Cmd { text: String },
+    /// Music for the gramophone this browser is playing: Opus frames (base64),
+    /// and what's playing.
+    Audio {
+        frames: Vec<String>,
+        #[serde(default)]
+        title: Option<String>,
+    },
 }
 
 /// A board as plain lines, for clients that show it in their log. `None`

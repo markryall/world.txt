@@ -148,7 +148,8 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                         }
                         while seen.len() > CONTEXT_LINES { seen.pop_front(); }
                     }
-                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. }) | Err(_) => {}
+                    // Sound is for browsers.
+                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. }) | Err(_) => {}
                 }
                 continue;
             }

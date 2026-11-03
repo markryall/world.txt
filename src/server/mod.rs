@@ -29,6 +29,8 @@ pub enum Event {
     /// Someone from another world, with a checked passport.
     Visit { id: u64, passport: federation::Passport, tx: ClientTx },
     Cmd { id: u64, text: String },
+    /// Music from a browser playing a gramophone.
+    Audio { id: u64, frames: Vec<String>, title: Option<String> },
     Leave { id: u64 },
 }
 
@@ -133,6 +135,9 @@ async fn connection(
             }
             ToServer::Cmd { text } if joined => {
                 events.send(Event::Cmd { id, text })?;
+            }
+            ToServer::Audio { frames, title } if joined => {
+                events.send(Event::Audio { id, frames, title })?;
             }
             _ => {}
         }

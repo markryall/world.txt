@@ -94,7 +94,8 @@ pub async fn run(name: String, server: &str, dir: PathBuf, invite: Option<String
                         }
                         let _ = log.flush();
                     }
-                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. }) | Err(_) => {}
+                    // Sound is for browsers.
+                    Ok(ToClient::Hint { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. }) | Err(_) => {}
                 }
             }
             Some(cmd) = cmd_rx.recv() => {
