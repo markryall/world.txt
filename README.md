@@ -20,14 +20,22 @@ keep working. In the world, keepers type `invite Poppy` to make an account for
 someone new. Pass `--url https://your.address` (or `WORLD_URL`) to `serve` and
 `invite` so links come out whole; otherwise the browser fills in its own address.
 Browsers keep the device token per web address, so stick to one address (a named
-tunnel, or the same home address).
+tunnel, or the same home address). A link opens on an **Enter the world** button
+and is only used when that's clicked, so a message's link preview (iMessage, a
+mail scanner) can't use it up first.
 
 **Keepers** look after the island. In the world they can `invite` and `link`,
 `promote Lu` / `demote Lu` (the last keeper can't step down), `kick Sam` for a
 break or `ban Sam` for good (`unban`), `signout Sam` to sign out all of
 someone's devices (a lost iPad: then `link Sam` for a fresh start), and `users`
-to see everyone with their devices and when they were last seen. On the server's
-machine, `world.txt promote Lu` always works.
+to see everyone with their devices and when they were last seen. `invites` shows
+recent magic links as waiting, used or expired, and `revoke Sam` cancels Sam's
+unused ones (a link sent to the wrong person). Old accounts from before nicknames
+can be folded into someone's account with `fold Mark into dappled-lamb-80`
+(usernames, from `users`): their satchel, journal, things, notes and mail move
+across. When a name could mean more than one account, commands ask for the
+username instead. On the server's machine, `world.txt promote Lu` always works,
+as do `world.txt invites` and `world.txt revoke Sam`.
 
 Cargo won't put a `.` in a binary name, so the crate is called `world-txt`.
 Homebrew and `make install` put it in place as `world.txt`; `cargo install world-txt`
@@ -158,7 +166,21 @@ cloudflared tunnel run --url http://localhost:4040 world
    runs the world and its tunnel in the background, starts them at every login
    and brings them back if they fall over. `world.txt service status` checks on
    them, logs are in `~/Library/Logs/world.txt/`, and `world.txt service uninstall`
-   stops them. Run `install` again after upgrading world.txt. (On Linux, a systemd
+   stops them. Run `install` again after upgrading world.txt.
+
+   **More than one world?** Give each its own folder, address, tunnel, name and
+   port:
+
+   ```
+   cloudflared tunnel create garden
+   cloudflared tunnel route dns garden garden.example.com
+   world.txt service install --db ~/worlds/garden/world.db --url https://garden.example.com \
+     --tunnel garden --name garden --port 4041
+   ```
+
+   `service status` lists every world, and `service uninstall --name garden` (or
+   `--all`) stops them. Each world's tunnel gets its own settings, so they never
+   pick up `~/.cloudflared/config.yml` or each other's. (On Linux, a systemd
    unit running `world.txt serve` and Cloudflare's own `cloudflared service install`
    do the same job.)
 

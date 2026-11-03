@@ -173,9 +173,22 @@ enum ServiceCmd {
         /// Also run this named Cloudflare tunnel (e.g. world).
         #[arg(long)]
         tunnel: Option<String>,
+        /// Which world this is, to run several side by side (e.g. garden).
+        #[arg(long)]
+        name: Option<String>,
+        /// The port this world listens on (each world needs its own).
+        #[arg(long, default_value_t = 4040)]
+        port: u16,
     },
-    /// Stop them and take them out of login.
-    Uninstall,
+    /// Stop a world and take it out of login.
+    Uninstall {
+        /// Which world (leave out for the unnamed one).
+        #[arg(long, conflicts_with = "all")]
+        name: Option<String>,
+        /// Every installed world.
+        #[arg(long)]
+        all: bool,
+    },
     /// Are they running?
     Status,
 }
@@ -207,8 +220,10 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Promote { name, db } => server::promote(&db, &name),
         Cmd::BackfillJournal { db } => server::backfill_journal(&db),
         Cmd::Service { action } => match action {
-            ServiceCmd::Install { db, url, backup_dir, tunnel } => service::install(service::Install { db, url, backup_dir, tunnel }),
-            ServiceCmd::Uninstall => service::uninstall(),
+            ServiceCmd::Install { db, url, backup_dir, tunnel, name, port } => {
+                service::install(service::Install { db, url, backup_dir, tunnel, name, port })
+            }
+            ServiceCmd::Uninstall { name, all } => service::uninstall(name, all),
             ServiceCmd::Status => service::status(),
         },
         Cmd::Send { name, command, dir } => bridge::send(&name, &dir, &command).await,
