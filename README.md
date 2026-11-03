@@ -335,7 +335,10 @@ Progress is saved by name, so returning visitors never see it again
 - `make a gramophone`, stand by it and `play music`, then choose songs from your
   computer: everyone nearby hears them, loudest beside it and fading over five
   steps (`stop music` to stop). `make a radio` and `tune radio https://…` plays
-  an internet radio station the same way (`radio off`). Sound makers must be more
+  an internet radio station the same way (`radio off`), and says what's
+  playing when the stream does; for stations whose stream doesn't, `radio guide
+  https://…` points it at a programme guide in AirNet's format, to say what show
+  is on air instead. Sound makers must be more
   than ten steps apart, and you only ever hear the nearest, never two at once.
   Browser only, with the sound on; playing a gramophone needs a browser with
   WebCodecs (Chrome, Edge, recent Safari and Firefox).

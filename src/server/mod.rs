@@ -64,6 +64,8 @@ pub enum Event {
     Cmd { id: u64, text: String },
     /// Music from a browser playing a gramophone.
     Audio { id: u64, frames: Vec<String>, title: Option<String> },
+    /// What a radio's on, looked up elsewhere: None if nothing's known.
+    RadioNews { thing: i64, title: Option<String> },
     Leave { id: u64 },
 }
 
@@ -87,7 +89,7 @@ pub async fn run(
     if let Some(i) = info.as_ref() {
         println!("🌍 this world is {} (other worlds can check its passports at {}{})", i.name, i.url, federation::WELL_KNOWN);
     }
-    tokio::spawn(game::run(world, events_rx, url));
+    tokio::spawn(game::run(world, events_rx, events_tx.clone(), url));
     if keep_backups > 0 {
         tokio::spawn(backup::run_daily(db_path.to_string(), backup_dir, keep_backups));
     }

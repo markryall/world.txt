@@ -100,11 +100,17 @@ struct Game {
     spins: HashMap<i64, gramophone::Spin>,
     /// Radios and the stream each is tuned to, by thing id.
     radios: HashMap<i64, String>,
+    /// Radios' programme guides, for saying what's on air.
+    radio_guides: HashMap<i64, String>,
+    /// What each radio's on, as far as the world last looked.
+    radio_news: HashMap<i64, radio::News>,
+    /// For work done elsewhere (looking up what's on) to report back.
+    inbox: tokio::sync::mpsc::UnboundedSender<Event>,
 }
 
-pub async fn run(world: World, mut events: UnboundedReceiver<Event>, url: Option<String>) {
+pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox };
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
@@ -134,6 +140,7 @@ impl Game {
             Event::Visit { id, passport, tx } => self.visit(id, passport, tx),
             Event::Leave { id } => self.leave(id),
             Event::Audio { id, frames, title } => self.audio(id, frames, title),
+            Event::RadioNews { thing, title } => self.radio_news(thing, title),
             Event::Cmd { id, text } => {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.ambient_quiet = 0;
@@ -439,6 +446,9 @@ impl Game {
             "play" | "wind" => return self.cmd_play(id),
             "tune" => return self.cmd_tune(id, rest),
             "radio" if rest.trim() == "off" => return self.cmd_radio_off(id),
+            "radio" if rest.trim_start().starts_with("guide") => {
+                return self.cmd_radio_guide(id, rest.trim_start().trim_start_matches("guide"));
+            }
             "radio" if self.has_radio_here(id) => return self.cmd_tune(id, rest),
             "join" | "visit" => return self.cmd_join(id, rest),
             "stop" if rest.starts_with("music") || rest.starts_with("the music") => return self.cmd_stop_music(id),
@@ -1896,6 +1906,7 @@ const HELP: &[HelpTopic] = &[
             ("make a music box / teach C E G / play", "a box that remembers your tune"),
             ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
             ("make a radio / tune radio https://… / radio off", "an internet radio station for everyone nearby"),
+            ("radio guide https://…", "where it finds what's on air, if its stream doesn't say"),
         ],
         footer: Some("Turn the sound on (🔊 in the browser) to hear them. Gramophones and radios carry five steps, and you only ever hear the nearest."),
     },
