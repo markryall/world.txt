@@ -442,6 +442,27 @@ if (window.visualViewport) {
 }
 document.querySelectorAll('[data-prefill]').forEach((b) => b.onclick = () => prefill(b.dataset.prefill));
 
+// Keep the command box ready. A click anywhere else hands focus back to it,
+// and so does just starting to type, unless something else wants the keys
+// (the join screen, a noticeboard, a box of its own) or text is being selected.
+const pointerFine = matchMedia('(pointer: fine)');
+const elsewhere = () =>
+  getComputedStyle($('#join')).display !== 'none' || $('#board').classList.contains('on');
+const ownInput = (el) => el && el.closest && el.closest('input, textarea, select');
+document.addEventListener('click', (e) => {
+  // On a phone that would pop the keyboard up at every tap.
+  if (!pointerFine.matches || elsewhere() || ownInput(e.target)) return;
+  if (getSelection().toString()) return;
+  $('#cmd').focus({ preventScroll: true });
+});
+document.addEventListener('keydown', (e) => {
+  if (elsewhere() || ownInput(document.activeElement)) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
+  // Space on a focused button presses it.
+  if (e.key === ' ' && document.activeElement?.closest('button, [role=button]')) return;
+  $('#cmd').focus({ preventScroll: true });
+});
+
 // ---- sound: hums become notes, rain sounds like rain --------------------
 
 $('#sound').onclick = () => {
