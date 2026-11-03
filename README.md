@@ -220,6 +220,76 @@ For family only, [Tailscale](https://tailscale.com) is a nice alternative: share
 the machine with them and they join at `http://<machine-name>:4040`, with nothing
 exposed to the internet.
 
+## Hosting on Fly.io
+
+A laptop world goes dark whenever the laptop sleeps. [Fly.io](https://fly.io)
+keeps it up on one small always-on machine for a couple of dollars a month,
+with the world on a volume. The repo has what it needs: `Dockerfile`,
+`fly.toml` and `deploy/fly-start.sh`.
+
+### Setting it up (once)
+
+1. Install `flyctl` (`brew install flyctl`) and `fly auth login`.
+2. In `fly.toml`, set `app` to a name of your own and `WORLD_URL` to your
+   world's address. `primary_region` is Sydney; pick one near your people.
+3. Make the app and its volume, then deploy:
+
+   ```
+   fly apps create <your-app>
+   fly volumes create world_data --size 1 --region syd
+   fly deploy
+   ```
+
+   That starts a fresh, empty world. `curl https://<your-app>.fly.dev/.well-known/world.txt`
+   to check it's up.
+4. **Your address:** `fly certs add home.example.com`, then in your DNS point
+   `home.example.com` at `<your-app>.fly.dev` with a CNAME (on Cloudflare, set
+   it to **DNS only**, the grey cloud, and remove the tunnel's record for that
+   name). `fly certs show home.example.com` says when the certificate is ready.
+
+### Bringing an existing world across
+
+People keep their sign-ins as long as the address stays the same, because
+their device tokens live in `world.db`, along with the world's identity key.
+
+1. Stop the old server (and its tunnel), so nothing changes after the copy.
+2. Copy the world safely: `sqlite3 world.db ".backup /tmp/world-move.db"`
+3. Upload it as `import.db`, then restart. On start, `fly-start.sh` moves it
+   into place before the server opens anything, and keeps the world it replaced
+   in `/data/replaced/`:
+
+   ```
+   fly ssh sftp shell
+   » put /tmp/world-move.db /data/import.db
+   fly machine restart
+   ```
+
+4. Check `curl https://home.example.com/.well-known/world.txt` shows the same
+   `public_key` as before.
+
+### Deploying changes
+
+`fly deploy` from the repo builds the image (on Fly's own builders, so Docker
+isn't needed locally), pushes it to Fly's registry and swaps the machine over.
+With one machine and a volume, that's a few seconds' gap: people see the world
+fade and refresh to come back in. Deploy when the island is quiet.
+
+### Keeper chores on Fly
+
+Commands run on the machine find the world on their own (`WORLD_DB` and
+`WORLD_URL` are set there):
+
+```
+fly ssh console -C "world.txt invite Sam"
+fly ssh console -C "world.txt invites"
+fly ssh console -C "world.txt rename 'Willow Bank'"   # then fly machine restart
+fly logs                                            # what the world is saying
+```
+
+**Backups** land in `/data/backups/`, on the same volume as the world, and Fly
+also snapshots volumes daily. To keep a copy off Fly too, pull one down now and
+then: `fly ssh sftp get /data/backups/world-<date>.db`.
+
 ## In the world
 
 New arrivals get five tiny first steps: walk, say hi, make something, plant

@@ -22,7 +22,7 @@ enum Cmd {
     Serve {
         #[arg(long, default_value = "0.0.0.0:4040")]
         addr: String,
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
         /// Seed for a brand-new world's landscape.
         #[arg(long, default_value_t = 7)]
@@ -40,7 +40,7 @@ enum Cmd {
     },
     /// Copy the world to backups/ right now.
     Backup {
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
         #[arg(long, default_value_t = 14)]
         keep_backups: usize,
@@ -100,38 +100,38 @@ enum Cmd {
         /// The world's public address, for the link (e.g. https://world.example.com).
         #[arg(long, env = "WORLD_URL")]
         url: Option<String>,
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
     },
     /// Recent magic links: waiting, used or expired.
     Invites {
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
     },
     /// Cancel someone's unused magic links (one sent to the wrong person).
     Revoke {
         /// Their nickname or username.
         name: String,
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
     },
     /// Give the world a proper name (shown to visitors and other worlds).
     Rename {
         /// e.g. "Willow Bank"
         name: String,
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
     },
     /// Write past weeks' discoveries into the Island Journal's archive.
     BackfillJournal {
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
     },
     /// Make someone an island keeper (run on the server's machine).
     Promote {
         /// Their nickname or username.
         name: String,
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
     },
     /// Print a new magic link for someone's next device.
@@ -140,7 +140,7 @@ enum Cmd {
         name: String,
         #[arg(long, env = "WORLD_URL")]
         url: Option<String>,
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
     },
     /// Keep the world (and its tunnel) running in the background, from login (macOS).
@@ -163,7 +163,7 @@ enum Cmd {
 enum ServiceCmd {
     /// Start the world now and at every login, restarting it if it falls over.
     Install {
-        #[arg(long, default_value = "world.db")]
+        #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
         /// The world's public address (e.g. https://world.example.com).
         #[arg(long, env = "WORLD_URL")]

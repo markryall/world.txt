@@ -1,0 +1,10 @@
+target/
+tmp/
+backups/
+agent-state/
+.git/
+.jj/
+.cards/
+.claude/
+*.db
+*.db-*

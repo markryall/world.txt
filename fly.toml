@@ -1,0 +1,37 @@
+# world.txt on Fly.io: one small machine that never sleeps, with the world on
+# a volume. See "Hosting on Fly.io" in the README.
+#
+# Change `app` to your own app's name, and WORLD_URL to your world's address.
+
+app = "world-txt-home"
+primary_region = "syd"
+
+[build]
+
+[env]
+  WORLD_URL = "https://home.world-txt.com"
+
+# The world, its backups and anything it replaced live here.
+[mounts]
+  source = "world_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Always on: people come and go, and a world that's asleep can't greet them.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/.well-known/world.txt"
+    timeout = "5s"
+
+# One world is one SQLite file, so exactly one machine: never scale this up.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
