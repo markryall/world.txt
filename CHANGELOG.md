@@ -2,6 +2,7 @@
 
 ## 0.2.1 (2026-11-03)
 
+- `dig` chips rock down to a hill, so no rock is stuck forever.
 - `link me` gives you a magic link for your own new device (phone, laptop,
   tablet), so you don't need a keeper for it. Keepers can still `link Poppy`.
 - Arriving again takes over from your old connection: a phone or tab that's

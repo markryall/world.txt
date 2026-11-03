@@ -984,10 +984,12 @@ impl Game {
                 Ok(())
             }
             Hill => self.reshape(id, Grass, "You dig away at the hill until it's level ground.", "levels the hill with a lot of digging."),
-            Stone => {
-                self.say1(id, Line::plain("The rock here is far too hard to dig."));
-                Ok(())
-            }
+            Stone => self.reshape(
+                id,
+                Hill,
+                "You chip away at the rock, stone by stone, until it's worn down to a hill. ⛏",
+                "chips away at the rock until it's just a hill.",
+            ),
             Water | Pond | DeepWater => {
                 self.say1(id, Line::col(Col::Blue, "You splash about. It's very satisfying, but you're not digging anything."));
                 Ok(())
@@ -1988,7 +1990,7 @@ const HELP: &[HelpTopic] = &[
         title: "🌱 shaping the land",
         keepers: false,
         items: &[
-            ("dig / fill", "ponds, earth, sandbanks"),
+            ("dig / fill", "ponds, earth, sandbanks (and chip rock down to hills)"),
             ("plant tree|flowers|grass", "make things grow"),
             ("raise / path", "hills, rocks, paths"),
             ("name The Willow Bank", "name this place"),
