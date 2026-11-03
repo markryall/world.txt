@@ -342,6 +342,8 @@ Progress is saved by name, so returning visitors never see it again
   one of the island's radio stations the same way (`radio off`); `stations`
   lists them, and part of a name will do. Island keepers choose the stations:
   `station add Night Owl FM https://… [guide https://…]` and `station remove`.
+  `world.txt add-stations` (on the server's machine) starts a world off with a
+  recommended list from `stations.txt`: community radio, SomaFM and more.
   Radios say what's playing when the stream does, or, with a guide (AirNet's
   format, used by many community stations), what show is on air. Sound makers must be more
   than ten steps apart, and you only ever hear the nearest, never two at once.

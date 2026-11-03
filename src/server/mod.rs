@@ -281,6 +281,37 @@ pub fn revoke(db_path: &str, name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The recommended radio stations that come with world.txt.
+const STATIONS: &str = include_str!("../../stations.txt");
+
+/// The recommended stations: (name, stream, guide).
+pub fn recommended_stations() -> Vec<(String, String, Option<String>)> {
+    STATIONS
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .filter_map(|l| {
+            let mut parts = l.split('|').map(str::trim);
+            let name = parts.next().filter(|n| !n.is_empty())?.to_string();
+            let url = parts.next().filter(|u| u.starts_with("https://"))?.to_string();
+            let guide = parts.next().filter(|g| g.starts_with("https://")).map(str::to_string);
+            Some((name, url, guide))
+        })
+        .collect()
+}
+
+/// `world.txt add-stations`: put the recommended stations on the world's list
+/// (keeping any others; ones with the same name are updated).
+pub fn add_stations(db_path: &str) -> anyhow::Result<()> {
+    let db = db::Db::open(db_path)?;
+    let list = recommended_stations();
+    for (name, url, guide) in &list {
+        db.set_station(&game::clean_station_name(name), url, guide.as_deref(), "world.txt", accounts::now())?;
+    }
+    println!("📻 {} stations on the list now. In the world: stations, then tune radio <station>", db.stations()?.len());
+    Ok(())
+}
+
 /// `world.txt rename <name>`: give the world a proper name.
 pub fn rename(db_path: &str, name: &str) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
@@ -366,6 +397,19 @@ pub fn backfill_journal(db_path: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_recommended_stations_are_all_good() {
+        let list = recommended_stations();
+        assert!(list.len() >= 20, "only {}", list.len());
+        let mut names = std::collections::HashSet::new();
+        for (name, url, guide) in &list {
+            assert!(names.insert(name.to_lowercase()), "{name} twice");
+            assert_eq!(name, &game::clean_station_name(name), "{name} isn't a tidy name");
+            assert!(url.starts_with("https://") && !url.contains(' '), "{name}: {url}");
+            assert!(guide.as_deref().is_none_or(|g| g.starts_with("https://")), "{name}");
+        }
+    }
 
     #[test]
     fn music_for_a_stalled_listener_is_dropped_but_words_still_go() {

@@ -17,6 +17,8 @@ Music, cooking, and a world that stays up on its own.
   Island keepers choose the stations (`station add`, `station remove`), and
   anyone can see them (`stations`) and tune in. Radios say what's playing when
   the stream does, or what show is on air from the station's programme guide.
+  `world.txt add-stations` adds a recommended list of community and
+  independent stations, and SomaFM (see `stations.txt`).
 - Sound makers must be more than ten steps apart, and you only ever hear the
   nearest one: never two songs at once.
 

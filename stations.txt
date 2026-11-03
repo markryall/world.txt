@@ -1,0 +1,31 @@
+# Recommended radio stations: name | stream | programme guide (optional).
+# Community and independent stations, and SomaFM. Load them into a world with
+# `world.txt add-stations`; island keepers can change the list from there.
+# Guides are in AirNet's format (many Australian community stations use it).
+
+4ZZZ FM | https://iheart.4zzz.org.au/4zzz | https://airnet.org.au/rest/stations/4ZZZ/guides/fm
+Zed Digital | https://iheart.4zzz.org.au/zed-digital | https://airnet.org.au/rest/stations/4ZZZ/guides/digital
+Triple R | https://ondemand.rrr.org.au/getstream?id=wshq | https://airnet.org.au/rest/stations/3RRR/guides/fm
+PBS 106.7 | https://playerservices.streamtheworld.com/api/livestream-redirect/3PBS_FMAACHIGH.aac | https://airnet.org.au/rest/stations/3PBS/guides/fm
+FBi Radio | https://streamer.fbiradio.com/stream | https://airnet.org.au/rest/stations/2FBI/guides/fm
+4EB | https://playerservices.streamtheworld.com/api/livestream-redirect/4EB.mp3 | https://airnet.org.au/rest/stations/4EB/guides/fm
+Radio Adelaide | https://playerservices.streamtheworld.com/api/livestream-redirect/RADIO_ADEAAC.aac | https://airnet.org.au/rest/stations/5UV/guides/fm
+RTRFM | https://live.rtrfm.com.au/stream1
+2SER | https://icecast1.myradio.click/streamrelay | https://airnet.org.au/rest/stations/2SER/guides/fm
+KEXP | https://kexp-mp3-128.streamguys1.com/kexp128.mp3
+WFMU | https://stream0.wfmu.org/freeform-128k
+NTS 1 | https://stream-relay-geo.ntslive.net/stream
+NTS 2 | https://stream-relay-geo.ntslive.net/stream2
+Resonance FM | https://stream.resonance.fm/resonance
+dublab | https://dublab.out.airtime.pro/dublab_a
+Radio Paradise | https://stream.radioparadise.com/mp3-128
+Groove Salad | https://ice2.somafm.com/groovesalad-128-mp3
+Drone Zone | https://ice2.somafm.com/dronezone-128-mp3
+Lush | https://ice2.somafm.com/lush-128-mp3
+Secret Agent | https://ice2.somafm.com/secretagent-128-mp3
+Indie Pop Rocks | https://ice2.somafm.com/indiepop-128-mp3
+Deep Space One | https://ice2.somafm.com/deepspaceone-128-mp3
+Folk Forward | https://ice2.somafm.com/folkfwd-128-mp3
+Boot Liquor | https://ice2.somafm.com/bootliquor-128-mp3
+Space Station Soma | https://ice2.somafm.com/spacestation-128-mp3
+Sonic Universe | https://ice2.somafm.com/sonicuniverse-128-mp3

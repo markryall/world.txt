@@ -13,6 +13,7 @@ mod homes;
 mod jukebox;
 mod music;
 mod radio;
+pub(crate) use radio::clean_station_name;
 mod sailing;
 mod travel;
 mod visitors;
