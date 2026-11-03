@@ -1335,7 +1335,7 @@ impl Game {
         Ok(())
     }
 
-    /// Keepers: `fold Mark into dappled-lamb-80` moves an old account's things
+    /// Keepers: `fold Poppy into sunny-otter-42` moves an old account's things
     /// into someone's account and removes the old one.
     fn cmd_fold(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
         if !self.is_keeper(&self.user(id)) {
@@ -1343,13 +1343,13 @@ impl Game {
             return Ok(());
         }
         let Some((old, new)) = rest.split_once(" into ").map(|(a, b)| (a.trim(), b.trim())).filter(|(a, b)| !a.is_empty() && !b.is_empty()) else {
-            self.say1(id, Line::plain("Fold who into who? e.g. 'fold Mark into dappled-lamb-80' (use usernames: 'users' lists them)"));
+            self.say1(id, Line::plain("Fold who into who? e.g. 'fold Poppy into sunny-otter-42' (use usernames: 'users' lists them)"));
             return Ok(());
         };
         // Usernames only: this can't be undone, so no guessing from nicknames.
         let exact = |n: &str| self.world.db.matching_users(n).ok().and_then(|m| m.into_iter().find(|u| u.eq_ignore_ascii_case(n)));
         let (Some(old), Some(new)) = (exact(old), exact(new)) else {
-            self.say1(id, Line::plain("Use both usernames exactly ('users' lists them), e.g. 'fold Mark into dappled-lamb-80'."));
+            self.say1(id, Line::plain("Use both usernames exactly ('users' lists them), e.g. 'fold Poppy into sunny-otter-42'."));
             return Ok(());
         };
         if old == new {
@@ -1860,7 +1860,7 @@ fn help() -> Vec<Line> {
         h("promote Lu / demote Lu", "make someone a keeper, or not"),
         h("signout Sam", "sign out all their devices (a lost iPad)"),
         h("invites / revoke Sam", "see recent magic links, or cancel someone's unused ones"),
-        h("fold Mark into dappled-lamb-80", "move an old account's things into someone's account"),
+        h("fold Poppy into sunny-otter-42", "move an old account's things into someone's account"),
         h("users", "everyone, with their devices"),
         h("visitors / admit / turn away", "people sailing in from other worlds"),
         h("trust their.address / untrust / worlds", "let a friendly world's people straight in"),

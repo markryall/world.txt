@@ -862,36 +862,36 @@ mod tests {
     fn folding_an_old_account_moves_its_things_and_removes_it() {
         let db = Db::open(":memory:").unwrap();
         // An old account (username is a plain name) and a new one nicknamed the same.
-        db.conn.execute("INSERT INTO players (name, x, y, keeper) VALUES ('Mark', 1, 1, 1)", []).unwrap();
-        db.create_user("dappled-lamb-80", "Mark", 2, 2).unwrap();
-        assert_eq!(db.matching_users("mark").unwrap(), vec!["Mark", "dappled-lamb-80"]);
+        db.conn.execute("INSERT INTO players (name, x, y, keeper) VALUES ('Poppy', 1, 1, 1)", []).unwrap();
+        db.create_user("sunny-otter-42", "Poppy", 2, 2).unwrap();
+        assert_eq!(db.matching_users("poppy").unwrap(), vec!["Poppy", "sunny-otter-42"]);
 
-        db.satchel_add("Mark", "daisy", 2).unwrap();
-        db.satchel_add("dappled-lamb-80", "daisy", 1).unwrap();
-        db.journal_add("Mark", "frog").unwrap();
-        db.send_mail("Mark", "Iz", "hi", 5).unwrap();
+        db.satchel_add("Poppy", "daisy", 2).unwrap();
+        db.satchel_add("sunny-otter-42", "daisy", 1).unwrap();
+        db.journal_add("Poppy", "frog").unwrap();
+        db.send_mail("Poppy", "Sam", "hi", 5).unwrap();
 
-        db.fold_account("Mark", "dappled-lamb-80").unwrap();
+        db.fold_account("Poppy", "sunny-otter-42").unwrap();
 
-        assert_eq!(db.matching_users("Mark").unwrap(), vec!["dappled-lamb-80"]);
-        assert_eq!(db.satchel("dappled-lamb-80").unwrap(), vec![("daisy".to_string(), 3)]);
-        assert_eq!(db.journal("dappled-lamb-80").unwrap(), vec!["frog"]);
-        assert_eq!(db.take_mail("dappled-lamb-80").unwrap().len(), 1);
-        assert!(db.is_keeper("dappled-lamb-80"), "keeping keeper powers from the old account");
-        assert!(db.satchel("Mark").unwrap().is_empty());
+        assert_eq!(db.matching_users("Poppy").unwrap(), vec!["sunny-otter-42"]);
+        assert_eq!(db.satchel("sunny-otter-42").unwrap(), vec![("daisy".to_string(), 3)]);
+        assert_eq!(db.journal("sunny-otter-42").unwrap(), vec!["frog"]);
+        assert_eq!(db.take_mail("sunny-otter-42").unwrap().len(), 1);
+        assert!(db.is_keeper("sunny-otter-42"), "keeping keeper powers from the old account");
+        assert!(db.satchel("Poppy").unwrap().is_empty());
     }
 
     #[test]
     fn invites_show_whether_theyre_used_and_can_be_revoked() {
         let db = Db::open(":memory:").unwrap();
-        db.create_user("sunny-seal-32", "Tom", -1, -1).unwrap();
-        db.add_invite("sunny-seal-32", "a", 1_000).unwrap();
-        db.add_invite("sunny-seal-32", "b", 2_000).unwrap();
-        assert_eq!(db.redeem_invite("a", 500).as_deref(), Some("sunny-seal-32"));
+        db.create_user("plucky-wren-17", "Sam", -1, -1).unwrap();
+        db.add_invite("plucky-wren-17", "a", 1_000).unwrap();
+        db.add_invite("plucky-wren-17", "b", 2_000).unwrap();
+        assert_eq!(db.redeem_invite("a", 500).as_deref(), Some("plucky-wren-17"));
         let list = db.invites(10).unwrap();
-        assert_eq!(list[0], ("sunny-seal-32".into(), "Tom".into(), 2_000, None));
+        assert_eq!(list[0], ("plucky-wren-17".into(), "Sam".into(), 2_000, None));
         assert_eq!(list[1].3, Some(500));
-        assert_eq!(db.revoke_invites("sunny-seal-32").unwrap(), 1, "only the unused one goes");
+        assert_eq!(db.revoke_invites("plucky-wren-17").unwrap(), 1, "only the unused one goes");
         assert_eq!(db.redeem_invite("b", 600), None);
     }
 }
