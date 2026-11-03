@@ -60,6 +60,11 @@ struct Player {
     voyage: Option<sailing::Voyage>,
     /// Their animal friend: (animal id, nickname).
     companion: Option<(String, Option<String>)>,
+    /// The last little bit of scenery they were told, so it isn't said twice running.
+    last_ambient: Option<&'static str>,
+    /// Scenery lines since they last did anything: someone who's stepped away
+    /// shouldn't come back to a screenful of birdsong.
+    ambient_quiet: u8,
 }
 
 impl Player {
@@ -119,6 +124,9 @@ impl Game {
             Event::Visit { id, passport, tx } => self.visit(id, passport, tx),
             Event::Leave { id } => self.leave(id),
             Event::Cmd { id, text } => {
+                if let Some(p) = self.players.get_mut(&id) {
+                    p.ambient_quiet = 0;
+                }
                 let before = self.snapshot(id);
                 if let Err(e) = self.command(id, text.trim()) {
                     eprintln!("command error: {e}");
@@ -281,7 +289,7 @@ impl Game {
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         let full = super::names::full(&name, &user);
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0 });
 
         self.send(
             id,
@@ -1560,10 +1568,15 @@ impl Game {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.sky = sky;
                 }
-            } else if self.rng.chance(1.0 / 14.0) {
+            } else if p.ambient_quiet < AMBIENT_WHILE_IDLE && self.rng.chance(1.0 / 14.0) {
                 let terrain = self.world.terrain(x, y);
-                if let Some(line) = ambient(&mut self.rng, terrain, sky, phase, Clock::season()) {
+                let last = p.last_ambient;
+                if let Some(line) = ambient(&mut self.rng, terrain, sky, phase, Clock::season()).filter(|l| Some(*l) != last) {
                     self.say1(id, Line::col(Col::Dim, line));
+                    if let Some(p) = self.players.get_mut(&id) {
+                        p.last_ambient = Some(line);
+                        p.ambient_quiet += 1;
+                    }
                 }
             }
         }
@@ -1637,6 +1650,9 @@ fn sky_change(from: Sky, to: Sky, season: Season) -> Option<&'static str> {
     })
 }
 
+/// Scenery lines someone gets while not doing anything, before it goes quiet.
+const AMBIENT_WHILE_IDLE: u8 = 2;
+
 fn ambient(rng: &mut Rng, terrain: Terrain, sky: Sky, phase: Phase, season: Season) -> Option<&'static str> {
     use Terrain::*;
     let night = phase == Phase::Night;
@@ -1684,7 +1700,12 @@ fn ambient(rng: &mut Rng, terrain: Terrain, sky: Sky, phase: Phase, season: Seas
         ],
         (Pond, _, _) => &["A frog plops into the water.", "A dragonfly hovers over the pond."],
         (Hill | Stone, _, false) => &["The wind hums over the rocks.", "A hawk circles lazily high above."],
-        (Hill | Stone, _, true) => &["The whole sky is wheeling with stars up here."],
+        (Hill | Stone, _, true) => &[
+            "The whole sky is wheeling with stars up here.",
+            "A shooting star streaks across the dark and is gone.",
+            "The wind is cool and quiet over the rocks tonight.",
+            "Far below, the sea glints silver under the moon.",
+        ],
         _ => return None,
     };
     Some(*rng.pick(options))
