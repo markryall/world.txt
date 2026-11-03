@@ -1,0 +1,7 @@
+name = "Give the world a proper name"
+status = "todo"
+description = "The world calls itself by its hostname (home.world-txt.com), and that's what other worlds see when visiting or trusting it. 'world.txt rename <name>' on the server machine sets a proper name (e.g. Willow Bank), kept in the world, shown in .well-known/world.txt and on the join screen. The address and key stay the same, so trust isn't affected."
+created_at = "2026-11-03T00:03:18.000000Z"
+updated_at = "2026-11-03T00:03:18.000000Z"
+tags = ["federation"]
+priority = "medium"
