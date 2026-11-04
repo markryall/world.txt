@@ -404,41 +404,140 @@ impl Game {
         HookReply::Posted
     }
 
-    pub(super) fn cmd_follow(&mut self, id: u64, follow: bool) -> anyhow::Result<()> {
+    /// The boards someone follows that are still standing, in `boards` order.
+    fn followed_boards(&self, user: &str) -> Vec<(i64, i64)> {
+        self.world.db.followed(user).unwrap_or_default().into_iter().filter(|(b, _)| self.board_place(*b).is_some()).collect()
+    }
+
+    /// `follow` / `unfollow` here, or `unfollow 2` from anywhere (the
+    /// number from `boards`).
+    pub(super) fn cmd_follow(&mut self, id: u64, follow: bool, which: &str) -> anyhow::Result<()> {
         let Some((x, y, _name)) = self.here(id) else { return Ok(()) };
         let user = self.user(id);
-        let Some((board, _)) = self.board_here(x, y) else {
-            self.say1(id, Line::plain("Stand at a noticeboard to follow or unfollow it."));
-            return Ok(());
+        let which = which.trim();
+        let board = if let Ok(n) = which.parse::<usize>() {
+            match self.followed_boards(&user).get(n.wrapping_sub(1)) {
+                Some(&(b, _)) if !follow => b,
+                Some(_) => {
+                    self.say1(id, Line::plain("You already follow that one."));
+                    return Ok(());
+                }
+                None => {
+                    self.say1(id, Line::plain("Which one? 'boards' lists the boards you follow."));
+                    return Ok(());
+                }
+            }
+        } else {
+            match self.board_here(x, y) {
+                Some((b, _)) => b,
+                None => {
+                    let msg = if follow { "Stand at a noticeboard to follow it." } else { "Stand at a noticeboard to unfollow it, or 'unfollow 2' (the number from 'boards') from anywhere." };
+                    self.say1(id, Line::plain(msg));
+                    return Ok(());
+                }
+            }
         };
         self.world.db.set_following(&user, board, follow)?;
         let msg = if follow {
-            "📌 Following. You'll hear about new notes here wherever you are."
+            "📌 Following. You'll hear about new notes here wherever you are.".to_string()
         } else {
-            "📌 Unfollowed. It'll keep quiet now."
+            format!("📌 Unfollowed {}. It'll keep quiet now.", self.board_title(board).trim_start_matches("📌 "))
         };
         self.say1(id, Line::col(Col::Yellow, msg));
+        Ok(())
+    }
+
+    /// Whether `add` here means adding people to a board.
+    pub(super) fn adding_to_board(&self, id: u64, rest: &str) -> bool {
+        let r = rest.trim().to_lowercase();
+        !r.is_empty() && !r.starts_with("song") && self.players.get(&id).is_some_and(|p| self.board_here(p.x, p.y).is_some_and(|b| !b.1))
+    }
+
+    /// `add Poppy, Sam to board`: they follow this board now, like being
+    /// added to a group chat. Anyone who follows it (or made it, or a keeper)
+    /// can add people, and anyone added can leave with unfollow.
+    pub(super) fn cmd_add_to_board(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
+        let Some((board, false)) = self.board_here(x, y) else {
+            self.say1(id, Line::plain("Stand at a noticeboard to add people to it. (Not the Island Journal: that's everyone's.)"));
+            return Ok(());
+        };
+        let maker = self.world.things.iter().find(|t| t.id == board).is_some_and(|t| t.maker == user);
+        let member = self.world.db.membership(&user, board).is_some_and(|m| m.0);
+        if !member && !maker && !self.is_keeper(&user) {
+            self.say1(id, Line::plain("Follow this board first, then you can add people to it."));
+            return Ok(());
+        }
+        let mut who = rest.trim();
+        for tail in [" to the noticeboard", " to noticeboard", " to the board", " to board", " to this board"] {
+            if who.to_lowercase().ends_with(tail) {
+                who = &who[..who.len() - tail.len()];
+            }
+        }
+        let names: Vec<&str> =
+            who.split([',', '&']).flat_map(|p| p.split(" and ")).map(|n| n.trim().trim_start_matches('@').trim()).filter(|n| !n.is_empty()).collect();
+        if names.is_empty() {
+            self.say1(id, Line::plain("Add who? e.g. 'add Poppy, Sam to board'"));
+            return Ok(());
+        }
+        let place = self.world.place_title(x, y);
+        let mut added = Vec::new();
+        let mut already = Vec::new();
+        for n in names {
+            let found = self.world.db.matching_users(n)?;
+            let [them] = found.as_slice() else {
+                let why = if found.is_empty() { "there's nobody called" } else { "more than one person could be" };
+                self.say1(id, Line::plain(format!("Skipping {n}: {why} {n}. (Usernames from 'users' always work.)")));
+                continue;
+            };
+            let nick = self.world.nick(them);
+            if self.world.db.membership(them, board).is_some_and(|m| m.0) {
+                already.push(nick);
+                continue;
+            }
+            self.world.db.set_following(them, board, true)?;
+            let n_boards = self.followed_boards(them).iter().position(|(b, _)| *b == board).map_or(1, |i| i + 1);
+            let note = format!("📌 added you to the noticeboard at {place}: you'll hear its notes wherever you are. (boards to see it, unfollow {n_boards} to leave)");
+            match self.players.iter().find(|(_, p)| p.user == *them) {
+                Some((&pid, p)) if p.hears(&user) => self.say1(pid, Line::new().b(Col::Yellow, format!("📌 {name}")).c(Col::Yellow, note.trim_start_matches("📌"))),
+                Some(_) => {}
+                None => self.world.db.send_mail(them, &user, &note, now())?,
+            }
+            added.push(nick);
+        }
+        if !added.is_empty() {
+            let verb = if added.len() == 1 { "follows" } else { "follow" };
+            self.say1(id, Line::col(Col::Yellow, format!("📌 {} {verb} this board now. They'll hear its notes (and place events here) wherever they are.", join(&added))));
+        }
+        if !already.is_empty() {
+            self.say1(id, Line::col(Col::Dim, format!("   {} already follow{} it.", join(&already), if already.len() == 1 { "s" } else { "" })));
+        }
         Ok(())
     }
 
     pub(super) fn cmd_boards(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((_, _, _name)) = self.here(id) else { return Ok(()) };
         let user = self.user(id);
-        let followed = self.world.db.followed(&user)?;
+        let followed = self.followed_boards(&user);
         let mut lines = vec![Line::new().b(Col::Magenta, "📌 Boards you follow")];
         if followed.is_empty() {
             lines.push(Line::col(Col::Dim, "  None yet. Post on a board to follow it."));
         }
-        for (board, seen) in followed {
-            let Some((bx, by)) = self.board_place(board) else { continue };
-            let new = self.world.db.notes_after(board, seen)?;
+        for (i, (board, seen)) in followed.iter().enumerate() {
+            let Some((bx, by)) = self.board_place(*board) else { continue };
+            let new = self.world.db.notes_after(*board, *seen)?;
             let news = if new > 0 { format!("  {new} new") } else { String::new() };
             lines.push(
                 Line::new()
-                    .t(format!("  {}", self.board_title(board)))
+                    .c(Col::Yellow, format!("  {}. ", i + 1))
+                    .t(self.board_title(*board))
                     .c(Col::Dim, format!("  ({})", self.world.place_title(bx, by)))
                     .b(Col::Yellow, news),
             );
+        }
+        if !followed.is_empty() {
+            lines.push(Line::col(Col::Dim, "  unfollow 2 leaves one from anywhere"));
         }
         if let Some(j) = self.journal_board {
             if let Some((jx, jy)) = self.board_place(j) {
@@ -489,6 +588,10 @@ pub fn backfill_journal(db: &crate::server::db::Db, board: i64) -> anyhow::Resul
 
 fn discovery_text(s: &Species) -> String {
     format!("found {} {}", crate::server::nature::a(s.name), s.kind.icon())
+}
+
+fn join(names: &[String]) -> String {
+    crate::server::world::join_and(names)
 }
 
 /// The least time between one hook's posts.

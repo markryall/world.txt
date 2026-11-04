@@ -455,6 +455,10 @@ people who've said `going 2` (the number from `events`; `not going 2` drops
 out), followers of a noticeboard on that spot, and anyone within ten steps hear
 it announced, reminded and starting. It's posted on that noticeboard rather
 than the Island Journal, and `events` marks it 📍 with who's going.
+`event here fri 10am Standup with Poppy, Sam and Lu` signs them up as going
+too: they're told straight away, or find a note waiting when they next arrive.
+A place event's call link is only shown to people who are in on it (going,
+following its board, or standing nearby); everyone else sees that it has one.
 
 ### Meetings
 
@@ -524,7 +528,11 @@ chat that belongs to that spot:
   board opens as a chat panel that loads older notes as you scroll up.
 - `post see you at sunset!` leaves a note. Everyone standing there sees it, and
   posting **follows** the board, so you hear about new notes wherever you are.
-  `follow` / `unfollow` to change that, and `boards` lists the ones you follow.
+  `follow` / `unfollow` to change that, and `boards` lists the ones you follow
+  (`unfollow 2` leaves one from anywhere).
+- A board's followers are its group, like a group chat: anyone who follows it
+  (or made it, or a keeper) can `add Poppy, Sam to board`, and they're told, or
+  find a note waiting. They hear its notes and the place events planned there.
 - **Hooks** let outside tools post too (builds, deploys, a calendar). At a
   board, its maker or a keeper types `hook CI` and is shown a secret address,
   once. Anything POSTed there lands on the board as a note from `🔔 CI`, like

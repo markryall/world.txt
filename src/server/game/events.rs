@@ -104,26 +104,66 @@ pub fn place_event(text: &str) -> (bool, &str) {
     (false, t)
 }
 
+/// "Standup with Poppy, Sam and Lu" → ("Standup", their usernames), when
+/// every name is someone; "Tea with cake" (nobody's called cake) stays as it
+/// is (None); some names but not others: Err(the unknown ones).
+pub fn invited(name: &str, lookup: impl Fn(&str) -> Vec<String>) -> Option<Result<(String, Vec<String>), Vec<String>>> {
+    let lower = name.to_lowercase();
+    let at = lower.rfind(" with ")?;
+    let (what, who) = (name[..at].trim(), &name[at + " with ".len()..]);
+    let names: Vec<&str> = who
+        .split([',', '&'])
+        .flat_map(|part| part.split(" and "))
+        .map(|n| n.trim().trim_start_matches('@').trim())
+        .filter(|n| !n.is_empty())
+        .collect();
+    if what.is_empty() || names.is_empty() {
+        return None;
+    }
+    let mut users = Vec::new();
+    let mut unknown = Vec::new();
+    for n in &names {
+        match lookup(n).as_slice() {
+            [one] => users.push(one.clone()),
+            _ => unknown.push(n.to_string()),
+        }
+    }
+    match (users.is_empty(), unknown.is_empty()) {
+        (true, _) => None,
+        (false, true) => Some(Ok((what.to_string(), users))),
+        (false, false) => Some(Err(unknown)),
+    }
+}
+
 impl Game {
     /// Who hears about an event: everyone online, or for a place event its
     /// host, whoever's going, followers of a noticeboard on that spot, and
     /// anyone nearby.
     fn audience(&self, e: &EventRow) -> Vec<u64> {
+        let insiders = self.insiders(e);
+        self.players.iter().filter(|(_, p)| self.in_on(e, &insiders, &p.user, p.x, p.y)).map(|(&id, _)| id).collect()
+    }
+
+    /// For a place event: who's going, and who follows a board on its spot.
+    fn insiders(&self, e: &EventRow) -> Vec<String> {
         if !e.local {
-            return self.players.keys().copied().collect();
+            return vec![];
         }
-        let going = self.world.db.going(e.id).unwrap_or_default();
-        let followers = self.board_here(e.x, e.y).filter(|b| !b.1).map(|b| self.world.db.followers(b.0).unwrap_or_default()).unwrap_or_default();
-        self.players
-            .iter()
-            .filter(|(_, p)| {
-                p.user == e.host
-                    || going.contains(&p.user)
-                    || followers.contains(&p.user)
-                    || ((p.x - e.x).abs().max((p.y - e.y).abs()) <= NEARBY && super::super::islands::island_at(p.x, p.y).id == super::super::islands::island_at(e.x, e.y).id)
-            })
-            .map(|(&id, _)| id)
-            .collect()
+        let mut people = self.world.db.going(e.id).unwrap_or_default();
+        if let Some((board, false)) = self.board_here(e.x, e.y) {
+            people.extend(self.world.db.followers(board).unwrap_or_default());
+        }
+        people
+    }
+
+    /// Whether someone (standing at x, y) is in on an event: hears about it,
+    /// and sees its call link.
+    fn in_on(&self, e: &EventRow, insiders: &[String], user: &str, x: i64, y: i64) -> bool {
+        use super::super::islands::island_at;
+        !e.local
+            || user == e.host
+            || insiders.iter().any(|u| u == user)
+            || ((x - e.x).abs().max((y - e.y).abs()) <= NEARBY && island_at(x, y).id == island_at(e.x, e.y).id)
     }
 
     fn tell_audience(&self, e: &EventRow, except: Option<u64>, line: Line) {
@@ -148,9 +188,21 @@ impl Game {
             self.say1(id, Line::plain("When, and what? e.g. 'event sat 4pm Beach party', or just for this place: 'event here fri 10am Standup'. It happens right here."));
             return Ok(());
         };
+        // "Standup with Poppy, Sam and Lu": those three are going too.
+        let (name, invited) = match local.then(|| invited(&name, |n| self.world.db.matching_users(n).unwrap_or_default())).flatten() {
+            Some(Ok((name, users))) => (name, users),
+            Some(Err(unknown)) => {
+                self.say1(id, Line::plain(format!("Who's {}? Check the names with 'users' or 'who' (or use their usernames), then plan it again.", super::super::world::join_and(&unknown))));
+                return Ok(());
+            }
+            None => (name, vec![]),
+        };
         let name: String = name.chars().take(80).collect();
         let place = self.world.place_title(x, y);
         let event = self.world.db.add_event(at, &name, x, y, &host, link.as_deref(), local)?;
+        for u in &invited {
+            self.world.db.set_going(event, u, true)?;
+        }
         let when = when_label(at);
         let call = link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"));
         let now = super::boards::now();
@@ -161,10 +213,16 @@ impl Game {
             "Everyone will get a reminder."
         };
         self.say1(id, Line::new().c(Col::Yellow, "📅 Planned: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}. {who}")));
+        if !invited.is_empty() {
+            let names: Vec<String> = invited.iter().map(|u| self.world.nick(u)).collect();
+            self.say1(id, Line::col(Col::Dim, format!("   {} {} going too, and will hear about it wherever they are.", super::super::world::join_and(&names), if names.len() == 1 { "is" } else { "are" })));
+        }
         // Written down where people will find it: the Island Journal for the
         // whole island, or the noticeboard here for a place event.
         let board = if local { self.board_here(x, y).filter(|b| !b.1).map(|b| b.0) } else { self.journal_board };
         if let Some(board) = board {
+            // Anyone can read a board, so a place event's call link stays off it.
+            let call = if local { "" } else { call.as_str() };
             self.world.db.add_note(board, &host, &format!("📅 {name} · {when} at {place}{call}"), now, &super::boards::week_key(now), None)?;
         }
         let row = self.world.db.upcoming_events(at)?.into_iter().find(|e| e.id == event);
@@ -172,6 +230,20 @@ impl Game {
         let line = Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}")).c(Col::Dim, invite);
         if let Some(e) = row {
             self.tell_audience(&e, Some(id), line);
+            // The invited who are away: a note waiting for when they arrive.
+            let hostname = self.world.nick(&host);
+            for u in &invited {
+                if *u != host && !self.players.values().any(|p| p.user == *u) {
+                    let note = format!("📅 invited you to {name} · {when} at {place}{call} (not going drops out)");
+                    self.world.db.send_mail(u, &host, &note, now)?;
+                }
+            }
+            let line = Line::col(Col::Yellow, format!("📅 {hostname} has invited you to {name}. (not going drops out)"));
+            for (&pid, p) in &self.players {
+                if pid != id && invited.contains(&p.user) {
+                    self.say1(pid, line.clone());
+                }
+            }
         }
         Ok(())
     }
@@ -179,6 +251,7 @@ impl Game {
     pub(super) fn cmd_events(&mut self, id: u64) -> anyhow::Result<()> {
         let events = self.world.db.upcoming_events(super::boards::now() - KEEP_AFTER)?;
         let me = self.user(id);
+        let (mx, my) = self.players.get(&id).map_or((-1, -1), |p| (p.x, p.y));
         let mut lines = vec![Line::new().b(Col::Magenta, "📅 Coming up on the island")];
         if events.is_empty() {
             lines.push(Line::col(Col::Dim, "  Nothing planned yet. Plan one just for here: event here fri 10am Standup"));
@@ -196,7 +269,11 @@ impl Game {
                     .c(Col::Dim, format!(" (hosted by {})", self.world.nick(&e.host))),
             );
             if let Some(l) = &e.link {
-                lines.push(Line::new().c(Col::Cyan, "     📞 ").c(Col::Cyan, l.clone()));
+                if self.in_on(e, &self.insiders(e), &me, mx, my) {
+                    lines.push(Line::new().c(Col::Cyan, "     📞 ").c(Col::Cyan, l.clone()));
+                } else {
+                    lines.push(Line::col(Col::Dim, "     📞 has a call link, for whoever's going"));
+                }
             }
             if e.local {
                 let going = self.world.db.going(e.id)?;
@@ -234,7 +311,12 @@ impl Game {
         let changed = self.world.db.set_going(e.id, &me, going)?;
         let place = self.world.place_title(e.x, e.y);
         let msg = match (going, changed) {
-            (true, true) => format!("📅 You're going to {} ({} at {place}). You'll get a reminder wherever you are.", e.name, when_label(e.at)),
+            (true, true) => format!(
+                "📅 You're going to {} ({} at {place}{}). You'll get a reminder wherever you are.",
+                e.name,
+                when_label(e.at),
+                e.link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"))
+            ),
             (true, false) => format!("📅 You're already going to {}.", e.name),
             (false, true) => format!("📅 You're not going to {} any more.", e.name),
             (false, false) => format!("📅 You weren't going to {} anyway.", e.name),
@@ -331,6 +413,26 @@ mod tests {
         assert!(parse_when("sat Beach party", now).is_none(), "needs a time");
         assert!(parse_when("4pm", now).is_none(), "needs a name");
         assert!(parse_when("4 Beach", now).is_none(), "a bare number is too vague");
+    }
+
+    #[test]
+    fn with_names_invites_them() {
+        let people = |n: &str| match n.to_lowercase().as_str() {
+            "poppy" => vec!["sunny-otter-42".to_string()],
+            "sam" => vec!["plucky-wren-17".to_string()],
+            "lu" => vec!["calm-heron-3".to_string()],
+            "twin" => vec!["a".to_string(), "b".to_string()],
+            _ => vec![],
+        };
+        assert_eq!(
+            invited("Standup with Poppy, Sam and @Lu", people),
+            Some(Ok(("Standup".to_string(), vec!["sunny-otter-42".to_string(), "plucky-wren-17".to_string(), "calm-heron-3".to_string()])))
+        );
+        assert_eq!(invited("Tea with cake", people), None, "nobody's called cake");
+        assert_eq!(invited("Standup", people), None);
+        assert_eq!(invited("Walk with Poppy & Bob", people), Some(Err(vec!["Bob".to_string()])));
+        assert_eq!(invited("Chat with Twin", people), None, "ambiguous names aren't guessed");
+        assert_eq!(invited("Tea with milk with Sam", people), Some(Ok(("Tea with milk".to_string(), vec!["plucky-wren-17".to_string()]))));
     }
 
     #[test]

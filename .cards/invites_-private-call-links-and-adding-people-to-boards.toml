@@ -1,0 +1,7 @@
+name = "Invites, private call links and adding people to boards"
+status = "done"
+description = "'event here fri 10am Standup with Poppy, Sam and Lu' signs those people up as going (only when every name is someone, so 'Tea with cake' stays tea); they're told now or find a note when they arrive. A place event's call link only shows to people in on it (going, following its board, nearby); others see that it has one, and it's left off the board's note. Boards are groups: anyone following a board (or its maker, or a keeper) can 'add Poppy, Sam to board'; they're told or mailed, and 'boards' now numbers boards so 'unfollow 2' leaves from anywhere."
+created_at = "2026-11-04T23:33:34.013699Z"
+updated_at = "2026-11-04T23:33:34.013699Z"
+tags = ["practical"]
+priority = "medium"
