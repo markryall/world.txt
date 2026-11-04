@@ -331,7 +331,7 @@ Progress is saved by name, so returning visitors never see it again
   everyone, `find Poppy` tells you which way to walk, and `join Poppy` walks you
   there automatically (around the water, following if they move; `stop` to stop).
   In the browser, tap a name to message them.
-- `dig`, `fill`, `plant tree|flowers|grass`, `raise`, `path`, `name The Willow Bank`
+- `dig`, `fill`, `plant birch|bluebells|grass` (see Gardens), `raise`, `path`, `name The Willow Bank`
 - `make a frog that croaks when it rains`, `push frog north`, `unmake frog`
 - `make a music box`, then `teach C E G E C` (only its maker can) and `play`; it also
   plays now and then when people are near. Two people humming at the same spot
@@ -370,6 +370,21 @@ sees in place of the land's: `describe A messy little den, records stacked
 everywhere and fairy lights strung over the jukebox.` (up to 280 characters;
 `describe` on its own puts it back).
 
+### Gardens
+
+What you plant grows slowly, over real time. A tree starts as a sapling, is a
+young tree after a day, a tall one after three and an old, mossy one after ten.
+Flowers come up as shoots, are in bud after a couple of hours and bloom after
+twelve. Nothing wilts and nothing needs watering. `plant oak` (or `birch`,
+`willow`, `apple tree`, `cherry tree`, `pine`, `rowan`) or `plant bluebells` (or
+`poppies`, `sunflowers`, `lavender`, `foxgloves`); `plant tree` and `plant
+flowers` let the island choose, with willows by the water. Looking at the spot
+says how it's coming along, who planted it and when, with the season's touch
+(apple blossom in spring, apples in autumn). Young plantings show lighter on the
+maps. When something you planted grows, you're told: straight away if you're
+around, or under "While you were away" when you next arrive. Digging or
+reshaping the spot clears it.
+
 ### Islands and boats
 
 The world is an archipelago of four islands, each in its own patch of sea:
@@ -382,6 +397,18 @@ go, and `sail Driftwood` rows you across. `map` shows the island you're on,
 `find` tells you which island a friend is on, and homes can be claimed on any
 island. Worlds from before the archipelago keep their island as Home Island and
 grow the other three the first time they start.
+
+### The lighthouse
+
+An old ruined lighthouse stands on Driftwood Isle's outermost point (Lighthouse
+Point), and everyone mends it together, a stage at a time: a driftwood door,
+stairs mended with smooth pebbles, a lens of quartz crystals, and then a light
+kindled with something that glows (fire opals, glowcaps or glow-worms). Standing
+there, `mend lighthouse` gives it what it needs next from your satchel. Looking at
+it says what it's missing and roughly how far along it is, only ever in words,
+and thanks everyone who has helped. Each finished stage is shouted to the whole
+world and written in the Island Journal. Once it's lit, its beam sweeps across
+the water at night, and it shows as `☼` on the map.
 
 ### Visiting other worlds
 
@@ -421,6 +448,19 @@ Keepers plan events where they're standing: `event sat 4pm Beach party` (or
 `tomorrow 10:30am`, `noon`...). It goes in the Island Journal, everyone hears a
 reminder ten minutes before and a shout when it starts, `events` lists what's
 coming up, and `go event` walks you there. `cancel event 1` for its host or a keeper.
+
+### Meetings
+
+The island can be the hallway outside a video call. `make a meeting table` (or a
+gazebo) makes a meeting spot, and its maker, the home's owner or a keeper gives it
+a call link: `meet https://meet.google.com/abc-defg-hij` (`meet off` clears it).
+Anyone standing there sees the link when they look, and `meet` hands it to you
+and tells everyone there that you've gone into the call. Events can carry a link
+too, `event fri 10am Standup https://zoom.us/j/123`, and one planned at a
+meeting table uses the table's. The link shows in `events`, the reminder and the
+"starting now" shout, and `meet` at an event's spot while it's on hands it over.
+Only https links are kept. In the browser, https links anywhere (lines and board
+notes) open in a new tab.
 
 ### Gathering
 
@@ -478,6 +518,16 @@ chat that belongs to that spot:
 - `post see you at sunset!` leaves a note. Everyone standing there sees it, and
   posting **follows** the board, so you hear about new notes wherever you are.
   `follow` / `unfollow` to change that, and `boards` lists the ones you follow.
+- **Hooks** let outside tools post too (builds, deploys, a calendar). At a
+  board, its maker or a keeper types `hook CI` and is shown a secret address,
+  once. Anything POSTed there lands on the board as a note from `🔔 CI`, like
+  any other post: plain text, or JSON with `text` (Slack style) or `content`
+  (Discord style), trimmed to 280 characters.
+  `curl -d 'the build passed 🎉' https://world.example.com/hook/<secret>`
+  `hooks` lists a board's hooks and when they last posted, and `unhook CI`
+  stops one. It answers 200 when posted, 404 for a stopped or unknown hook,
+  429 if one hook posts more than once every two seconds, and 413 past 16KB.
+  Not on the Island Journal.
 
 The **Island Journal** is a special board at the spawn point. The first find of
 every species each week goes in it automatically, with a shout-out to the whole
@@ -554,7 +604,10 @@ that's guidance, not a lock. So:
   the island (`world.rs`, `terrain.rs`), weather and clock (`weather.rs`), SQLite (`db.rs`)
 - `src/client.rs`: the ratatui terminal client
 - `src/server/nature.rs` and `src/server/game/gather.rs`: things to find, and gathering
-- `src/server/game/boards.rs`: noticeboards and the Island Journal
+- `src/server/game/boards.rs`: noticeboards, their hooks and the Island Journal
+- `src/server/gardens.rs` and `src/server/game/growing.rs`: plantings that grow over real days
+- `src/server/game/meetings.rs`: meeting spots and call links
+- `src/server/game/lighthouse.rs`: the lighthouse everyone mends together
 - `src/agent.rs`: AI residents
 - `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside
 - `.claude/skills/world-resident/`: the Claude Code skill

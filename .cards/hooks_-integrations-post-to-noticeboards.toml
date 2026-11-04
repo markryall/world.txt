@@ -1,0 +1,7 @@
+name = "Hooks: integrations post to noticeboards"
+status = "done"
+description = "Outside tools (CI, deploys, a calendar, GitHub via a relay) can post notes to a noticeboard, so the island is somewhere worth keeping open in a tab. At a noticeboard, its maker or a keeper types 'hook CI' and is shown, privately and once, a secret address: <world address>/hook/<secret>. Anything POSTed there lands on the board as a note from '🔔 CI': a plain-text body, or JSON with 'text' (Slack style) or 'content' (Discord style). Notes are trimmed to 280 characters. It behaves exactly like a post: people standing at the board see it, followers hear about it wherever they are, mutes apply. 'hooks' at a board lists its hooks (name, who made it, when it last posted); 'unhook CI' stops one. Only the secret's hash is kept, so a lost one is replaced with 'unhook' then 'hook' again. Not on the Island Journal. Answers 200 when posted, 404 for an unknown or stopped hook, 429 if one hook posts more than once every two seconds, 400 for nothing to post, 413 past 16KB. No gamification, no new UI: it's just notes."
+created_at = "2026-11-04T22:04:27.928756Z"
+updated_at = "2026-11-04T22:18:54.509781Z"
+tags = ["practical"]
+priority = "medium"

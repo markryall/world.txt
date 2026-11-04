@@ -1,0 +1,7 @@
+name = "Gardens that grow"
+status = "done"
+description = "Planting stops being instant. A tree you plant starts as a sapling and grows over real days: a sapling, a young tree after a day, a tall tree after three, and an old tree, grooved and mossy, after ten. Flowers come up as shoots, are in bud after a couple of hours and bloom after twelve. Nothing ever wilts or dies, and nothing needs watering: patience is the whole thing. You can choose what to plant: 'plant birch', 'plant apple tree', 'plant willow', 'plant oak', 'plant cherry tree', 'plant pine', 'plant rowan'; 'plant tree' picks one (a willow, near water). Flowers likewise: bluebells, poppies, sunflowers, lavender, foxgloves, or 'plant flowers' for a mix. Looking at a planted spot says what it is, how grown, who planted it and when, with a touch of the season (apple blossom in spring, apples in autumn). Young plantings show lighter on the maps. When something you planted grows a stage, you're told: straight away if you're on the island, or as 'While you were away…' when you next arrive. Digging or reshaping the spot clears the planting. The land the island started with counts as long-established. No counts, no timers on screen: it's all in the words."
+created_at = "2026-11-04T22:04:27.938471Z"
+updated_at = "2026-11-04T22:18:54.520996Z"
+tags = ["belonging"]
+priority = "medium"

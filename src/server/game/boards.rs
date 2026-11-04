@@ -280,6 +280,130 @@ impl Game {
         Ok(())
     }
 
+    // ---- hooks: outside tools posting here ---------------------------------
+
+    /// The board here that `id` may put hooks on: its maker, or a keeper.
+    /// Not the Island Journal, which is the island's own.
+    fn hookable_board(&self, id: u64) -> Option<i64> {
+        let (x, y, _) = self.here(id)?;
+        let user = self.user(id);
+        let Some((board, journal)) = self.board_here(x, y) else {
+            self.say1(id, Line::plain("Hooks belong to noticeboards. Stand at one (or make a noticeboard)."));
+            return None;
+        };
+        if journal {
+            self.say1(id, Line::plain("The Island Journal is the island's own: put hooks on a noticeboard instead."));
+            return None;
+        }
+        let maker = self.world.things.iter().find(|t| t.id == board).is_some_and(|t| t.maker == user);
+        if !maker && !self.is_keeper(&user) {
+            self.say1(id, Line::plain("Only whoever put this board up (or an island keeper) can change its hooks."));
+            return None;
+        }
+        Some(board)
+    }
+
+    /// `hook CI`: a secret address outside tools can post notes to.
+    pub(super) fn cmd_hook(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some(board) = self.hookable_board(id) else { return Ok(()) };
+        let name = clean_hook_name(name);
+        if name.is_empty() {
+            self.say1(id, Line::plain("Name it after whatever will post, e.g. 'hook CI' or 'hook Deploys'."));
+            return Ok(());
+        }
+        if self.world.db.hooks(board)?.iter().any(|h| h.0.eq_ignore_ascii_case(&name)) {
+            self.say1(id, Line::plain(format!("This board already has a hook called {name}. For a fresh address: unhook {name}, then hook {name}.")));
+            return Ok(());
+        }
+        let secret = crate::server::accounts::new_secret()?;
+        self.world.db.add_hook(board, &name, &crate::server::names::hash(&secret), &self.user(id), now())?;
+        let address = hook_url(self.url.as_deref(), &secret);
+        self.send(
+            id,
+            vec![
+                Line::new().b(Col::Yellow, format!("🔔 {name} can post here now. Its secret address:")),
+                Line::new().t("   ").b(Col::Yellow, address.clone()),
+                Line::col(Col::Dim, r#"   POST plain text, or JSON with "text" (Slack style) or "content" (Discord style). For example:"#),
+                Line::col(Col::Dim, format!("   curl -d 'the build passed 🎉' {address}")),
+                Line::col(Col::Dim, "   It's only shown this once, and anyone with it can post here: keep it like a password. (unhook to stop it)"),
+            ],
+        );
+        Ok(())
+    }
+
+    pub(super) fn cmd_unhook(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+        let Some(board) = self.hookable_board(id) else { return Ok(()) };
+        let name = clean_hook_name(name);
+        if name.is_empty() {
+            self.say1(id, Line::plain("Stop which one? 'hooks' lists them."));
+        } else if self.world.db.remove_hook(board, &name)? {
+            self.say1(id, Line::col(Col::Yellow, format!("🔕 {name} can't post here any more.")));
+        } else {
+            self.say1(id, Line::plain(format!("This board has no hook called {name}. ('hooks' lists them)")));
+        }
+        Ok(())
+    }
+
+    pub(super) fn cmd_hooks(&mut self, id: u64) -> anyhow::Result<()> {
+        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
+        let Some((board, _)) = self.board_here(x, y) else {
+            self.say1(id, Line::plain("Stand at a noticeboard to see its hooks."));
+            return Ok(());
+        };
+        let hooks = self.world.db.hooks(board)?;
+        let mut lines = vec![Line::new().b(Col::Magenta, "🔔 Hooks on this board")];
+        if hooks.is_empty() {
+            lines.push(Line::col(Col::Dim, "  None yet. Its maker or a keeper can add one: hook CI"));
+        }
+        for (name, by, _, last) in hooks {
+            let last = last.map_or("hasn't posted yet".to_string(), |t| format!("last posted {}", when(t)));
+            lines.push(Line::new().t("  ").b(Col::Yellow, name).c(Col::Dim, format!("  made by {} · {last}", self.world.nick(&by))));
+        }
+        self.send(id, lines);
+        Ok(())
+    }
+
+    /// An outside tool posting through its hook's secret address.
+    pub(super) fn hook_post(&mut self, secret: &str, text: &str) -> crate::server::HookReply {
+        use crate::server::HookReply;
+        let Some((hook, board, name)) = self.world.db.hook_by_secret(&crate::server::names::hash(secret)) else {
+            return HookReply::Unknown;
+        };
+        // A board that's been unmade keeps its hooks, quietly, in case of undo.
+        let Some((x, y)) = self.board_place(board) else { return HookReply::Unknown };
+        let soon = self.hook_last.get(&hook).is_some_and(|t| t.elapsed() < HOOK_GAP);
+        if soon {
+            return HookReply::TooFast;
+        }
+        self.hook_last.insert(hook, std::time::Instant::now());
+        let text: String = if text.chars().count() > MAX_NOTE {
+            text.chars().take(MAX_NOTE - 1).chain(['…']).collect()
+        } else {
+            text.to_string()
+        };
+        let author = format!("🔔 {name}");
+        let at = now();
+        let Ok(note_id) = self.world.db.add_note(board, &author, &text, at, &week_key(at), None) else {
+            return HookReply::Unknown;
+        };
+        let _ = self.world.db.touch_hook(hook, at);
+        let place = self.world.place_title(x, y);
+        let update = self.board_update(board, Note { id: note_id, author: author.clone(), text: text.clone(), when: when(at) });
+        let followers = self.world.db.followers(board).unwrap_or_default();
+        for p in self.players.values() {
+            let line = if (p.x, p.y) == (x, y) {
+                Line::new().b(Col::Yellow, &author).c(Col::Yellow, " posts on the noticeboard: ").c(Col::White, text.clone())
+            } else if followers.contains(&p.user) {
+                Line::new().b(Col::Yellow, &author).c(Col::Yellow, format!(" posted at {place}: ")).c(Col::White, text.clone())
+            } else {
+                continue;
+            };
+            let _ = p.tx.send(ToClient::Lines { lines: vec![line] });
+            let _ = p.tx.send(update.clone());
+        }
+        HookReply::Posted
+    }
+
     pub(super) fn cmd_follow(&mut self, id: u64, follow: bool) -> anyhow::Result<()> {
         let Some((x, y, _name)) = self.here(id) else { return Ok(()) };
         let user = self.user(id);
@@ -367,6 +491,22 @@ fn discovery_text(s: &Species) -> String {
     format!("found {} {}", crate::server::nature::a(s.name), s.kind.icon())
 }
 
+/// The least time between one hook's posts.
+const HOOK_GAP: std::time::Duration = std::time::Duration::from_secs(2);
+
+fn clean_hook_name(raw: &str) -> String {
+    let n: String = raw.chars().filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.')).collect();
+    n.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(24).collect()
+}
+
+/// Where a hook posts to. Without a known address, a placeholder.
+fn hook_url(url: Option<&str>, secret: &str) -> String {
+    match url {
+        Some(u) => format!("{}/hook/{secret}", u.trim_end_matches('/')),
+        None => format!("<world address>/hook/{secret}"),
+    }
+}
+
 pub fn board_kind() -> &'static str {
     BOARD_KIND
 }
@@ -381,6 +521,13 @@ mod tests {
         let d = NaiveDate::parse_from_str(&k, "%Y-%m-%d").unwrap();
         assert_eq!(d.weekday(), chrono::Weekday::Mon);
         assert!(week_start(&k).unwrap() <= now());
+    }
+
+    #[test]
+    fn hook_names_are_tidy() {
+        assert_eq!(clean_hook_name("  CI   builds <b> "), "CI builds b");
+        assert_eq!(clean_hook_name("a-very-long-name-for-a-hook-indeed"), "a-very-long-name-for-a-h");
+        assert_eq!(hook_url(Some("https://w.example/"), "abc"), "https://w.example/hook/abc");
     }
 
     #[test]

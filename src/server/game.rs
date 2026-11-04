@@ -9,8 +9,11 @@ mod craft;
 mod events;
 mod gather;
 mod gramophone;
+mod growing;
 mod homes;
 mod jukebox;
+mod lighthouse;
+mod meetings;
 mod music;
 mod radio;
 pub(crate) use radio::clean_station_name;
@@ -117,13 +120,18 @@ struct Game {
     radio_guides: HashMap<i64, String>,
     /// What each radio's on, as far as the world last looked.
     radio_news: HashMap<i64, radio::News>,
+    /// Meeting spots' call links, by thing id.
+    meeting_links: HashMap<i64, String>,
+    /// When each hook last posted, so one can't flood its board.
+    hook_last: HashMap<i64, std::time::Instant>,
     /// For work done elsewhere (looking up what's on) to report back.
     inbox: tokio::sync::mpsc::UnboundedSender<Event>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), meeting_links: HashMap::new() };
+    game.load_meetings();
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
@@ -158,6 +166,9 @@ impl Game {
             Event::Audio { id, frames, title } => self.audio(id, frames, title),
             Event::RadioNews { thing, title } => self.radio_news(thing, title),
             Event::Shutdown => self.shutdown(),
+            Event::Hook { secret, text, reply } => {
+                let _ = reply.send(self.hook_post(&secret, &text));
+            }
             Event::Queue { id, thing, songs } => self.queue_songs(id, thing, songs),
             Event::TrackDone { id, thing, key } => self.track_done(id, thing, &key),
             Event::Cmd { id, text } => {
@@ -287,6 +298,9 @@ impl Game {
         let mut lines = self.world.describe(p.x, p.y, &self.others_here(id));
         let exits = lines.pop();
         lines.extend(self.board_lines_here(id));
+        lines.extend(self.garden_lines_here(id));
+        lines.extend(self.lighthouse_lines_here(id));
+        lines.extend(self.meeting_lines_here(id));
         lines.extend(self.animal_lines(id));
         lines.extend(self.find_lines(p.x, p.y));
         lines.extend(exits);
@@ -395,6 +409,9 @@ impl Game {
             self.say1(id, Line::new().b(Col::Yellow, format!("{} {}", f.icon, f.greeting)));
         }
         self.deliver_mail(id);
+        if !bot {
+            self.garden_news(id);
+        }
         if first_time {
             // They're here now: a dropped connection before their first step
             // shouldn't make them new all over again.
@@ -498,6 +515,8 @@ impl Game {
             },
             "say" => return self.cmd_say(id, rest),
             "emote" | "me" => return self.cmd_emote(id, rest),
+            "call" if rest.starts_with("https://") || rest == "off" || (rest.is_empty() && self.meeting_here(id)) => return self.cmd_meet(id, rest),
+            "meet" | "meeting" => return self.cmd_meet(id, rest),
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
@@ -555,6 +574,9 @@ impl Game {
             "unfollow" => return self.cmd_follow(id, false),
             "boards" => return self.cmd_boards(id),
             "archive" => return self.cmd_archive(id),
+            "hook" => return self.cmd_hook(id, rest),
+            "unhook" => return self.cmd_unhook(id, rest),
+            "hooks" => return self.cmd_hooks(id),
             "gather" | "pick" | "catch" | "collect" | "forage" | "g" => return self.cmd_gather(id, rest),
             "fish" => return self.cmd_fish(id),
             "satchel" | "bag" | "inventory" | "inv" | "i" => return self.cmd_satchel(id),
@@ -602,6 +624,7 @@ impl Game {
             "name" | "call-this" => return self.cmd_name(id, rest),
             "make" | "build" | "create" => return self.cmd_make(id, rest),
             "craft" => return self.cmd_craft(id, rest),
+            "mend" | "repair" | "fix" => return self.cmd_mend(id),
             "recipes" => return self.cmd_recipes(id),
             "unmake" | "destroy" | "remove" => return self.cmd_unmake(id, rest),
             "undo" => return self.cmd_undo(id),
@@ -1064,27 +1087,6 @@ impl Game {
         }
     }
 
-    fn cmd_plant(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
-        let here = self.world.terrain(x, y);
-        use Terrain::*;
-        if matches!(here, Water | Pond | DeepWater | Stone) {
-            self.say1(id, Line::plain("Nothing would grow here."));
-            return Ok(());
-        }
-        let w = strip_article(&what.to_lowercase()).to_string();
-        if w.contains("tree") || w.contains("forest") || w.contains("wood") || w.contains("seed") {
-            self.reshape(id, Forest, "You plant a sapling. It grows, impossibly fast, into a tall tree. 🌳", "plants a tree, which shoots up overnight-fast.")
-        } else if w.contains("flower") || w.contains("bulb") || w.contains("meadow") {
-            self.reshape(id, Meadow, "You scatter seeds and flowers bloom around your feet. 🌼", "scatters seeds; wildflowers bloom everywhere.")
-        } else if w.contains("grass") || w.is_empty() {
-            self.reshape(id, Grass, "You sow grass seed. A soft green carpet spreads out. 🌱", "sows grass, and green spreads around.")
-        } else {
-            self.say1(id, Line::plain("You can plant a tree, flowers or grass."));
-            Ok(())
-        }
-    }
-
     fn cmd_raise(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((x, y, _)) = self.here(id) else { return Ok(()) };
         match self.world.terrain(x, y) {
@@ -1205,6 +1207,18 @@ impl Game {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(music::music_kind()))?;
             self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach C E G E C"));
             self.tell_here(x, y, id, Line::col(Col::Pink, format!("🎶 {who} makes {name}.")));
+            self.status_all();
+            return Ok(());
+        }
+        if meetings::is_meeting_spot(&name) {
+            if self.world.things_at(x, y).any(|t| t.kind.as_deref() == Some(meetings::kind())) {
+                self.say1(id, Line::plain("There's already a meeting spot here. Set its call: meet https://…"));
+                return Ok(());
+            }
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(meetings::kind()))?;
+            self.say1(id, Line::new().c(Col::Cyan, "📞 You make ").b(Col::Cyan, &name).c(Col::Cyan, ". Give it a call link (Meet, Zoom…): meet https://…"));
+            self.say1(id, Line::col(Col::Dim, "Then anyone here can type meet to go in. Events planned here use its link too."));
+            self.tell_here(x, y, id, Line::col(Col::Cyan, format!("📞 {who} makes {name}.")));
             self.status_all();
             return Ok(());
         }
@@ -1724,6 +1738,8 @@ impl Game {
 
     fn tick(&mut self) {
         self.world.weather.step();
+        self.growing_tick();
+        self.lighthouse_tick();
 
         let season = Clock::season();
         if season != self.season {
@@ -2030,6 +2046,7 @@ const HELP: &[HelpTopic] = &[
             ("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
             ("sail to other.world", "visit another world (their keepers let you in)"),
             ("events / go event", "what's coming up on the island, and walk there"),
+            ("meet", "go into the video call here (at a meeting table, or an event with a link)"),
         ],
         footer: Some("There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
     },
@@ -2075,7 +2092,8 @@ const HELP: &[HelpTopic] = &[
         keepers: false,
         items: &[
             ("dig / fill", "ponds, earth, sandbanks (and chip rock down to hills)"),
-            ("plant tree|flowers|grass", "make things grow"),
+            ("plant tree|flowers|grass", "make things grow (slowly: trees over days, flowers over hours)"),
+            ("plant apple tree / plant bluebells", "choose: oak birch willow apple cherry pine rowan, bluebells poppies sunflowers lavender foxgloves"),
             ("raise / path", "hills, rocks, paths"),
             ("name The Willow Bank", "name this place"),
         ],
@@ -2093,6 +2111,7 @@ const HELP: &[HelpTopic] = &[
             ("give daisy to Poppy", "share with someone here"),
             ("place daisy / release moth", "decorate, or set something free"),
             ("recipes", "what you can make from what you've gathered"),
+            ("mend lighthouse", "help everyone rebuild the old lighthouse on Driftwood Isle"),
             ("craft wind chime", "make it (then place it, or give it away)"),
         ],
         footer: None,
@@ -2127,6 +2146,7 @@ const HELP: &[HelpTopic] = &[
         keepers: false,
         items: &[
             ("make a frog that croaks when it rains", "also: at night, during the day, when it's sunny, when someone arrives"),
+            ("make a meeting table / meet https://…", "a spot that holds a video call link; meet goes in (meet off clears it)"),
             ("push bench north", "move something"),
             ("unmake bench / undo", "take away something you made, or bring it back"),
         ],
@@ -2156,6 +2176,7 @@ const HELP: &[HelpTopic] = &[
             ("post see you at sunset!", "leave a note (and follow the board)"),
             ("boards / follow / unfollow", "boards you hear about from anywhere"),
             ("archive / read week 2026-11-02", "past pages of the Island Journal"),
+            ("hook CI / hooks / unhook CI", "a secret address outside tools (builds, deploys…) can post notes to (the board's maker or a keeper)"),
         ],
         footer: None,
     },
@@ -2177,6 +2198,7 @@ const HELP: &[HelpTopic] = &[
             ("visitors / admit / turn away", "people sailing in from other worlds"),
             ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
             ("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
+            ("event fri 10am Standup https://meet…", "an event with a video call (at a meeting table, it uses the table's)"),
             ("station add Night Owl FM https://… [guide https://…]", "add a radio station anyone can tune to (station remove)"),
         ],
         footer: None,

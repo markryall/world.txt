@@ -76,6 +76,13 @@ fn time_word(w: &str) -> Option<NaiveTime> {
     NaiveTime::from_hms_opt(h, m, 0)
 }
 
+fn with_call(line: Line, link: &Option<String>) -> Line {
+    match link {
+        Some(l) => line.c(Col::Cyan, " 📞 ").c(Col::Cyan, l.clone()),
+        None => line,
+    }
+}
+
 /// "Sat 7 Nov, 4:00pm"
 pub fn when_label(at: i64) -> String {
     let t = Local.timestamp_opt(at, 0).single().unwrap_or_else(Local::now);
@@ -90,21 +97,24 @@ impl Game {
             self.say1(id, Line::plain("Only island keepers can plan events. Ask one! ('events' shows what's coming up)"));
             return Ok(());
         }
-        let Some((at, name)) = parse_when(text, Local::now()) else {
+        let (text, link) = super::meetings::split_link(text);
+        let link = link.or_else(|| self.meeting_link_at(x, y));
+        let Some((at, name)) = parse_when(&text, Local::now()) else {
             self.say1(id, Line::plain("When, and what? e.g. 'event sat 4pm Beach party' or 'event tomorrow 10:30am Treasure hunt'. It happens right here."));
             return Ok(());
         };
         let name: String = name.chars().take(80).collect();
         let place = self.world.place_title(x, y);
-        self.world.db.add_event(at, &name, x, y, &host)?;
+        self.world.db.add_event(at, &name, x, y, &host, link.as_deref())?;
         let when = when_label(at);
-        self.say1(id, Line::new().c(Col::Yellow, "📅 Planned: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}. Everyone will get a reminder.")));
+        let call = link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"));
+        self.say1(id, Line::new().c(Col::Yellow, "📅 Planned: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}. Everyone will get a reminder.")));
         // On the Island Journal too, so people who aren't here now see it.
         if let Some(board) = self.journal_board {
             let now = super::boards::now();
-            self.world.db.add_note(board, &host, &format!("📅 {name} · {when} at {place}"), now, &super::boards::week_key(now), None)?;
+            self.world.db.add_note(board, &host, &format!("📅 {name} · {when} at {place}{call}"), now, &super::boards::week_key(now), None)?;
         }
-        let line = Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}"));
+        let line = Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}"));
         for (&pid, p) in &self.players {
             if pid != id {
                 let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
@@ -130,6 +140,9 @@ impl Game {
                     .t(format!(" · {when} at {place}"))
                     .c(Col::Dim, format!(" (hosted by {})", self.world.nick(&e.host))),
             );
+            if let Some(l) = &e.link {
+                lines.push(Line::new().c(Col::Cyan, "     📞 ").c(Col::Cyan, l.clone()));
+            }
         }
         if !events.is_empty() {
             lines.push(Line::col(Col::Dim, "  go event (or go event 2) walks you there"));
@@ -178,6 +191,13 @@ impl Game {
         Ok(())
     }
 
+    /// The call link of an event happening at (x, y) right now, for `meet`.
+    pub(super) fn event_link_now(&self, x: i64, y: i64) -> Option<String> {
+        let now = super::boards::now();
+        let events = self.world.db.upcoming_events(now - KEEP_AFTER).ok()?;
+        events.into_iter().filter(|e| (e.x, e.y) == (x, y) && e.at - now <= REMIND_BEFORE).find_map(|e| e.link)
+    }
+
     /// Reminders shortly before, and a shout when things start.
     pub(super) fn events_tick(&mut self) {
         let now = super::boards::now();
@@ -186,12 +206,12 @@ impl Game {
             let place = self.world.place_title(e.x, e.y);
             let line = if !e.started && e.at <= now {
                 let _ = self.world.db.mark_event(e.id, true, true);
-                Line::new().b(Col::Yellow, format!("🎉 {} is starting now at {place}!", e.name)).c(Col::Dim, " (go event to head there)")
+                with_call(Line::new().b(Col::Yellow, format!("🎉 {} is starting now at {place}!", e.name)), &e.link).c(Col::Dim, " (go event to head there)")
             } else if !e.reminded && e.at - now <= REMIND_BEFORE && e.at > now {
                 let _ = self.world.db.mark_event(e.id, true, false);
                 let mins = ((e.at - now) / 60).max(1);
                 let mins = if mins == 1 { "1 minute".to_string() } else { format!("{mins} minutes") };
-                Line::new().c(Col::Yellow, format!("📅 In {mins}: ")).b(Col::Yellow, e.name.clone()).c(Col::Yellow, format!(" at {place}")).c(Col::Dim, " (go event)")
+                with_call(Line::new().c(Col::Yellow, format!("📅 In {mins}: ")).b(Col::Yellow, e.name.clone()).c(Col::Yellow, format!(" at {place}")), &e.link).c(Col::Dim, " (go event)")
             } else {
                 continue;
             };

@@ -43,6 +43,7 @@
   #join input { width: 100%; font: inherit; font-size: 18px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); text-align: center; outline: none; }
   #join button { margin-top: 12px; width: 100%; font: inherit; font-size: 17px; padding: 12px; border: 0; border-radius: 12px; background: var(--magenta); color: var(--bg); cursor: pointer; }
   #here a { color: var(--cyan); }
+  #log a, #notes a { color: inherit; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
   #hint { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel);
     border-top: 1px solid var(--line); color: var(--yellow); font-weight: bold; cursor: pointer; }
   #hint.on { display: flex; animation: glow 2s ease-in-out infinite; }
@@ -215,12 +216,25 @@ function paintLine(line) {
   const frag = document.createDocumentFragment();
   for (const s of line) {
     const span = document.createElement('span');
-    span.textContent = s.t.replace('<world address>', location.origin + location.pathname.replace(/\/$/, ''));
+    linkify(span, s.t.replace('<world address>', location.origin + location.pathname.replace(/\/$/, '')));
     span.style.color = `var(--${s.c})`;
     if (s.b) span.style.fontWeight = 'bold';
     frag.appendChild(span);
   }
   return frag;
+}
+
+// Text, with any https links in it made clickable (a call, a build), opening
+// in a new tab so the island stays put.
+function linkify(el, text) {
+  const parts = text.split(/(https:\/\/[^\s<>"']+)/);
+  parts.forEach((part, i) => {
+    if (i % 2 === 0) { if (part) el.append(part); return; }
+    const url = part.replace(/[.,!?;:)\]]+$/, '');
+    const a = document.createElement('a');
+    a.href = url; a.textContent = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    el.append(a, part.slice(url.length));
+  });
 }
 
 // Ask for the plain-text look of symbols phones like to draw as wide emoji
@@ -369,7 +383,8 @@ function noteEl(n) {
   d.className = 'n';
   const who = document.createElement('span'); who.className = 'who'; who.textContent = n.author;
   const when = document.createElement('span'); when.className = 'when'; when.textContent = n.when;
-  d.append(who, when, document.createElement('br'), document.createTextNode(n.text));
+  const text = document.createElement('span'); linkify(text, n.text);
+  d.append(who, when, document.createElement('br'), text);
   return d;
 }
 function olderMarker() {

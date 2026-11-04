@@ -34,6 +34,21 @@ pub struct EventRow {
     pub host: String,
     pub reminded: bool,
     pub started: bool,
+    /// A video call to join, if it has one.
+    pub link: Option<String>,
+}
+
+/// Something someone planted, growing over real days.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlantingRow {
+    pub x: i64,
+    pub y: i64,
+    /// What it is: "birch", "bluebells"...
+    pub kind: String,
+    pub by: String,
+    pub at: i64,
+    /// The last stage its planter was told about.
+    pub told: i64,
 }
 
 pub struct NoteRow {
@@ -111,7 +126,19 @@ impl Db {
                  by TEXT NOT NULL, at INTEGER NOT NULL);
              CREATE TABLE IF NOT EXISTS journal (
                  player TEXT NOT NULL, species TEXT NOT NULL, found_at INTEGER NOT NULL,
-                 PRIMARY KEY (player, species));",
+                 PRIMARY KEY (player, species));
+             CREATE TABLE IF NOT EXISTS hooks (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, board INTEGER NOT NULL, name TEXT NOT NULL,
+                 secret_hash TEXT NOT NULL UNIQUE, by TEXT NOT NULL, at INTEGER NOT NULL, last_at INTEGER);
+             CREATE TABLE IF NOT EXISTS meeting_links (
+                 thing INTEGER PRIMARY KEY, url TEXT NOT NULL, by TEXT NOT NULL, at INTEGER NOT NULL);
+             CREATE TABLE IF NOT EXISTS plantings (
+                 x INTEGER NOT NULL, y INTEGER NOT NULL, kind TEXT NOT NULL, by TEXT NOT NULL,
+                 at INTEGER NOT NULL, told INTEGER NOT NULL DEFAULT 0,
+                 PRIMARY KEY (x, y));
+             CREATE TABLE IF NOT EXISTS project_gifts (
+                 project TEXT NOT NULL, stage INTEGER NOT NULL, player TEXT NOT NULL,
+                 n INTEGER NOT NULL, at INTEGER NOT NULL);",
         )?;
         // Added later: first-steps progress. Players from before it existed
         // have clearly found their feet, so they start as done (99).
@@ -129,6 +156,8 @@ impl Db {
         let _ = conn.execute("ALTER TABLE things ADD COLUMN removed_at INTEGER", []);
         // When an invite was opened, for keepers keeping track.
         let _ = conn.execute("ALTER TABLE invites ADD COLUMN used_at INTEGER", []);
+        // A video call to go with an event.
+        let _ = conn.execute("ALTER TABLE events ADD COLUMN link TEXT", []);
         Ok(Db { conn })
     }
 
@@ -181,6 +210,10 @@ impl Db {
             ("invites", "user"),
             ("trusted_worlds", "by"),
             ("bans", "name"),
+            ("hooks", "by"),
+            ("meeting_links", "by"),
+            ("plantings", "by"),
+            ("project_gifts", "player"),
         ] {
             tx.execute(&format!("UPDATE {table} SET {col} = ?2 WHERE {col} = ?1"), [old, new])?;
         }
@@ -734,10 +767,10 @@ impl Db {
 
     // ---- events ----------------------------------------------------------------
 
-    pub fn add_event(&self, at: i64, name: &str, x: i64, y: i64, host: &str) -> anyhow::Result<()> {
+    pub fn add_event(&self, at: i64, name: &str, x: i64, y: i64, host: &str, link: Option<&str>) -> anyhow::Result<()> {
         self.conn.execute(
-            "INSERT INTO events (at, name, x, y, host) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![at, name, x, y, host],
+            "INSERT INTO events (at, name, x, y, host, link) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![at, name, x, y, host, link],
         )?;
         Ok(())
     }
@@ -745,7 +778,7 @@ impl Db {
     /// Events from `since` on, soonest first.
     pub fn upcoming_events(&self, since: i64) -> anyhow::Result<Vec<EventRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, at, name, x, y, host, reminded, started FROM events WHERE at >= ?1 ORDER BY at",
+            "SELECT id, at, name, x, y, host, reminded, started, link FROM events WHERE at >= ?1 ORDER BY at",
         )?;
         let rows = stmt.query_map([since], |r| {
             Ok(EventRow {
@@ -757,6 +790,7 @@ impl Db {
                 host: r.get(5)?,
                 reminded: r.get::<_, i64>(6)? != 0,
                 started: r.get::<_, i64>(7)? != 0,
+                link: r.get(8)?,
             })
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -901,6 +935,102 @@ impl Db {
             params![name, x, y, tutorial],
         )?;
         Ok(())
+    }
+
+    // ---- hooks: outside tools posting to boards ------------------------------
+
+    pub fn add_hook(&self, board: i64, name: &str, secret_hash: &str, by: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO hooks (board, name, secret_hash, by, at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![board, name, secret_hash, by, at],
+        )?;
+        Ok(())
+    }
+
+    /// A board's hooks: (name, made by, made at, last posted).
+    pub fn hooks(&self, board: i64) -> anyhow::Result<Vec<(String, String, i64, Option<i64>)>> {
+        let mut stmt = self.conn.prepare("SELECT name, by, at, last_at FROM hooks WHERE board = ?1 ORDER BY id")?;
+        let rows = stmt.query_map([board], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn remove_hook(&self, board: i64, name: &str) -> anyhow::Result<bool> {
+        Ok(self.conn.execute("DELETE FROM hooks WHERE board = ?1 AND name = ?2 COLLATE NOCASE", params![board, name])? > 0)
+    }
+
+    /// The hook a secret belongs to: (id, board, name).
+    pub fn hook_by_secret(&self, secret_hash: &str) -> Option<(i64, i64, String)> {
+        self.conn
+            .query_row("SELECT id, board, name FROM hooks WHERE secret_hash = ?1", [secret_hash], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .ok()
+    }
+
+    pub fn touch_hook(&self, id: i64, at: i64) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE hooks SET last_at = ?2 WHERE id = ?1", params![id, at])?;
+        Ok(())
+    }
+
+    // ---- meeting spots -------------------------------------------------------
+
+    pub fn meeting_links(&self) -> anyhow::Result<Vec<(i64, String)>> {
+        let mut stmt = self.conn.prepare("SELECT thing, url FROM meeting_links")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn set_meeting_link(&self, thing: i64, url: Option<&str>, by: &str, at: i64) -> anyhow::Result<()> {
+        match url {
+            Some(u) => self.conn.execute(
+                "INSERT INTO meeting_links (thing, url, by, at) VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(thing) DO UPDATE SET url = excluded.url, by = excluded.by, at = excluded.at",
+                params![thing, u, by, at],
+            )?,
+            None => self.conn.execute("DELETE FROM meeting_links WHERE thing = ?1", [thing])?,
+        };
+        Ok(())
+    }
+
+    // ---- gardens -------------------------------------------------------------
+
+    pub fn plantings(&self) -> anyhow::Result<Vec<PlantingRow>> {
+        let mut stmt = self.conn.prepare("SELECT x, y, kind, by, at, told FROM plantings")?;
+        let rows = stmt.query_map([], |r| {
+            Ok(PlantingRow { x: r.get(0)?, y: r.get(1)?, kind: r.get(2)?, by: r.get(3)?, at: r.get(4)?, told: r.get(5)? })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn set_planting(&self, p: &PlantingRow) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO plantings (x, y, kind, by, at, told) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(x, y) DO UPDATE SET kind = excluded.kind, by = excluded.by, at = excluded.at, told = excluded.told",
+            params![p.x, p.y, p.kind, p.by, p.at, p.told],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_planting(&self, x: i64, y: i64) -> anyhow::Result<()> {
+        self.conn.execute("DELETE FROM plantings WHERE x = ?1 AND y = ?2", params![x, y])?;
+        Ok(())
+    }
+
+    // ---- shared projects (the lighthouse) ------------------------------------
+
+    pub fn add_project_gift(&self, project: &str, stage: i64, player: &str, n: i64, at: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO project_gifts (project, stage, player, n, at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![project, stage, player, n, at],
+        )?;
+        Ok(())
+    }
+
+    /// Everything given towards one stage: (player, how many), first giver first.
+    pub fn project_gifts(&self, project: &str, stage: i64) -> anyhow::Result<Vec<(String, i64)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT player, SUM(n) FROM project_gifts WHERE project = ?1 AND stage = ?2 GROUP BY player ORDER BY MIN(rowid)",
+        )?;
+        let rows = stmt.query_map(params![project, stage], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 }
 

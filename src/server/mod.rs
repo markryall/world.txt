@@ -6,6 +6,7 @@ pub mod backup;
 mod db;
 mod game;
 pub mod federation;
+mod gardens;
 pub mod islands;
 pub mod names;
 mod nature;
@@ -104,8 +105,20 @@ pub enum Event {
     /// What a radio's on, looked up elsewhere: None if nothing's known.
     RadioNews { thing: i64, title: Option<String> },
     Leave { id: u64 },
+    /// Something an outside tool posted to a board's hook.
+    Hook { secret: String, text: String, reply: tokio::sync::oneshot::Sender<HookReply> },
     /// The server's been asked to stop (a redeploy): say so, then go.
     Shutdown,
+}
+
+/// How a hook's post went.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HookReply {
+    Posted,
+    /// No such hook (or it's been stopped, or its board is gone).
+    Unknown,
+    /// The same hook posted again too soon.
+    TooFast,
 }
 
 pub async fn run(
@@ -183,7 +196,7 @@ async fn connection(
     info: Arc<Option<federation::WorldInfo>>,
 ) -> anyhow::Result<()> {
     if !is_websocket(&stream).await? {
-        return serve_page(stream, &info).await;
+        return serve_page(stream, &info, &events).await;
     }
     let ws = tokio_tungstenite::accept_async(stream).await?;
     let (mut sink, mut source) = ws.split();
@@ -295,16 +308,113 @@ fn page(info: &Option<federation::WorldInfo>) -> String {
     }
 }
 
-async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>) -> anyhow::Result<()> {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    let mut buf = [0u8; 4096];
-    let n = stream.read(&mut buf).await?;
-    let req = String::from_utf8_lossy(&buf[..n]);
-    let path = req.split_whitespace().nth(1).unwrap_or("/");
-    let (status, ctype, body) = match (path, info) {
-        ("/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", page(info)),
-        (federation::WELL_KNOWN, Some(info)) => ("200 OK", "application/json", serde_json::to_string(info)?),
-        _ => ("404 Not Found", "text/plain; charset=utf-8", "nothing here, babe\n".to_string()),
+/// The most a request may send: its headers, and a hook's post.
+const MAX_HEAD: usize = 8 * 1024;
+const MAX_BODY: usize = 16 * 1024;
+
+/// A plain HTTP request, as much of it as the world cares about.
+#[derive(Debug, PartialEq)]
+struct Request {
+    method: String,
+    path: String,
+    body: Vec<u8>,
+}
+
+enum ReadError {
+    TooBig,
+    Bad,
+}
+
+/// Read one request: headers, then a body of up to [`MAX_BODY`] bytes.
+async fn read_request(stream: &mut TcpStream) -> Result<Request, ReadError> {
+    use tokio::io::AsyncReadExt;
+    let mut buf = Vec::with_capacity(4096);
+    let mut chunk = [0u8; 4096];
+    let head_end = loop {
+        if let Some(i) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            break i + 4;
+        }
+        if buf.len() > MAX_HEAD {
+            return Err(ReadError::TooBig);
+        }
+        let n = stream.read(&mut chunk).await.map_err(|_| ReadError::Bad)?;
+        if n == 0 {
+            if buf.is_empty() {
+                return Err(ReadError::Bad);
+            }
+            break buf.len(); // no blank line: take what came
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    };
+    let head = String::from_utf8_lossy(&buf[..head_end]).to_string();
+    let mut first = head.lines().next().unwrap_or("").split_whitespace();
+    let method = first.next().unwrap_or("GET").to_ascii_uppercase();
+    let path = first.next().unwrap_or("/").to_string();
+    let length = head
+        .lines()
+        .filter_map(|l| l.split_once(':'))
+        .find(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
+        .and_then(|(_, v)| v.trim().parse::<usize>().ok())
+        .unwrap_or(0);
+    if length > MAX_BODY {
+        return Err(ReadError::TooBig);
+    }
+    let mut body = buf[head_end..].to_vec();
+    while body.len() < length {
+        let n = stream.read(&mut chunk).await.map_err(|_| ReadError::Bad)?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&chunk[..n]);
+    }
+    body.truncate(length);
+    Ok(Request { method, path, body })
+}
+
+/// What a hook's post says: JSON with "text" (Slack style), "content"
+/// (Discord style) or "message", or else the body as plain text.
+fn hook_text(body: &[u8]) -> Option<String> {
+    let raw = String::from_utf8_lossy(body);
+    let raw = raw.trim();
+    let text = if raw.starts_with('{') {
+        let v: serde_json::Value = serde_json::from_str(raw).ok()?;
+        ["text", "content", "message"].iter().find_map(|k| v.get(*k).and_then(|t| t.as_str()).map(str::to_string))?
+    } else {
+        raw.to_string()
+    };
+    // One tidy line: no control characters, runs of space squashed.
+    let text: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!text.is_empty()).then_some(text)
+}
+
+async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>, events: &UnboundedSender<Event>) -> anyhow::Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let read = tokio::time::timeout(std::time::Duration::from_secs(10), read_request(&mut stream)).await;
+    let text = |status: &'static str, body: &str| (status, "text/plain; charset=utf-8", format!("{body}\n"));
+    let (status, ctype, body) = match read {
+        Err(_) | Ok(Err(ReadError::Bad)) => text("400 Bad Request", "that didn't make sense, babe"),
+        Ok(Err(ReadError::TooBig)) => text("413 Payload Too Large", "that's a lot, babe: keep it under 16KB"),
+        Ok(Ok(req)) => match (req.method.as_str(), req.path.as_str(), info) {
+            ("POST", p, _) if p.starts_with("/hook/") => {
+                let secret = p.trim_start_matches("/hook/").split(['?', '#']).next().unwrap_or("").to_string();
+                match hook_text(&req.body) {
+                    None => text("400 Bad Request", "nothing to post: send some text, or JSON with \"text\""),
+                    Some(t) => {
+                        let (reply, answer) = tokio::sync::oneshot::channel();
+                        events.send(Event::Hook { secret, text: t, reply })?;
+                        match answer.await {
+                            Ok(HookReply::Posted) => text("200 OK", "posted 📌"),
+                            Ok(HookReply::TooFast) => text("429 Too Many Requests", "one at a time, babe: wait a couple of seconds"),
+                            Ok(HookReply::Unknown) | Err(_) => text("404 Not Found", "no hook here (it may have been stopped)"),
+                        }
+                    }
+                }
+            }
+            (_, "/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", page(info)),
+            (_, federation::WELL_KNOWN, Some(info)) => ("200 OK", "application/json", serde_json::to_string(info)?),
+            _ => text("404 Not Found", "nothing here, babe"),
+        },
     };
     let resp = format!(
         "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -523,6 +633,35 @@ mod tests {
         }
         tx.send(status()).unwrap();
         assert!(matches!(rx.try_recv(), Ok(ToClient::Status { .. })));
+    }
+
+    #[test]
+    fn hooks_take_plain_text_or_slack_or_discord_json() {
+        assert_eq!(hook_text(b"deploy finished \xF0\x9F\x9A\x80").as_deref(), Some("deploy finished 🚀"));
+        assert_eq!(hook_text(br#"{"text":"build 42 passed"}"#).as_deref(), Some("build 42 passed"));
+        assert_eq!(hook_text(br#"{"content":"hi from discord","username":"x"}"#).as_deref(), Some("hi from discord"));
+        assert_eq!(hook_text(b"two\nlines\r\n  and   spaces").as_deref(), Some("two lines and spaces"));
+        assert_eq!(hook_text(b"   "), None);
+        assert_eq!(hook_text(br#"{"nope":1}"#), None);
+        assert_eq!(hook_text(b"{not json"), None);
+    }
+
+    #[tokio::test]
+    async fn reads_a_post_with_its_body_across_packets() {
+        use tokio::io::AsyncWriteExt;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let client = tokio::spawn(async move {
+            let mut c = TcpStream::connect(addr).await.unwrap();
+            c.write_all(b"POST /hook/abc HTTP/1.1\r\nHost: x\r\nContent-Length: 11\r\n\r\nhello").await.unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            c.write_all(b" world").await.unwrap();
+            c
+        });
+        let (mut s, _) = listener.accept().await.unwrap();
+        let Ok(req) = read_request(&mut s).await else { panic!("couldn't read it") };
+        assert_eq!(req, Request { method: "POST".into(), path: "/hook/abc".into(), body: b"hello world".to_vec() });
+        drop(client.await);
     }
 
     #[test]

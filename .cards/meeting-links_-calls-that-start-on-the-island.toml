@@ -1,0 +1,7 @@
+name = "Meeting links: calls that start on the island"
+status = "done"
+description = "The island as the hallway outside a video call (Google Meet, Zoom, anything with an https link). (1) Events can carry a link: 'event fri 10am Standup https://meet.google.com/abc-defg-hij'. The link is kept apart from the name and shown in 'events', the ten-minute reminder and the 'starting now' shout. (2) 'make a meeting table' (or a gazebo, or anything with 'meeting' in its name) makes a meeting spot. There, its maker, a keeper, or the home's owner sets its standing link with 'meet https://…' ('meet off' clears it). 'look' there shows the link, and 'meet' on its own hands it to you and tells everyone standing there that you've headed into the call. An event planned at a meeting spot without its own link uses the spot's. Only https links, up to 300 characters. (3) The browser makes https links in lines and board notes clickable, opening in a new tab; terminals already spot URLs. No presence tracking of who's actually on the call: the world can't know."
+created_at = "2026-11-04T22:04:27.933175Z"
+updated_at = "2026-11-04T22:18:54.515710Z"
+tags = ["practical"]
+priority = "medium"
