@@ -1,0 +1,7 @@
+name = "Place events: meetings for whoever's going"
+status = "done"
+description = "Events can belong to a place instead of the whole island, so a team's standup doesn't ping everyone. 'event here fri 10am Standup https://…' plans a place event where you're standing (island-wide 'event sat 4pm Beach party' stays as it is, for keepers). Anyone can plan a place event, since it only reaches the people who want it: its host, anyone who's said 'going' (going 2, from the events list; 'not going' to drop out), followers of a noticeboard on that spot (the team's board is its channel: the plan is posted there too), and anyone within ten steps when it's announced, reminded or starting. Place events aren't written in the Island Journal. 'events' lists both kinds, marking place events with 📍 and who's going. Call links work as before (and a meeting table's link is used if none is given). Cancelling: host or keeper, as now."
+created_at = "2026-11-04T23:16:01.105246Z"
+updated_at = "2026-11-04T23:20:52.716697Z"
+tags = ["practical"]
+priority = "medium"

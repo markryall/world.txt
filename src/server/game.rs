@@ -508,6 +508,8 @@ impl Game {
             }
             "event" | "plan" => return self.cmd_event(id, rest),
             "events" | "calendar" => return self.cmd_events(id),
+            "going" | "rsvp" | "attend" => return self.cmd_going(id, rest, true),
+            "not" if rest.starts_with("going") => return self.cmd_going(id, rest.trim_start_matches("going"), false),
             "cancel" => return self.cmd_cancel_event(id, rest),
             "go" | "walk" => match DIRS.iter().find(|d| d.0 == rest || d.1 == rest) {
                 Some(&(_, _, dx, dy)) => return self.walk(id, dx, dy),
@@ -2046,6 +2048,8 @@ const HELP: &[HelpTopic] = &[
             ("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
             ("sail to other.world", "visit another world (their keepers let you in)"),
             ("events / go event", "what's coming up on the island, and walk there"),
+            ("event here fri 10am Standup", "plan an event just for this place: only whoever's going, a board's followers here and people nearby hear about it"),
+            ("going 2 / not going 2", "say you'll come to a 📍 event, so you're reminded wherever you are"),
             ("meet", "go into the video call here (at a meeting table, or an event with a link)"),
         ],
         footer: Some("There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
@@ -2197,7 +2201,7 @@ const HELP: &[HelpTopic] = &[
             ("fold Poppy into sunny-otter-42", "move an old account's things into someone's account"),
             ("visitors / admit / turn away", "people sailing in from other worlds"),
             ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
-            ("event sat 4pm Beach party", "plan an event right here (cancel event 1)"),
+            ("event sat 4pm Beach party", "plan an event for the whole island, right here (cancel event 1)"),
             ("event fri 10am Standup https://meet…", "an event with a video call (at a meeting table, it uses the table's)"),
             ("station add Night Owl FM https://… [guide https://…]", "add a radio station anyone can tune to (station remove)"),
         ],

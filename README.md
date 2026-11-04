@@ -449,6 +449,13 @@ Keepers plan events where they're standing: `event sat 4pm Beach party` (or
 reminder ten minutes before and a shout when it starts, `events` lists what's
 coming up, and `go event` walks you there. `cancel event 1` for its host or a keeper.
 
+Events can also belong to just one place, so a team's standup doesn't ping the
+whole island: `event here fri 10am Standup`. Anyone can plan one. Only its host,
+people who've said `going 2` (the number from `events`; `not going 2` drops
+out), followers of a noticeboard on that spot, and anyone within ten steps hear
+it announced, reminded and starting. It's posted on that noticeboard rather
+than the Island Journal, and `events` marks it 📍 with who's going.
+
 ### Meetings
 
 The island can be the hallway outside a video call. `make a meeting table` (or a
@@ -456,7 +463,7 @@ gazebo) makes a meeting spot, and its maker, the home's owner or a keeper gives 
 a call link: `meet https://meet.google.com/abc-defg-hij` (`meet off` clears it).
 Anyone standing there sees the link when they look, and `meet` hands it to you
 and tells everyone there that you've gone into the call. Events can carry a link
-too, `event fri 10am Standup https://zoom.us/j/123`, and one planned at a
+too, `event here fri 10am Standup https://zoom.us/j/123`, and one planned at a
 meeting table uses the table's. The link shows in `events`, the reminder and the
 "starting now" shout, and `meet` at an event's spot while it's on hands it over.
 Only https links are kept. In the browser, https links anywhere (lines and board

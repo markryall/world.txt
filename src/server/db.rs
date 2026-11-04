@@ -36,6 +36,8 @@ pub struct EventRow {
     pub started: bool,
     /// A video call to join, if it has one.
     pub link: Option<String>,
+    /// For one place and whoever's going, not the whole island.
+    pub local: bool,
 }
 
 /// Something someone planted, growing over real days.
@@ -136,6 +138,8 @@ impl Db {
                  x INTEGER NOT NULL, y INTEGER NOT NULL, kind TEXT NOT NULL, by TEXT NOT NULL,
                  at INTEGER NOT NULL, told INTEGER NOT NULL DEFAULT 0,
                  PRIMARY KEY (x, y));
+             CREATE TABLE IF NOT EXISTS event_going (
+                 event INTEGER NOT NULL, player TEXT NOT NULL, PRIMARY KEY (event, player));
              CREATE TABLE IF NOT EXISTS project_gifts (
                  project TEXT NOT NULL, stage INTEGER NOT NULL, player TEXT NOT NULL,
                  n INTEGER NOT NULL, at INTEGER NOT NULL);",
@@ -158,6 +162,8 @@ impl Db {
         let _ = conn.execute("ALTER TABLE invites ADD COLUMN used_at INTEGER", []);
         // A video call to go with an event.
         let _ = conn.execute("ALTER TABLE events ADD COLUMN link TEXT", []);
+        // Events for one place (and whoever's going) rather than the whole island.
+        let _ = conn.execute("ALTER TABLE events ADD COLUMN local INTEGER NOT NULL DEFAULT 0", []);
         Ok(Db { conn })
     }
 
@@ -226,6 +232,7 @@ impl Db {
             ("board_members", "player"),
             ("mutes", "player"),
             ("mutes", "muted"),
+            ("event_going", "player"),
         ] {
             tx.execute(&format!("UPDATE OR IGNORE {table} SET {col} = ?2 WHERE {col} = ?1"), [old, new])?;
             tx.execute(&format!("DELETE FROM {table} WHERE {col} = ?1"), [old])?;
@@ -767,18 +774,36 @@ impl Db {
 
     // ---- events ----------------------------------------------------------------
 
-    pub fn add_event(&self, at: i64, name: &str, x: i64, y: i64, host: &str, link: Option<&str>) -> anyhow::Result<()> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_event(&self, at: i64, name: &str, x: i64, y: i64, host: &str, link: Option<&str>, local: bool) -> anyhow::Result<i64> {
         self.conn.execute(
-            "INSERT INTO events (at, name, x, y, host, link) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![at, name, x, y, host, link],
+            "INSERT INTO events (at, name, x, y, host, link, local) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![at, name, x, y, host, link, local],
         )?;
-        Ok(())
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// Who's said they're going to an event, in the order they said it.
+    pub fn going(&self, event: i64) -> anyhow::Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT player FROM event_going WHERE event = ?1 ORDER BY rowid")?;
+        let rows = stmt.query_map([event], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Say you're going (or not). True if that changed anything.
+    pub fn set_going(&self, event: i64, player: &str, going: bool) -> anyhow::Result<bool> {
+        let n = if going {
+            self.conn.execute("INSERT OR IGNORE INTO event_going (event, player) VALUES (?1, ?2)", params![event, player])?
+        } else {
+            self.conn.execute("DELETE FROM event_going WHERE event = ?1 AND player = ?2", params![event, player])?
+        };
+        Ok(n > 0)
     }
 
     /// Events from `since` on, soonest first.
     pub fn upcoming_events(&self, since: i64) -> anyhow::Result<Vec<EventRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, at, name, x, y, host, reminded, started, link FROM events WHERE at >= ?1 ORDER BY at",
+            "SELECT id, at, name, x, y, host, reminded, started, link, local FROM events WHERE at >= ?1 ORDER BY at",
         )?;
         let rows = stmt.query_map([since], |r| {
             Ok(EventRow {
@@ -791,6 +816,7 @@ impl Db {
                 reminded: r.get::<_, i64>(6)? != 0,
                 started: r.get::<_, i64>(7)? != 0,
                 link: r.get(8)?,
+                local: r.get::<_, i64>(9)? != 0,
             })
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -806,11 +832,13 @@ impl Db {
 
     pub fn remove_event(&self, id: i64) -> anyhow::Result<()> {
         self.conn.execute("DELETE FROM events WHERE id = ?1", [id])?;
+        self.conn.execute("DELETE FROM event_going WHERE event = ?1", [id])?;
         Ok(())
     }
 
     pub fn forget_events_before(&self, before: i64) -> anyhow::Result<()> {
         self.conn.execute("DELETE FROM events WHERE at < ?1", [before])?;
+        self.conn.execute("DELETE FROM event_going WHERE event NOT IN (SELECT id FROM events)", [])?;
         Ok(())
     }
 
@@ -1059,6 +1087,20 @@ mod tests {
         assert_eq!(db.take_mail("sunny-otter-42").unwrap().len(), 1);
         assert!(db.is_keeper("sunny-otter-42"), "keeping keeper powers from the old account");
         assert!(db.satchel("Poppy").unwrap().is_empty());
+    }
+
+    #[test]
+    fn whos_going_is_kept_with_the_event_and_goes_with_it() {
+        let db = Db::open(":memory:").unwrap();
+        let e = db.add_event(100, "Standup", 1, 2, "host", None, true).unwrap();
+        assert!(db.set_going(e, "poppy", true).unwrap());
+        assert!(!db.set_going(e, "poppy", true).unwrap(), "already going");
+        assert!(db.set_going(e, "sam", true).unwrap());
+        assert_eq!(db.going(e).unwrap(), vec!["poppy", "sam"]);
+        assert!(db.set_going(e, "poppy", false).unwrap());
+        assert!(db.upcoming_events(0).unwrap()[0].local);
+        db.remove_event(e).unwrap();
+        assert!(db.going(e).unwrap().is_empty());
     }
 
     #[test]

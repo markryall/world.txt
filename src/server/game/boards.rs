@@ -116,7 +116,7 @@ impl Game {
 
     // ---- finding boards --------------------------------------------------
 
-    fn board_here(&self, x: i64, y: i64) -> Option<(i64, bool)> {
+    pub(super) fn board_here(&self, x: i64, y: i64) -> Option<(i64, bool)> {
         self.world
             .things_at(x, y)
             .find(|t| t.is_board())

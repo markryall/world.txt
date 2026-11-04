@@ -3,7 +3,8 @@
 //! minutes before and a shout when they start, and 'go event' walks you there.
 
 use super::Game;
-use crate::protocol::{Col, Line, ToClient};
+use crate::protocol::{Col, Line};
+use crate::server::db::EventRow;
 use chrono::{Datelike, Duration, Local, NaiveTime, TimeZone, Weekday};
 
 const REMIND_BEFORE: i64 = 10 * 60;
@@ -89,53 +90,107 @@ pub fn when_label(at: i64) -> String {
     t.format("%a %-d %b, %-I:%M%P").to_string()
 }
 
+/// How far away people hear about a place event: about as far as a shout.
+const NEARBY: i64 = 10;
+
+/// "here fri 10am Standup" → a place event; anything else is island-wide.
+pub fn place_event(text: &str) -> (bool, &str) {
+    let t = text.trim_start();
+    for p in ["here ", "local ", "place "] {
+        if t.len() >= p.len() && t[..p.len()].eq_ignore_ascii_case(p) {
+            return (true, t[p.len()..].trim_start());
+        }
+    }
+    (false, t)
+}
+
 impl Game {
+    /// Who hears about an event: everyone online, or for a place event its
+    /// host, whoever's going, followers of a noticeboard on that spot, and
+    /// anyone nearby.
+    fn audience(&self, e: &EventRow) -> Vec<u64> {
+        if !e.local {
+            return self.players.keys().copied().collect();
+        }
+        let going = self.world.db.going(e.id).unwrap_or_default();
+        let followers = self.board_here(e.x, e.y).filter(|b| !b.1).map(|b| self.world.db.followers(b.0).unwrap_or_default()).unwrap_or_default();
+        self.players
+            .iter()
+            .filter(|(_, p)| {
+                p.user == e.host
+                    || going.contains(&p.user)
+                    || followers.contains(&p.user)
+                    || ((p.x - e.x).abs().max((p.y - e.y).abs()) <= NEARBY && super::super::islands::island_at(p.x, p.y).id == super::super::islands::island_at(e.x, e.y).id)
+            })
+            .map(|(&id, _)| id)
+            .collect()
+    }
+
+    fn tell_audience(&self, e: &EventRow, except: Option<u64>, line: Line) {
+        for id in self.audience(e) {
+            if Some(id) != except {
+                self.say1(id, line.clone());
+            }
+        }
+    }
+
     pub(super) fn cmd_event(&mut self, id: u64, text: &str) -> anyhow::Result<()> {
         let Some((x, y, _)) = self.here(id) else { return Ok(()) };
         let host = self.user(id);
-        if !self.is_keeper(&host) {
-            self.say1(id, Line::plain("Only island keepers can plan events. Ask one! ('events' shows what's coming up)"));
+        let (local, text) = place_event(text);
+        if !local && !self.is_keeper(&host) {
+            self.say1(id, Line::plain("Only island keepers can plan events for the whole island. Anyone can plan one just for here, though: event here fri 10am Standup"));
             return Ok(());
         }
         let (text, link) = super::meetings::split_link(text);
         let link = link.or_else(|| self.meeting_link_at(x, y));
         let Some((at, name)) = parse_when(&text, Local::now()) else {
-            self.say1(id, Line::plain("When, and what? e.g. 'event sat 4pm Beach party' or 'event tomorrow 10:30am Treasure hunt'. It happens right here."));
+            self.say1(id, Line::plain("When, and what? e.g. 'event sat 4pm Beach party', or just for this place: 'event here fri 10am Standup'. It happens right here."));
             return Ok(());
         };
         let name: String = name.chars().take(80).collect();
         let place = self.world.place_title(x, y);
-        self.world.db.add_event(at, &name, x, y, &host, link.as_deref())?;
+        let event = self.world.db.add_event(at, &name, x, y, &host, link.as_deref(), local)?;
         let when = when_label(at);
         let call = link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"));
-        self.say1(id, Line::new().c(Col::Yellow, "📅 Planned: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}. Everyone will get a reminder.")));
-        // On the Island Journal too, so people who aren't here now see it.
-        if let Some(board) = self.journal_board {
-            let now = super::boards::now();
+        let now = super::boards::now();
+        let who = if local {
+            self.world.db.set_going(event, &host, true)?;
+            "Whoever's going, people following a board here, and anyone nearby will get a reminder."
+        } else {
+            "Everyone will get a reminder."
+        };
+        self.say1(id, Line::new().c(Col::Yellow, "📅 Planned: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}. {who}")));
+        // Written down where people will find it: the Island Journal for the
+        // whole island, or the noticeboard here for a place event.
+        let board = if local { self.board_here(x, y).filter(|b| !b.1).map(|b| b.0) } else { self.journal_board };
+        if let Some(board) = board {
             self.world.db.add_note(board, &host, &format!("📅 {name} · {when} at {place}{call}"), now, &super::boards::week_key(now), None)?;
         }
-        let line = Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}"));
-        for (&pid, p) in &self.players {
-            if pid != id {
-                let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
-            }
+        let row = self.world.db.upcoming_events(at)?.into_iter().find(|e| e.id == event);
+        let invite = if local { " (going to say you'll come)" } else { "" };
+        let line = Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}")).c(Col::Dim, invite);
+        if let Some(e) = row {
+            self.tell_audience(&e, Some(id), line);
         }
         Ok(())
     }
 
     pub(super) fn cmd_events(&mut self, id: u64) -> anyhow::Result<()> {
         let events = self.world.db.upcoming_events(super::boards::now() - KEEP_AFTER)?;
+        let me = self.user(id);
         let mut lines = vec![Line::new().b(Col::Magenta, "📅 Coming up on the island")];
         if events.is_empty() {
-            lines.push(Line::col(Col::Dim, "  Nothing planned yet. Keepers can plan one: event sat 4pm Beach party"));
+            lines.push(Line::col(Col::Dim, "  Nothing planned yet. Plan one just for here: event here fri 10am Standup"));
         }
         for (i, e) in events.iter().enumerate() {
             let place = self.world.place_title(e.x, e.y);
             let now = super::boards::now();
             let when = if e.at <= now { "happening now!".to_string() } else { when_label(e.at) };
+            let pin = if e.local { "📍 " } else { "" };
             lines.push(
                 Line::new()
-                    .c(Col::Yellow, format!("  {}. ", i + 1))
+                    .c(Col::Yellow, format!("  {}. {pin}", i + 1))
                     .b(Col::Yellow, e.name.clone())
                     .t(format!(" · {when} at {place}"))
                     .c(Col::Dim, format!(" (hosted by {})", self.world.nick(&e.host))),
@@ -143,18 +198,55 @@ impl Game {
             if let Some(l) = &e.link {
                 lines.push(Line::new().c(Col::Cyan, "     📞 ").c(Col::Cyan, l.clone()));
             }
+            if e.local {
+                let going = self.world.db.going(e.id)?;
+                let names: Vec<String> = going.iter().map(|u| if *u == me { "you".to_string() } else { self.world.nick(u) }).collect();
+                let verb = if names.len() == 1 && names[0] != "you" { "is" } else { "are" };
+                let text = if names.is_empty() { "nobody's said they're going yet".to_string() } else { format!("{} {verb} going", super::super::world::join_and(&names)) };
+                lines.push(Line::col(Col::Dim, format!("     {text}")));
+            }
         }
         if !events.is_empty() {
-            lines.push(Line::col(Col::Dim, "  go event (or go event 2) walks you there"));
+            lines.push(Line::col(Col::Dim, "  go event 2 walks you there · going 2 / not going 2 for 📍 events just for one place"));
         }
         self.send(id, lines);
         Ok(())
     }
 
-    fn pick_event(&self, which: &str) -> anyhow::Result<Option<super::super::db::EventRow>> {
+    fn pick_event(&self, which: &str) -> anyhow::Result<Option<EventRow>> {
         let events = self.world.db.upcoming_events(super::boards::now() - KEEP_AFTER)?;
-        let n: usize = which.trim().parse().unwrap_or(1);
+        let n: usize = which.trim().trim_start_matches("to").trim().trim_start_matches("event").trim().parse().unwrap_or(1);
         Ok(events.into_iter().nth(n.saturating_sub(1)))
+    }
+
+    /// `going 2` / `not going 2`: say you'll come to a place event, so you
+    /// hear its reminder wherever you are.
+    pub(super) fn cmd_going(&mut self, id: u64, which: &str, going: bool) -> anyhow::Result<()> {
+        let Some(e) = self.pick_event(which)? else {
+            self.say1(id, Line::plain("Going to which? 'events' lists them, then e.g. 'going 2'."));
+            return Ok(());
+        };
+        let me = self.user(id);
+        if !e.local {
+            self.say1(id, Line::plain(format!("{} is for the whole island: everyone hears about it anyway.", e.name)));
+            return Ok(());
+        }
+        let changed = self.world.db.set_going(e.id, &me, going)?;
+        let place = self.world.place_title(e.x, e.y);
+        let msg = match (going, changed) {
+            (true, true) => format!("📅 You're going to {} ({} at {place}). You'll get a reminder wherever you are.", e.name, when_label(e.at)),
+            (true, false) => format!("📅 You're already going to {}.", e.name),
+            (false, true) => format!("📅 You're not going to {} any more.", e.name),
+            (false, false) => format!("📅 You weren't going to {} anyway.", e.name),
+        };
+        self.say1(id, Line::col(Col::Yellow, msg));
+        if going && changed && e.host != me {
+            if let Some((&host, _)) = self.players.iter().find(|(_, p)| p.user == e.host) {
+                let name = self.world.nick(&me);
+                self.say1(host, Line::col(Col::Yellow, format!("📅 {name} is going to {}.", e.name)));
+            }
+        }
+        Ok(())
     }
 
     pub(super) fn cmd_go_event(&mut self, id: u64, which: &str) -> anyhow::Result<()> {
@@ -173,7 +265,6 @@ impl Game {
     }
 
     pub(super) fn cmd_cancel_event(&mut self, id: u64, which: &str) -> anyhow::Result<()> {
-        let which = which.trim().trim_start_matches("event").trim();
         let Some(e) = self.pick_event(which)? else {
             self.say1(id, Line::plain("Cancel which? 'events' lists them, then e.g. 'cancel event 2'."));
             return Ok(());
@@ -183,11 +274,12 @@ impl Game {
             self.say1(id, Line::plain("Only its host or a keeper can cancel that."));
             return Ok(());
         }
-        self.world.db.remove_event(e.id)?;
-        let line = Line::col(Col::Dim, format!("📅 {} has been cancelled.", e.name));
-        for p in self.players.values() {
-            let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
+        // Tell the same people who'd have heard about it, before it's gone.
+        self.tell_audience(&e, None, Line::col(Col::Dim, format!("📅 {} has been cancelled.", e.name)));
+        if !self.audience(&e).contains(&id) {
+            self.say1(id, Line::col(Col::Dim, format!("📅 {} has been cancelled.", e.name)));
         }
+        self.world.db.remove_event(e.id)?;
         Ok(())
     }
 
@@ -215,9 +307,7 @@ impl Game {
             } else {
                 continue;
             };
-            for p in self.players.values() {
-                let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
-            }
+            self.tell_audience(&e, None, line);
         }
         let _ = self.world.db.forget_events_before(now - KEEP_AFTER);
     }
@@ -241,5 +331,13 @@ mod tests {
         assert!(parse_when("sat Beach party", now).is_none(), "needs a time");
         assert!(parse_when("4pm", now).is_none(), "needs a name");
         assert!(parse_when("4 Beach", now).is_none(), "a bare number is too vague");
+    }
+
+    #[test]
+    fn here_makes_it_a_place_event() {
+        assert_eq!(place_event("here fri 10am Standup"), (true, "fri 10am Standup"));
+        assert_eq!(place_event("Here 4pm Tea"), (true, "4pm Tea"));
+        assert_eq!(place_event("sat 4pm Beach party"), (false, "sat 4pm Beach party"));
+        assert_eq!(place_event("hereford 4pm cattle show").0, false);
     }
 }
