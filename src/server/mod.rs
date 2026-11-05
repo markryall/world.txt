@@ -130,7 +130,7 @@ pub enum HookReply {
 pub async fn run(
     addr: &str,
     db_path: &str,
-    seed: u64,
+    seed: Option<u64>,
     keep_backups: usize,
     backup_dir: Option<std::path::PathBuf>,
     url: Option<String>,

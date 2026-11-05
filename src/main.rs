@@ -25,9 +25,10 @@ enum Cmd {
         addr: String,
         #[arg(long, env = "WORLD_DB", default_value = "world.db")]
         db: String,
-        /// Seed for a brand-new world's landscape.
-        #[arg(long, default_value_t = 7)]
-        seed: u64,
+        /// Seed for a brand-new world's landscape (random if not given).
+        /// An existing world keeps the one it started with.
+        #[arg(long)]
+        seed: Option<u64>,
         /// Daily copies to keep (0 turns backups off).
         #[arg(long, default_value_t = 14)]
         keep_backups: usize,

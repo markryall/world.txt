@@ -14,7 +14,7 @@ pub fn new_secret() -> anyhow::Result<String> {
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
-fn random_u64() -> anyhow::Result<u64> {
+pub fn random_u64() -> anyhow::Result<u64> {
     let mut bytes = [0u8; 8];
     std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
     Ok(u64::from_le_bytes(bytes))

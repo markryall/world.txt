@@ -123,10 +123,18 @@ pub const DIRS: [(&str, &str, i64, i64); 8] = [
 ];
 
 impl World {
-    pub fn load_or_create(mut db: Db, seed: u64) -> anyhow::Result<World> {
+    /// Open a world, or grow a brand-new one from `seed` (random if none:
+    /// every new world is its own shape). The seed is kept, so a world keeps
+    /// its shape whatever it's started with later.
+    pub fn load_or_create(mut db: Db, seed: Option<u64>) -> anyhow::Result<World> {
         let seed = match db.meta("seed") {
             Some(s) => s.parse()?,
             None => {
+                // Short enough to read out, should anyone want a twin.
+                let seed = match seed {
+                    Some(s) => s,
+                    None => super::accounts::random_u64()? % 1_000_000,
+                };
                 db.save_tiles(&super::islands::ISLANDS[0].generate(seed))?;
                 db.set_meta("seed", &seed.to_string())?;
                 println!("🌱 grew a brand-new island from seed {seed}");

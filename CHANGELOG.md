@@ -40,6 +40,12 @@ minute however much it flaps. Two lights (or bars) with the same name on
 different boards say where each one is. While something's down, there may be someone
 on the noticeboard who'd appreciate a pat.
 
+### Every new world its own shape
+A brand-new world now grows from a random seed, so its coastlines, hills,
+woods and ponds are its own (the islands keep their names). It's printed when
+the world is first made; `--seed 7` still grows a twin of the old layout.
+Existing worlds keep exactly the shape they have.
+
 ### A shorter help
 `help` is down to the essentials (walking, talking, gathering, making, home
 and `mute`), plus the topics that need explaining: gatherings, noticeboards,
