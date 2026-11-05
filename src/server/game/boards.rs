@@ -386,8 +386,8 @@ impl Game {
         let (hook, board, name) = (h.id, h.board, h.name);
         // A board that's been unmade keeps its hooks, quietly, in case of undo.
         let Some((x, y)) = self.board_place(board) else { return HookReply::Unknown };
-        // Progress only moves a bar along, and side panels go out at most
-        // twice a second anyway, so it can post as often as it likes.
+        // Progress only moves a bar along in memory; saving it and sending
+        // it out happens at most once a second (see progress.rs).
         if h.kind == "progress" {
             return self.progress_post(hook, board, name, text);
         }

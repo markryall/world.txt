@@ -8,11 +8,17 @@
 use super::Game;
 use crate::protocol::{Bar, Col, Line};
 use crate::server::HookReply;
+use std::time::{Duration, Instant};
 
 /// How near a board you have to be to see its bars without following it.
 const NEAR: i64 = 3;
 /// The longest label a tool can give its bar.
 const MAX_LABEL: usize = 32;
+/// A bar is saved and sent out at most this often, however fast a tool
+/// posts: anything in between only updates it in memory, and the latest
+/// goes out when the time comes. Posts are never turned away, so the last
+/// one (100/100) can't be lost to a limit.
+const SETTLE: Duration = Duration::from_secs(1);
 
 /// A bar that's showing: which board it's on, and where it's up to.
 pub struct Progress {
@@ -21,6 +27,10 @@ pub struct Progress {
     done: u64,
     total: u64,
     label: Option<String>,
+    /// Changed since it was last saved and sent out.
+    pending: bool,
+    /// When it was last saved and sent out.
+    sent: Option<Instant>,
 }
 
 impl Progress {
@@ -64,7 +74,7 @@ impl Game {
         match self.world.db.progress_bars() {
             Ok(bars) => {
                 for (hook, board, name, done, total, label) in bars {
-                    self.bars.insert(hook, Progress { board, name, done, total, label });
+                    self.bars.insert(hook, Progress { board, name, done, total, label, pending: false, sent: None });
                 }
             }
             Err(e) => eprintln!("loading progress bars: {e}"),
@@ -102,8 +112,6 @@ impl Game {
     /// An outside tool saying how far along it is.
     pub(super) fn progress_post(&mut self, hook: i64, board: i64, name: String, text: &str) -> HookReply {
         let Some(post) = parse(text) else { return HookReply::NotProgress };
-        let at = super::boards::now();
-        let _ = self.world.db.touch_hook(hook, at);
         match post {
             Post::Clear => {
                 if self.bars.remove(&hook).is_some() {
@@ -112,15 +120,37 @@ impl Game {
                 }
             }
             Post::At { done, total, label } => {
-                let same = self.bars.get(&hook).is_some_and(|b| (b.done, b.total, &b.label) == (done, total, &label));
-                if !same {
-                    let _ = self.world.db.set_progress(hook, Some((done, total, label.as_deref())));
-                    self.bars.insert(hook, Progress { board, name, done, total, label });
-                    self.bars_changed(board);
+                let bar = self.bars.entry(hook).or_insert(Progress { board, name, done, total, label: label.clone(), pending: true, sent: None });
+                if (bar.done, bar.total, &bar.label) != (done, total, &label) {
+                    (bar.done, bar.total, bar.label, bar.pending) = (done, total, label, true);
                 }
+                self.flush_bar(hook);
             }
         }
         HookReply::Progressed
+    }
+
+    /// Save a bar and freshen the side panels showing it, if it's changed
+    /// and it's been long enough since last time.
+    fn flush_bar(&mut self, hook: i64) {
+        let Some(b) = self.bars.get_mut(&hook) else { return };
+        if !b.pending || b.sent.is_some_and(|t| t.elapsed() < SETTLE) {
+            return;
+        }
+        b.pending = false;
+        b.sent = Some(Instant::now());
+        let (board, done, total, label) = (b.board, b.done, b.total, b.label.clone());
+        let _ = self.world.db.set_progress(hook, Some((done, total, label.as_deref())));
+        let _ = self.world.db.touch_hook(hook, super::boards::now());
+        self.bars_changed(board);
+    }
+
+    /// Every stride: send out bars that changed while they were settling.
+    pub(super) fn bars_tick(&mut self) {
+        let due: Vec<i64> = self.bars.iter().filter(|(_, b)| b.pending).map(|(&h, _)| h).collect();
+        for hook in due {
+            self.flush_bar(hook);
+        }
     }
 
     /// A progress hook is gone (unhooked): its bar goes too.

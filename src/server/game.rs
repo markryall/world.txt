@@ -179,6 +179,7 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
                 game.update_radios();
                 game.jukes_tick();
                 game.cooking_tick();
+                game.bars_tick();
                 game.flush_status();
             }
         }

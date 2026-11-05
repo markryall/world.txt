@@ -89,8 +89,8 @@ chat that belongs to that spot:
   `3 of 10 photos` (any words after the numbers become its label; otherwise
   it's called Deploy). Everyone who follows the board, or is within a few
   steps of it, sees the bar fill in their side panel, with its label on the
-  right. Nothing is said in anyone's log, and it can post as often as it
-  likes. When it's finished, `clear Deploy` at the board (or the tool posting
+  right. Nothing is said in anyone's log. It can post as often as it likes:
+  the bar moves on at most once a second, always to the latest number. When it's finished, `clear Deploy` at the board (or the tool posting
   `clear`) takes the bar away until it next says something, and `unhook
   Deploy` stops it for good.
   `curl -d '3 of 10 photos' https://world.example.com/hook/<secret>`
