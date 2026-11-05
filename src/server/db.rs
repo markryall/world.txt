@@ -38,6 +38,10 @@ pub struct EventRow {
     pub link: Option<String>,
     /// For one place and whoever's going, not the whole island.
     pub local: bool,
+    /// The days it repeats on ("mon,tue,wed,thu,fri"), if it does.
+    pub repeat: Option<String>,
+    /// The timezone its time of day belongs to, for repeating.
+    pub tz: Option<String>,
 }
 
 /// Something someone planted, growing over real days.
@@ -166,6 +170,9 @@ impl Db {
         let _ = conn.execute("ALTER TABLE events ADD COLUMN local INTEGER NOT NULL DEFAULT 0", []);
         // Where in the world someone last was, for times written to them while away.
         let _ = conn.execute("ALTER TABLE players ADD COLUMN tz TEXT", []);
+        // Repeating events: which days ("mon,tue,wed,thu,fri"), in whose timezone.
+        let _ = conn.execute("ALTER TABLE events ADD COLUMN repeat TEXT", []);
+        let _ = conn.execute("ALTER TABLE events ADD COLUMN tz TEXT", []);
         Ok(Db { conn })
     }
 
@@ -805,7 +812,7 @@ impl Db {
     /// Events from `since` on, soonest first.
     pub fn upcoming_events(&self, since: i64) -> anyhow::Result<Vec<EventRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, at, name, x, y, host, reminded, started, link, local FROM events WHERE at >= ?1 ORDER BY at",
+            "SELECT id, at, name, x, y, host, reminded, started, link, local, repeat, tz FROM events WHERE at >= ?1 ORDER BY at",
         )?;
         let rows = stmt.query_map([since], |r| {
             Ok(EventRow {
@@ -819,9 +826,23 @@ impl Db {
                 started: r.get::<_, i64>(7)? != 0,
                 link: r.get(8)?,
                 local: r.get::<_, i64>(9)? != 0,
+                repeat: r.get(10)?,
+                tz: r.get(11)?,
             })
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Make an event repeat on these days, at its time of day in `tz`.
+    pub fn set_repeat(&self, id: i64, days: &str, tz: &str) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE events SET repeat = ?2, tz = ?3 WHERE id = ?1", params![id, days, tz])?;
+        Ok(())
+    }
+
+    /// A repeating event moves on to its next time, to be reminded afresh.
+    pub fn reschedule_event(&self, id: i64, at: i64) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE events SET at = ?2, reminded = 0, started = 0 WHERE id = ?1", params![id, at])?;
+        Ok(())
     }
 
     pub fn mark_event(&self, id: i64, reminded: bool, started: bool) -> anyhow::Result<()> {
@@ -839,7 +860,8 @@ impl Db {
     }
 
     pub fn forget_events_before(&self, before: i64) -> anyhow::Result<()> {
-        self.conn.execute("DELETE FROM events WHERE at < ?1", [before])?;
+        // Repeating events aren't forgotten: they move on to their next time.
+        self.conn.execute("DELETE FROM events WHERE at < ?1 AND repeat IS NULL", [before])?;
         self.conn.execute("DELETE FROM event_going WHERE event NOT IN (SELECT id FROM events)", [])?;
         Ok(())
     }

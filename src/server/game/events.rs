@@ -80,7 +80,7 @@ fn time_word(w: &str) -> Option<NaiveTime> {
 
 fn with_call(line: Line, link: &Option<String>) -> Line {
     match link {
-        Some(l) => line.c(Col::Cyan, " 📞 ").c(Col::Cyan, super::meetings::shown(l)),
+        Some(l) => line.c(Col::Cyan, " 🔗 ").c(Col::Cyan, super::meetings::shown(l)),
         None => line,
     }
 }
@@ -93,6 +93,103 @@ pub fn when_label(at: i64, tz: Tz) -> String {
 /// "Sat 7 Nov, 4:00pm AEDT": for words everyone reads alike (a board's note).
 pub fn when_zoned(at: i64, tz: Tz) -> String {
     tz.timestamp_opt(at, 0).single().map_or_else(String::new, |t| t.format("%a %-d %b, %-I:%M%P %Z").to_string())
+}
+
+/// A repeating event moves on to its next time this long after it starts.
+const ROLL_AFTER: i64 = 3600;
+
+const DAY_NAMES: [&str; 7] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+/// "weekdays 9:20am Standup" → (the days it repeats on, "9:20am Standup").
+/// Also weekends, daily / every day, and every mon wed fri (or mondays).
+pub fn repeat_rule(text: &str) -> (Option<Vec<Weekday>>, String) {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let lower: Vec<String> = words.iter().map(|w| w.to_lowercase().trim_end_matches(',').to_string()).collect();
+    let day = |w: &str| -> Option<Weekday> {
+        let w = w.trim_end_matches('s');
+        let i = DAY_NAMES.iter().position(|d| w.starts_with(d) && (w.len() == 3 || "monday tuesday wednesday thursday friday saturday sunday tues weds thur thurs".split(' ').any(|full| full == w)))?;
+        Weekday::try_from(i as u8).ok()
+    };
+    let all = || (0..7u8).filter_map(|i| Weekday::try_from(i).ok()).collect::<Vec<_>>();
+    let rest = |n: usize| words[n.min(words.len())..].join(" ");
+    let first = lower.first().map(String::as_str).unwrap_or("");
+    let second = lower.get(1).map(String::as_str).unwrap_or("");
+    match (first, second) {
+        ("weekdays" | "weekday", _) => return (Some(all()[..5].to_vec()), rest(1)),
+        ("every", "weekday" | "weekdays") => return (Some(all()[..5].to_vec()), rest(2)),
+        ("weekends" | "weekend", _) => return (Some(all()[5..].to_vec()), rest(1)),
+        ("every", "weekend") => return (Some(all()[5..].to_vec()), rest(2)),
+        ("daily" | "everyday", _) => return (Some(all()), rest(1)),
+        ("every", "day") => return (Some(all()), rest(2)),
+        _ => {}
+    }
+    // "every mon wed and fri", or just "mondays".
+    let (start, needs_every) = if first == "every" { (1, true) } else { (0, false) };
+    let mut days = Vec::new();
+    let mut n = start;
+    while n < lower.len() {
+        let w = lower[n].as_str();
+        if w == "and" || w == "&" {
+            n += 1;
+            continue;
+        }
+        // Without "every", only plurals ("mondays") mean repeating.
+        let plural = w.ends_with('s') && !w.ends_with("ss");
+        match day(w) {
+            Some(d) if needs_every || plural => {
+                if !days.contains(&d) {
+                    days.push(d);
+                }
+                n += 1;
+            }
+            _ => break,
+        }
+    }
+    if days.is_empty() {
+        return (None, text.to_string());
+    }
+    days.sort_by_key(|d| d.num_days_from_monday());
+    (Some(days), rest(n))
+}
+
+/// "mon,tue,wed,thu,fri" for keeping.
+fn days_code(days: &[Weekday]) -> String {
+    days.iter().map(|d| DAY_NAMES[d.num_days_from_monday() as usize]).collect::<Vec<_>>().join(",")
+}
+
+fn days_from_code(code: &str) -> Vec<Weekday> {
+    code.split(',').filter_map(|c| DAY_NAMES.iter().position(|d| *d == c)).filter_map(|i| Weekday::try_from(i as u8).ok()).collect()
+}
+
+/// "weekdays", "every day", "every mon, wed and fri"
+pub fn days_label(code: &str) -> String {
+    let days = days_from_code(code);
+    match code {
+        "mon,tue,wed,thu,fri" => "weekdays".into(),
+        "sat,sun" => "weekends".into(),
+        "mon,tue,wed,thu,fri,sat,sun" => "every day".into(),
+        _ => format!("every {}", super::super::world::join_and(&days.iter().map(|d| DAY_NAMES[d.num_days_from_monday() as usize]).collect::<Vec<_>>())),
+    }
+}
+
+/// The next time after `after` that falls on one of `days`, at `time` of day
+/// where `tz` is.
+pub fn next_at(days: &[Weekday], time: NaiveTime, tz: Tz, after: i64) -> Option<i64> {
+    let from = tz.timestamp_opt(after, 0).single()?.date_naive();
+    (0..9).find_map(|ahead| {
+        let date = from + Duration::days(ahead);
+        if !days.contains(&date.weekday()) {
+            return None;
+        }
+        let at = tz.from_local_datetime(&date.and_time(time)).earliest()?.timestamp();
+        (at > after).then_some(at)
+    })
+}
+
+/// How a repeating event's next time reads: "🔁 weekdays · next Fri 6 Nov, 9:20am".
+fn repeat_when(e: &EventRow, tz: Tz) -> Option<String> {
+    let code = e.repeat.as_deref()?;
+    Some(format!("🔁 {} · next {}", days_label(code), when_label(e.at, tz)))
 }
 
 /// How far away people hear about a place event: about as far as a shout.
@@ -190,8 +287,10 @@ impl Game {
         let Some((x, y, _)) = self.here(id) else { return Ok(()) };
         let host = self.user(id);
         let (local, text) = place_event(text);
+        let (repeat, text) = repeat_rule(text);
+        let text = text.as_str();
         if !local && !self.is_keeper(&host) {
-            self.say1(id, Line::plain("Only island keepers can plan events for the whole island. Anyone can plan one just for here, though: event here fri 10am Standup"));
+            self.say1(id, Line::plain("Only island keepers can plan events for the whole island. Anyone can plan one just for here, though: event here fri 4pm Tea party"));
             return Ok(());
         }
         let (text, link) = super::meetings::split_link(text);
@@ -199,14 +298,21 @@ impl Game {
         // Times are the planner's own: 2pm is 2pm where they are.
         let tz = self.my_zone(id);
         let now_there = chrono::Utc::now().with_timezone(&tz);
-        let Some((at, name)) = parse_when(&text, now_there) else {
+        let Some((at, name)) = parse_when(&text, now_there).map(|(at, name)| {
+            // Repeating: the same time of day, on the first of its days to come.
+            let next = repeat.as_ref().and_then(|days| {
+                let time = tz.timestamp_opt(at, 0).single()?.time();
+                next_at(days, time, tz, now_there.timestamp())
+            });
+            (next.unwrap_or(at), name)
+        }) else {
             // A time earlier today reads fine from midnight: it's just gone.
             let midnight = now_there.date_naive().and_hms_opt(0, 0, 0).and_then(|m| tz.from_local_datetime(&m).earliest());
             if let Some((at, _)) = midnight.and_then(|m| parse_when(&text, m)) {
                 self.say1(id, Line::plain(format!("{} has already gone by (it's {} where you are). Try a later time, or tomorrow.", when_label(at, tz), now_there.format("%-I:%M%P"))));
                 return Ok(());
             }
-            self.say1(id, Line::plain("When, and what? e.g. 'event sat 4pm Beach party', or just for this place: 'event here fri 10am Standup'. It happens right here."));
+            self.say1(id, Line::plain("When, and what? e.g. 'event sat 4pm Beach party', or just for this place: 'event here fri 4pm Tea party'. It happens right here."));
             return Ok(());
         };
         // "Standup with Poppy, Sam and Lu": those three are going too.
@@ -224,8 +330,15 @@ impl Game {
         for u in &invited {
             self.world.db.set_going(event, u, true)?;
         }
-        let when = when_label(at, tz);
-        let call = link.as_ref().map_or(String::new(), |l| format!(" · 📞 {}", super::meetings::shown(l)));
+        if let Some(days) = &repeat {
+            self.world.db.set_repeat(event, &days_code(days), tz.name())?;
+        }
+        let every = repeat.as_ref().map(|d| days_label(&days_code(d)));
+        let when = match &every {
+            Some(every) => format!("🔁 {every} · next {}", when_label(at, tz)),
+            None => when_label(at, tz),
+        };
+        let call = link.as_ref().map_or(String::new(), |l| format!(" · 🔗 {}", super::meetings::shown(l)));
         let now = super::boards::now();
         let who = if local {
             self.world.db.set_going(event, &host, true)?;
@@ -245,12 +358,19 @@ impl Game {
             // Anyone can read a board, so a place event's call link stays off it.
             let call = if local { "" } else { call.as_str() };
             // Everyone reads a note alike, so it names the zone.
-            let when = when_zoned(at, tz);
+            let when = match &every {
+                Some(every) => format!("🔁 {every} · next {}", when_zoned(at, tz)),
+                None => when_zoned(at, tz),
+            };
             self.world.db.add_note(board, &host, &format!("📅 {name} · {when} at {place}{call}"), now, &super::boards::week_key(now), None)?;
         }
         let row = self.world.db.upcoming_events(at)?.into_iter().find(|e| e.id == event);
         let invite = if local { " (going to say you'll come)" } else { "" };
-        let line = |tz: Tz| Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {} at {place}{call}", when_label(at, tz))).c(Col::Dim, invite);
+        let when_for = |tz: Tz| match &every {
+            Some(every) => format!("🔁 {every} · next {}", when_label(at, tz)),
+            None => when_label(at, tz),
+        };
+        let line = |tz: Tz| Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {} at {place}{call}", when_for(tz))).c(Col::Dim, invite);
         if let Some(e) = row {
             // The invited get their invite (below) instead.
             for pid in self.audience(&e) {
@@ -262,14 +382,17 @@ impl Game {
             let hostname = self.world.nick(&host);
             for u in &invited {
                 if *u != host && !self.players.values().any(|p| p.user == *u) {
-                    let when = when_zoned(at, self.zone_of(u));
+                    let when = match &every {
+                        Some(every) => format!("🔁 {every} · next {}", when_zoned(at, self.zone_of(u))),
+                        None => when_zoned(at, self.zone_of(u)),
+                    };
                     let note = format!("📅 invited you to {name} · {when} at {place}{call} (not going drops out)");
                     self.world.db.send_mail(u, &host, &note, now)?;
                 }
             }
             for (&pid, p) in &self.players {
                 if pid != id && invited.contains(&p.user) {
-                    let when = when_label(at, p.tz);
+                    let when = when_for(p.tz);
                     self.say1(pid, Line::new().c(Col::Yellow, format!("📅 {hostname} has invited you to ")).b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}")).c(Col::Dim, " (not going drops out)"));
                 }
             }
@@ -288,12 +411,12 @@ impl Game {
             Line::col(Col::Dim, format!("  It's {} where you are ({}). Times here are yours.", now_there.format("%a %-d %b, %-I:%M%P"), now_there.format("%Z"))),
         ];
         if events.is_empty() {
-            lines.push(Line::col(Col::Dim, "  Nothing planned yet. Plan one just for here: event here fri 10am Standup"));
+            lines.push(Line::col(Col::Dim, "  Nothing planned yet. Plan one just for here: event here fri 4pm Tea party"));
         }
         for (i, e) in events.iter().enumerate() {
             let place = self.world.place_title(e.x, e.y);
             let now = super::boards::now();
-            let when = if e.at <= now { "happening now!".to_string() } else { when_label(e.at, self.my_zone(id)) };
+            let when = if e.at <= now { "happening now!".to_string() } else { repeat_when(e, self.my_zone(id)).unwrap_or_else(|| when_label(e.at, self.my_zone(id))) };
             let pin = if e.local { "📍 " } else { "" };
             lines.push(
                 Line::new()
@@ -304,9 +427,9 @@ impl Game {
             );
             if let Some(l) = &e.link {
                 if self.in_on(e, &self.insiders(e), &me, mx, my) {
-                    lines.push(Line::new().c(Col::Cyan, "     📞 ").c(Col::Cyan, super::meetings::shown(l)));
+                    lines.push(Line::new().c(Col::Cyan, "     🔗 ").c(Col::Cyan, super::meetings::shown(l)));
                 } else {
-                    lines.push(Line::col(Col::Dim, "     📞 has a call link, for whoever's going"));
+                    lines.push(Line::col(Col::Dim, "     🔗 has links, for whoever's going"));
                 }
             }
             if e.local {
@@ -349,7 +472,7 @@ impl Game {
                 "📅 You're going to {} ({} at {place}{}). You'll get a reminder wherever you are.",
                 e.name,
                 when_label(e.at, self.my_zone(id)),
-                e.link.as_ref().map_or(String::new(), |l| format!(" · 📞 {}", super::meetings::shown(l)))
+                e.link.as_ref().map_or(String::new(), |l| format!(" · 🔗 {}", super::meetings::shown(l)))
             ),
             (true, false) => format!("📅 You're already going to {}.", e.name),
             (false, true) => format!("📅 You're not going to {} any more.", e.name),
@@ -409,9 +532,27 @@ impl Game {
     /// Reminders shortly before, and a shout when things start.
     pub(super) fn events_tick(&mut self) {
         let now = super::boards::now();
+        // Repeating events move on to their next time once they're over
+        // (including ones missed while the world was asleep).
+        for e in self.world.db.upcoming_events(0).unwrap_or_default() {
+            let (Some(code), true) = (e.repeat.as_deref(), e.at < now - ROLL_AFTER) else { continue };
+            let tz: Tz = e.tz.as_deref().and_then(|t| t.parse().ok()).unwrap_or(chrono_tz::UTC);
+            let next = tz.timestamp_opt(e.at, 0).single().and_then(|t| next_at(&days_from_code(code), t.time(), tz, now));
+            match next {
+                Some(at) => {
+                    let _ = self.world.db.reschedule_event(e.id, at);
+                }
+                None => {
+                    let _ = self.world.db.remove_event(e.id);
+                }
+            }
+        }
         let Ok(events) = self.world.db.upcoming_events(now - KEEP_AFTER) else { return };
         for e in events {
             let place = self.world.place_title(e.x, e.y);
+            if e.at < now - ROLL_AFTER && e.repeat.is_some() {
+                continue;
+            }
             let line = if !e.started && e.at <= now {
                 let _ = self.world.db.mark_event(e.id, true, true);
                 with_call(Line::new().b(Col::Yellow, format!("🎉 {} is starting now at {place}!", e.name)), &e.link).c(Col::Dim, " (go event to head there)")
@@ -461,6 +602,46 @@ mod tests {
         assert_eq!(when_label(at, London), "Thu 5 Nov, 3:00am");
         assert_eq!(when_zoned(at, Sydney), "Thu 5 Nov, 2:00pm AEDT");
         assert!(parse_when("today 9am Standup", sydney).is_none(), "9am has gone by");
+    }
+
+    #[test]
+    fn reads_how_things_repeat() {
+        use Weekday::*;
+        let rule = |t: &str| repeat_rule(t);
+        assert_eq!(rule("weekdays 9:20am Standup"), (Some(vec![Mon, Tue, Wed, Thu, Fri]), "9:20am Standup".to_string()));
+        assert_eq!(rule("every weekday 9:20am Standup").0.map(|d| d.len()), Some(5));
+        assert_eq!(rule("daily 8am Tea").0.map(|d| d.len()), Some(7));
+        assert_eq!(rule("every day 8am Tea").1, "8am Tea");
+        assert_eq!(rule("weekends 10am Brunch").0, Some(vec![Sat, Sun]));
+        assert_eq!(rule("every mon, wed and fri 9am Gym"), (Some(vec![Mon, Wed, Fri]), "9am Gym".to_string()));
+        assert_eq!(rule("every Tuesday 4pm Retro"), (Some(vec![Tue]), "4pm Retro".to_string()));
+        assert_eq!(rule("fridays 5pm Drinks"), (Some(vec![Fri]), "5pm Drinks".to_string()));
+        assert_eq!(rule("fri 5pm Drinks").0, None, "one friday, not every");
+        assert_eq!(rule("every 5pm Drinks").0, None);
+        assert_eq!(rule("tomorrow 9am Standup").0, None);
+        assert_eq!(days_label("mon,tue,wed,thu,fri"), "weekdays");
+        assert_eq!(days_label("mon,wed,fri"), "every mon, wed, and fri");
+        assert_eq!(days_label("tue"), "every tue");
+    }
+
+    #[test]
+    fn repeats_at_the_same_time_of_day_on_the_right_days() {
+        use chrono_tz::{Australia::Brisbane, Australia::Sydney, Europe::London};
+        let weekdays = repeat_rule("weekdays x").0.unwrap();
+        let t = NaiveTime::from_hms_opt(9, 20, 0).unwrap();
+        // Thursday 10:52am in Brisbane: today's has gone, so Friday's.
+        let thu = Brisbane.with_ymd_and_hms(2026, 11, 5, 10, 52, 0).unwrap().timestamp();
+        let next = next_at(&weekdays, t, Brisbane, thu).unwrap();
+        assert_eq!(when_label(next, Brisbane), "Fri 6 Nov, 9:20am");
+        // After Friday's, it skips the weekend to Monday.
+        let after = next_at(&weekdays, t, Brisbane, next + 3600).unwrap();
+        assert_eq!(when_label(after, Brisbane), "Mon 9 Nov, 9:20am");
+        // Seen from London, it's the evening before.
+        assert_eq!(when_label(next, London), "Thu 5 Nov, 11:20pm");
+        // Across Sydney's clocks going back (5 April 2026), still 9:20am there.
+        let before = Sydney.with_ymd_and_hms(2026, 4, 3, 10, 0, 0).unwrap().timestamp();
+        let n = next_at(&weekdays, t, Sydney, before).unwrap();
+        assert_eq!(when_label(n, Sydney), "Mon 6 Apr, 9:20am");
     }
 
     #[test]

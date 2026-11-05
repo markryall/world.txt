@@ -1,5 +1,5 @@
-//! Meeting spots: the island as the hallway outside a video call. A meeting
-//! table (or a gazebo) holds a standing call link; 'meet' hands it to you and
+//! Meeting spots: somewhere to gather, with links for whatever's going on
+//! (a call, a list, a song). A meeting table (or a gazebo) holds them; 'meet' hands it to you and
 //! tells everyone there you've gone in. Events can carry a link too.
 
 use super::Game;
@@ -27,7 +27,6 @@ pub fn clean_link(raw: &str) -> Option<String> {
     ok.then(|| url.to_string())
 }
 
-/// Take a call link out of some words: "Standup https://meet…" → ("Standup", link).
 /// How many links one event or meeting spot keeps (a call, a board, notes).
 const MAX_LINKS: usize = 3;
 
@@ -84,8 +83,8 @@ impl Game {
         let Some(p) = self.players.get(&id) else { return vec![] };
         let Some((thing, name, _)) = self.meeting_spot_at(p.x, p.y) else { return vec![] };
         match self.meeting_links.get(&thing) {
-            Some(link) => vec![Line::new().c(Col::Cyan, format!("📞 {} has {}: ", super::capitalise(&super::the(&name)), if link.contains(' ') { "links" } else { "a call link" })).c(Col::Cyan, shown(link)).c(Col::Dim, " (meet to go in)")],
-            None => vec![Line::col(Col::Dim, "📞 Nobody's set a call link here yet (meet https://…)")],
+            Some(link) => vec![Line::new().c(Col::Cyan, format!("🔗 {} has {}: ", super::capitalise(&super::the(&name)), if link.contains(' ') { "links" } else { "a link" })).c(Col::Cyan, shown(link)).c(Col::Dim, " (meet to get them)")],
+            None => vec![Line::col(Col::Dim, "🔗 Nobody's left any links here yet (meet https://…)")],
         }
     }
 
@@ -99,43 +98,43 @@ impl Game {
             let link = spot.as_ref().and_then(|s| self.meeting_links.get(&s.0).cloned()).or_else(|| self.event_link_now(x, y));
             let Some(link) = link else {
                 let msg = if spot.is_some() {
-                    "There's no call link here yet. Its maker (or a keeper) can set one: meet https://meet.google.com/…"
+                    "There are no links here yet. Its maker (or a keeper) can add some: meet https://…"
                 } else {
-                    "There's no call here. Meetings happen at a meeting table: make a meeting table, then meet https://…"
+                    "There's nothing to join here. Gatherings with links happen at a meeting table: make a meeting table, then meet https://…"
                 };
                 self.say1(id, Line::plain(msg));
                 return Ok(());
             };
-            self.say1(id, Line::new().c(Col::Cyan, "📞 In you go: ").b(Col::Cyan, shown(&link)).c(Col::Dim, " (the island will be right here when you're back)"));
+            self.say1(id, Line::new().c(Col::Cyan, "🔗 Here you go: ").b(Col::Cyan, shown(&link)).c(Col::Dim, " (the island will be right here when you're back)"));
             let user = self.user(id);
-            self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("📞 {name} heads into the call.")));
+            self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("🔗 {name} heads off to the meeting.")));
             return Ok(());
         }
         let Some((thing, spot_name, maker)) = spot else {
-            self.say1(id, Line::plain("Call links live on meeting spots. Make one here first: make a meeting table"));
+            self.say1(id, Line::plain("Links live on meeting spots. Make one here first: make a meeting table"));
             return Ok(());
         };
         let user = self.user(id);
         let home_owner = self.world.home_at(x, y).is_some_and(|h| h.owner == user);
         if maker != user && !home_owner && !self.is_keeper(&user) {
-            self.say1(id, Line::plain(format!("Only whoever made {} (or a keeper) can change its call link.", super::the(&spot_name))));
+            self.say1(id, Line::plain(format!("Only whoever made {} (or a keeper) can change its links.", super::the(&spot_name))));
             return Ok(());
         }
         let the_spot = super::the(&spot_name);
         if matches!(rest.to_lowercase().as_str(), "off" | "clear" | "none" | "stop") {
             self.world.db.set_meeting_link(thing, None, &user, super::boards::now())?;
             self.meeting_links.remove(&thing);
-            self.say1(id, Line::col(Col::Cyan, format!("📞 {} has no call link now.", super::capitalise(&the_spot))));
+            self.say1(id, Line::col(Col::Cyan, format!("🔗 {} has no links now.", super::capitalise(&the_spot))));
             return Ok(());
         }
         let (_, Some(link)) = split_link(rest) else {
-            self.say1(id, Line::plain("That doesn't look like a call link. It needs to start https:// (a Meet, Zoom or Teams link, say)."));
+            self.say1(id, Line::plain("That doesn't look like a link. Links need to start https://"));
             return Ok(());
         };
         self.world.db.set_meeting_link(thing, Some(&link), &user, super::boards::now())?;
         self.meeting_links.insert(thing, link.clone());
-        self.say1(id, Line::new().c(Col::Cyan, format!("📞 {} now holds ", super::capitalise(&the_spot))).c(Col::Cyan, shown(&link)).c(Col::Dim, ". Anyone here can type meet to go in."));
-        self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("📞 {name} sets up a call at {the_spot}. (meet to go in)")));
+        self.say1(id, Line::new().c(Col::Cyan, format!("🔗 {} now holds ", super::capitalise(&the_spot))).c(Col::Cyan, shown(&link)).c(Col::Dim, ". Anyone here can type meet to get them."));
+        self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("🔗 {name} leaves some links at {the_spot}. (meet to get them)")));
         Ok(())
     }
 }

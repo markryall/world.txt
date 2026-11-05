@@ -456,35 +456,40 @@ date and time (🕰 … your time) under the island's own clock, and `events` st
 with it too. In the browser, everyone else out in the world is listed at the foot of
 the side panel with their local time (tap a name to talk to them, and whoever's
 on your spot is marked "here"); `who` shows what time it is for everyone online
-("3:12am Fri in London"), and `time Corey` tells you Corey's, from where they
+("3:12am Fri in London"), and `time Poppy` tells you Poppy's, from where they
 last were if they're away. It goes in the Island Journal, everyone hears a
 reminder ten minutes before and a shout when it starts, `events` lists what's
 coming up, and `go event` walks you there. `cancel event 1` for its host or a keeper.
 
-Events can also belong to just one place, so a team's standup doesn't ping the
-whole island: `event here fri 10am Standup`. Anyone can plan one. Only its host,
+Events can also belong to just one place, so a little get-together doesn't ping
+the whole island: `event here fri 4pm Tea party`. Anyone can plan one. Only its host,
 people who've said `going 2` (the number from `events`; `not going 2` drops
 out), followers of a noticeboard on that spot, and anyone within ten steps hear
 it announced, reminded and starting. It's posted on that noticeboard rather
 than the Island Journal, and `events` marks it 📍 with who's going.
-`event here fri 10am Standup with Poppy, Sam and Lu` signs them up as going
+Events can repeat: `event here fridays 5pm Frog choir` (also `weekdays`,
+`weekends`, `daily`, or `every mon wed`). It stays at 5pm in the planner's
+time, even across daylight saving, moves on to the next one an hour after each
+starts, and `events` shows it as "🔁 every fri · next Fri 6 Nov, 5:00pm". Who's
+going, the board's followers and its links carry over; `cancel event 1` stops
+the series.
+`event here sun 10am Pancakes with Poppy, Sam and Lu` signs them up as going
 too: they're told straight away, or find a note waiting when they next arrive.
-A place event's call link is only shown to people who are in on it (going,
+A place event's links are only shown to people who are in on it (going,
 following its board, or standing nearby); everyone else sees that it has one.
 
 ### Meetings
 
-The island can be the hallway outside a video call. `make a meeting table` (or a
-gazebo) makes a meeting spot, and its maker, the home's owner or a keeper gives it
-a call link: `meet https://meet.google.com/abc-defg-hij` (`meet off` clears it).
-Anyone standing there sees the link when they look, and `meet` hands it to you
-and tells everyone there that you've gone into the call. Events can carry a link
-too, `event here fri 10am Standup https://zoom.us/j/123`, and one planned at a
-meeting table uses the table's. The link shows in `events`, the reminder and the
-"starting now" shout, and `meet` at an event's spot while it's on hands it over.
-Up to three https links are kept together (say, the Meet and the team's
-Trello board: `meet https://meet.google.com/… https://trello.com/b/…`), each
-shown and clickable on its own. In the browser, https links anywhere (lines and board
+Somewhere to gather, with links for whatever's going on: a call, a list, a song.
+`make a meeting table` (or a gazebo) makes a meeting spot, and its maker, the
+home's owner or a keeper leaves its links there:
+`meet https://example.com/gathering https://example.com/snack-list` (up to
+three; `meet off` clears them). Anyone standing there sees them when they look,
+and `meet` hands them to you and tells everyone there you've headed off to the
+meeting. Events can carry links too, `event here fri 4pm Tea party https://…`,
+and one planned at a meeting table uses the table's. They show in `events`, the
+reminder and the "starting now" shout, and `meet` at an event's spot while it's
+on hands them over, each clickable on its own. In the browser, https links anywhere (lines and board
 notes) open in a new tab.
 
 ### Gathering
@@ -635,7 +640,7 @@ that's guidance, not a lock. So:
 - `src/server/nature.rs` and `src/server/game/gather.rs`: things to find, and gathering
 - `src/server/game/boards.rs`: noticeboards, their hooks and the Island Journal
 - `src/server/gardens.rs` and `src/server/game/growing.rs`: plantings that grow over real days
-- `src/server/game/meetings.rs`: meeting spots and call links
+- `src/server/game/meetings.rs`: meeting spots and their links
 - `src/server/game/lighthouse.rs`: the lighthouse everyone mends together
 - `src/agent.rs`: AI residents
 - `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside

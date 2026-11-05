@@ -6,25 +6,27 @@ Reasons to come back, and a world that works across timezones. Still no
 points, coins or streaks: just more to potter about with.
 
 ### Meetings and events
-- **Meeting tables:** `make a meeting table` (or a gazebo) and give it a video
-  call link with `meet https://…`. Anyone there sees the link, and `meet` hands
-  it to you and tells everyone nearby you've gone into the call: the island as
-  the hallway outside the meeting.
-- **Events can carry a call link** (`event fri 10am Standup https://…`), shown
-  in `events`, the reminder and the "starting now" shout. At a meeting table,
-  the table's link is used. Up to three links each (the call and the team's
-  Trello board, say), every one clickable.
-- **Place events:** `event here fri 10am Standup` is just for that spot. Only
+- **Meeting tables:** `make a meeting table` (or a gazebo) and leave links there
+  with `meet https://…`: a call, a list, a song, whatever the gathering needs
+  (up to three). Anyone there sees them, and `meet` hands them over and tells
+  everyone nearby you've headed off to the meeting.
+- **Events can carry links** (`event fri 4pm Tea party https://…`), shown in
+  `events`, the reminder and the "starting now" shout, each clickable. At a
+  meeting table, the table's are used.
+- **Place events:** `event here fri 4pm Tea party` is just for that spot. Only
   its host, people who've said `going 2`, followers of a noticeboard there and
-  anyone nearby hear about it, so a team's standup doesn't ping the whole
+  anyone nearby hear about it, so a little get-together doesn't ping the whole
   island. Anyone can plan one; whole-island events are still for keepers.
-- **Invites:** `event here today 2pm 1:1 with Corey` signs Corey up as going,
-  with a note waiting if they're away. A place event's call link only shows to
-  people who are in on it.
+- **Repeating events:** `event here fridays 5pm Frog choir` (or `weekdays`,
+  `weekends`, `daily`, `every mon wed`) stays at your 5pm and moves on to the
+  next one by itself, keeping who's going and the links.
+- **Invites:** `event here sun 10am Pancakes with Poppy` signs Poppy up as
+  going, with a note waiting if they're away. A place event's links only show
+  to people who are in on it.
 - **Everyone's own time:** browsers and the terminal client tell the world
   their timezone. 2pm means 2pm where you are, and everyone sees event times in
   theirs. A time that's already gone by says so. Your real date and time shows
-  under the island's own clock, and `time Corey` tells you what time it is for
+  under the island's own clock, and `time Poppy` tells you what time it is for
   someone else, even while they're away.
 
 ### Noticeboards

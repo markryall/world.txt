@@ -125,7 +125,7 @@ struct Game {
     radio_guides: HashMap<i64, String>,
     /// What each radio's on, as far as the world last looked.
     radio_news: HashMap<i64, radio::News>,
-    /// Meeting spots' call links, by thing id.
+    /// Meeting spots' links, by thing id.
     meeting_links: HashMap<i64, String>,
     /// Timezones connections said they're in, until they're on the island.
     zones: HashMap<u64, chrono_tz::Tz>,
@@ -1284,13 +1284,13 @@ impl Game {
         }
         if meetings::is_meeting_spot(&name) {
             if self.world.things_at(x, y).any(|t| t.kind.as_deref() == Some(meetings::kind())) {
-                self.say1(id, Line::plain("There's already a meeting spot here. Set its call: meet https://…"));
+                self.say1(id, Line::plain("There's already a meeting spot here. Give it its links: meet https://…"));
                 return Ok(());
             }
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(meetings::kind()))?;
-            self.say1(id, Line::new().c(Col::Cyan, "📞 You make ").b(Col::Cyan, &name).c(Col::Cyan, ". Give it a call link (Meet, Zoom…): meet https://…"));
-            self.say1(id, Line::col(Col::Dim, "Then anyone here can type meet to go in. Events planned here use its link too."));
-            self.tell_here(x, y, id, Line::col(Col::Cyan, format!("📞 {who} makes {name}.")));
+            self.say1(id, Line::new().c(Col::Cyan, "🔗 You make ").b(Col::Cyan, &name).c(Col::Cyan, ". Give it a link or two for whatever happens here: meet https://…"));
+            self.say1(id, Line::col(Col::Dim, "Then anyone here can type meet to get them. Events planned here use them too."));
+            self.tell_here(x, y, id, Line::col(Col::Cyan, format!("🔗 {who} makes {name}.")));
             self.status_all();
             return Ok(());
         }
@@ -2151,9 +2151,10 @@ const HELP: &[HelpTopic] = &[
             ("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
             ("sail to other.world", "visit another world (their keepers let you in)"),
             ("events / go event", "what's coming up on the island, and walk there"),
-            ("event here fri 10am Standup", "plan an event just for this place: only whoever's going, a board's followers here and people nearby hear about it"),
+            ("event here fri 4pm Tea party", "plan an event just for this place: only whoever's going, a board's followers here and people nearby hear about it"),
+            ("event here fridays 5pm Frog choir", "a repeating one (also weekdays, daily, every mon wed)"),
             ("going 2 / not going 2", "say you'll come to a 📍 event, so you're reminded wherever you are"),
-            ("meet", "go into the video call here (at a meeting table, or an event with a link)"),
+            ("meet", "get the links for the gathering here (at a meeting table, or an event that has some)"),
         ],
         footer: Some("There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
     },
@@ -2253,7 +2254,7 @@ const HELP: &[HelpTopic] = &[
         keepers: false,
         items: &[
             ("make a frog that croaks when it rains", "also: at night, during the day, when it's sunny, when someone arrives"),
-            ("make a meeting table / meet https://…", "a spot that holds a video call link; meet goes in (meet off clears it)"),
+            ("make a meeting table / meet https://…", "a spot that holds links for gatherings there (up to three); meet hands them over (meet off clears them)"),
             ("push bench north", "move something"),
             ("unmake bench / undo", "take away something you made, or bring it back"),
         ],
@@ -2306,7 +2307,7 @@ const HELP: &[HelpTopic] = &[
             ("visitors / admit / turn away", "people sailing in from other worlds"),
             ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
             ("event sat 4pm Beach party", "plan an event for the whole island, right here (cancel event 1)"),
-            ("event fri 10am Standup https://meet…", "an event with a video call (at a meeting table, it uses the table's)"),
+            ("event fri 4pm Tea party https://…", "an event with links (at a meeting table, it uses the table's)"),
             ("station add Night Owl FM https://… [guide https://…]", "add a radio station anyone can tune to (station remove)"),
         ],
         footer: None,
