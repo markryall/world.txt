@@ -46,6 +46,10 @@ woods and ponds are its own (the islands keep their names). It's printed when
 the world is first made; `--seed 7` still grows a twin of the old layout.
 Existing worlds keep exactly the shape they have.
 
+### Buttons for the things you do most
+The buttons under the arrows are now 🧺 gather and 🎒 satchel (instead of
+planting and dancing), so gathering is a click rather than a word.
+
 ### A shorter help
 `help` is down to the essentials (walking, talking, gathering, making, home
 and `mute`), plus the topics that need explaining: gatherings, noticeboards,
