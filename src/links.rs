@@ -66,6 +66,17 @@ pub fn plain(text: &str) -> String {
         .collect()
 }
 
+/// Just what the links say, for somewhere small (a side panel): "the notes".
+pub fn labels(text: &str) -> String {
+    pieces(text)
+        .into_iter()
+        .map(|p| match p {
+            Piece::Text(t) => t,
+            Piece::Link { label, .. } => label,
+        })
+        .collect()
+}
+
 /// Slack writes links as `<https://…|the notes>` (or just `<https://…>`):
 /// turn them into the markdown kind, so a hook that thinks it's talking to
 /// Slack still comes out as a proper link.
@@ -130,6 +141,7 @@ mod tests {
     fn terminal_shows_where_it_goes() {
         assert_eq!(plain("See [the notes](https://example.com/n) now"), "See the notes (https://example.com/n) now");
         assert_eq!(plain("https://example.com"), "https://example.com");
+        assert_eq!(labels("[build 42](https://ci.example.com/42) failed"), "build 42 failed");
     }
 
     #[test]

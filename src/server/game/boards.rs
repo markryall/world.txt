@@ -305,11 +305,15 @@ impl Game {
 
     /// `hook CI`: a secret address outside tools can post notes to.
     /// `progress Deploy`: one they post "37/100" to, for a progress bar.
-    pub(super) fn cmd_hook(&mut self, id: u64, name: &str, progress: bool) -> anyhow::Result<()> {
+    pub(super) fn cmd_hook(&mut self, id: u64, name: &str, kind: &str) -> anyhow::Result<()> {
         let Some(board) = self.hookable_board(id) else { return Ok(()) };
         let name = clean_hook_name(name);
         if name.is_empty() {
-            let eg = if progress { "'progress Deploy' or 'progress Backup'" } else { "'hook CI' or 'hook Deploys'" };
+            let eg = match kind {
+                "progress" => "'progress Deploy' or 'progress Backup'",
+                "status" => "'status CI' or 'status Website'",
+                _ => "'hook CI' or 'hook Deploys'",
+            };
             self.say1(id, Line::plain(format!("Name it after whatever will post, e.g. {eg}.")));
             return Ok(());
         }
@@ -318,10 +322,18 @@ impl Game {
             return Ok(());
         }
         let secret = crate::server::accounts::new_secret()?;
-        let kind = if progress { "progress" } else { "notes" };
         self.world.db.add_hook(board, &name, kind, &crate::server::names::hash(&secret), &self.user(id), now())?;
         let address = hook_url(self.url.as_deref(), &secret);
-        let lines = if progress {
+        let lines = if kind == "status" {
+            vec![
+                Line::new().b(Col::Yellow, format!("🚦 {name} can say whether it's up or down here now. Its secret address:")),
+                Line::new().t("   ").b(Col::Yellow, address.clone()),
+                Line::col(Col::Dim, "   POST up or down (ok, passed, failed… work too), with any words after it. Pingdom-style JSON works. For example:"),
+                Line::col(Col::Dim, format!("   curl -d 'down build 42 failed' {address}")),
+                Line::col(Col::Dim, "   Everyone who follows this board, or is nearby, sees its light, and hears when it goes down or comes back up (at most once a minute)."),
+                Line::col(Col::Dim, "   It's only shown this once, and anyone with it can post here: keep it like a password. (clear hides the light; unhook stops it)"),
+            ]
+        } else if kind == "progress" {
             vec![
                 Line::new().b(Col::Yellow, format!("📊 {name} can show its progress here now. Its secret address:")),
                 Line::new().t("   ").b(Col::Yellow, address.clone()),
@@ -350,6 +362,7 @@ impl Game {
             self.say1(id, Line::plain("Stop which one? 'hooks' lists them."));
         } else if let Some(hook) = self.world.db.remove_hook(board, &name)? {
             self.drop_bar(hook);
+            self.drop_light(hook);
             self.say1(id, Line::col(Col::Yellow, format!("🔕 {name} can't post here any more.")));
         } else {
             self.say1(id, Line::plain(format!("This board has no hook called {name}. ('hooks' lists them)")));
@@ -366,11 +379,15 @@ impl Game {
         let hooks = self.world.db.hooks(board)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "🔔 Hooks on this board")];
         if hooks.is_empty() {
-            lines.push(Line::col(Col::Dim, "  None yet. Its maker or a keeper can add one: hook CI (notes) or progress Deploy (a progress bar)"));
+            lines.push(Line::col(Col::Dim, "  None yet. Its maker or a keeper can add one: hook CI (notes), progress Deploy (a progress bar) or status CI (up or down)"));
         }
         for h in hooks {
             let last = h.last_at.map_or("hasn't posted yet".to_string(), |t| format!("last posted {}", when(t)));
-            let icon = if h.kind == "progress" { "📊 " } else { "🔔 " };
+            let icon = match h.kind.as_str() {
+                "progress" => "📊 ",
+                "status" => "🚦 ",
+                _ => "🔔 ",
+            };
             lines.push(Line::new().t("  ").t(icon).b(Col::Yellow, h.name).c(Col::Dim, format!("  made by {} · {last}", self.world.nick(&h.by))));
         }
         self.send(id, lines);
@@ -388,8 +405,10 @@ impl Game {
         let Some((x, y)) = self.board_place(board) else { return HookReply::Unknown };
         // Progress only moves a bar along in memory; saving it and sending
         // it out happens at most once a second (see progress.rs).
-        if h.kind == "progress" {
-            return self.progress_post(hook, board, name, text);
+        match h.kind.as_str() {
+            "progress" => return self.progress_post(hook, board, name, text),
+            "status" => return self.status_post(hook, board, name, text),
+            _ => {}
         }
         let soon = self.hook_last.get(&hook).is_some_and(|t| t.elapsed() < HOOK_GAP);
         if soon {

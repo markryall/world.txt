@@ -67,6 +67,12 @@
   #bars .full .fill { background: var(--yellow); }
   #bars .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
   #bars .amt { color: var(--dim); flex-shrink: 0; }
+  #bars .light { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; }
+  #bars .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; align-self: center; background: var(--green); }
+  #bars .down .dot { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  #bars .light .lbl { max-width: none; }
+  #bars .light .amt { overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+  #bars .light a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
   #log a, #notes a { color: inherit; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
   #hint { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel);
     border-top: 1px solid var(--line); color: var(--yellow); font-weight: bold; cursor: pointer; }
@@ -304,7 +310,7 @@ function status(m) {
   });
   people = m.people || [];
   showPeople();
-  showBars(m.progress || []);
+  showBars(m.progress || [], m.lights || []);
   const map = $('#map');
   map.replaceChildren();
   m.map.forEach((line, i) => {
@@ -364,9 +370,19 @@ function lost() {
 }
 
 // Progress bars outside tools keep filling on noticeboards you follow or are near.
-function showBars(bars) {
+function showBars(bars, lights) {
   const el = $('#bars');
-  el.replaceChildren(...bars.map((b) => {
+  const span = (className, textContent) => Object.assign(document.createElement('span'), { className, textContent });
+  const lightRows = lights.map((l) => {
+    // A note's links show as their words, clickable; the hover has the words too.
+    const words = (l.note || '').replace(/\[([^\[\]\n]{1,100})\]\((https:\/\/[^\s<>"')]+)\)/g, '$1');
+    const row = Object.assign(document.createElement('div'), { className: 'light' + (l.up ? '' : ' down'), title: `${l.label} is ${l.up ? 'up' : 'down'}${words ? ': ' + words : ''}` });
+    const amt = span('amt', l.up ? 'up' : 'down');
+    if (!l.up && l.note) { amt.append(' · '); linkify(amt, l.note); }
+    row.append(span('dot', ''), span('lbl', l.label), amt);
+    return row;
+  });
+  el.replaceChildren(...lightRows, ...bars.map((b) => {
     const pct = Math.round(100 * Math.min(b.done, b.total) / Math.max(b.total, 1));
     const amount = b.total === 100 ? `${b.done}%` : `${b.done}/${b.total}`;
     const row = Object.assign(document.createElement('div'), { className: 'bar' + (pct >= 100 ? ' full' : ''), title: `${b.label}: ${b.done} of ${b.total} (${pct}%)` });

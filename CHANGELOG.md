@@ -22,6 +22,15 @@ following the board, or standing near it, sees the bar fill in their side
 panel, label on the right, without a word in their log. `clear Deploy` (or
 posting `clear`) takes it away when it's done.
 
+### Status lights
+`status CI` at a noticeboard gives an address that a build or an uptime check
+posts `up` or `down` to, with a note if it likes (`down [build 42](https://…)
+failed`; Pingdom's alerts work as they are). Followers, and
+anyone nearby, see a green or red light in their side panel and get a message
+when it goes down or comes back up, never for staying up, and at most once a
+minute however much it flaps. While something's down, there may be someone
+on the noticeboard who'd appreciate a pat.
+
 ### A shorter help
 `help` is down to the essentials (walking, talking, gathering, making, home
 and `mute`), plus the topics that need explaining: gatherings, noticeboards,

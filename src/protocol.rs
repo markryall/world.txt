@@ -96,6 +96,16 @@ impl Bar {
     }
 }
 
+/// Something outside that's up or down (a build, a website), for the side panel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Light {
+    pub label: String,
+    pub up: bool,
+    /// What it last said, e.g. "build 42 failed".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
     pub id: i64,
@@ -146,6 +156,9 @@ pub enum ToClient {
         /// Progress bars on noticeboards you follow or are near.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         progress: Vec<Bar>,
+        /// Up-or-down lights on noticeboards you follow or are near.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        lights: Vec<Light>,
     },
     /// The current first-steps nudge, or none to clear it.
     Hint {

@@ -11,7 +11,7 @@ use crate::server::HookReply;
 use std::time::{Duration, Instant};
 
 /// How near a board you have to be to see its bars without following it.
-const NEAR: i64 = 3;
+pub(super) const NEAR: i64 = 3;
 /// The longest label a tool can give its bar.
 const MAX_LABEL: usize = 32;
 /// A bar is saved and sent out at most this often, however fast a tool
@@ -98,8 +98,8 @@ impl Game {
             .collect()
     }
 
-    /// A board's bars have changed: freshen the side panels that show them.
-    fn bars_changed(&self, board: i64) {
+    /// A board's bars or lights have changed: freshen the side panels that show them.
+    pub(super) fn bars_changed(&self, board: i64) {
         let Some(t) = self.world.things.iter().find(|t| t.id == board) else { return };
         let followers = self.world.db.followers(board).unwrap_or_default();
         for p in self.players.values() {
@@ -160,33 +160,42 @@ impl Game {
         }
     }
 
-    /// `clear Deploy`: take a finished bar away, keeping its hook for next time.
+    /// `clear Deploy`: take a finished bar (or a status light) away,
+    /// keeping its hook for next time.
     pub(super) fn cmd_clear_bar(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
         let Some(board) = self.hookable_board(id) else { return Ok(()) };
         let name = name.trim();
-        let mine: Vec<(i64, String)> = self.bars.iter().filter(|(_, b)| b.board == board).map(|(&h, b)| (h, b.name.clone())).collect();
+        let mut mine: Vec<(i64, String, bool)> = self.bars.iter().filter(|(_, b)| b.board == board).map(|(&h, b)| (h, b.name.clone(), false)).collect();
+        mine.extend(self.lights_on(board).into_iter().map(|(h, n)| (h, n, true)));
         let found = match mine.as_slice() {
             [] => {
-                self.say1(id, Line::plain("There's no progress bar showing on this board."));
+                self.say1(id, Line::plain("There's no progress bar or status showing on this board."));
                 return Ok(());
             }
             [only] if name.is_empty() => only.clone(),
             _ if name.is_empty() => {
-                let names: Vec<String> = mine.into_iter().map(|(_, n)| n).collect();
+                let names: Vec<String> = mine.into_iter().map(|(_, n, _)| n).collect();
                 self.say1(id, Line::plain(format!("Clear which one? {}", crate::server::world::join_and(&names))));
                 return Ok(());
             }
-            _ => match mine.into_iter().find(|(_, n)| n.eq_ignore_ascii_case(name)) {
+            _ => match mine.into_iter().find(|(_, n, _)| n.eq_ignore_ascii_case(name)) {
                 Some(m) => m,
                 None => {
-                    self.say1(id, Line::plain(format!("This board has no progress bar called {name}.")));
+                    self.say1(id, Line::plain(format!("This board has nothing showing called {name}.")));
                     return Ok(());
                 }
             },
         };
-        self.world.db.set_progress(found.0, None)?;
-        self.drop_bar(found.0);
-        self.say1(id, Line::col(Col::Yellow, format!("📊 {}'s bar is cleared. It comes back when it next says how far along it is.", found.1)));
+        let (hook, name, light) = found;
+        if light {
+            self.world.db.set_light(hook, None)?;
+            self.drop_light(hook);
+            self.say1(id, Line::col(Col::Yellow, format!("🚦 {name}'s light is cleared. It comes back when it next says up or down.")));
+        } else {
+            self.world.db.set_progress(hook, None)?;
+            self.drop_bar(hook);
+            self.say1(id, Line::col(Col::Yellow, format!("📊 {name}'s bar is cleared. It comes back when it next says how far along it is.")));
+        }
         Ok(())
     }
 }

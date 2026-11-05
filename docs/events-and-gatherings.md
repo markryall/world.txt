@@ -94,6 +94,18 @@ chat that belongs to that spot:
   `clear`) takes the bar away until it next says something, and `unhook
   Deploy` stops it for good.
   `curl -d '3 of 10 photos' https://world.example.com/hook/<secret>`
+- **Status lights:** `status CI` at a board gives a hook that's sent `up` or
+  `down` (`ok`, `passed`, `failed`, `broken` and friends work too), with any
+  words after it kept as a note: `down build 42 failed`, or with a link,
+  `down [build 42](https://ci.example.com/builds/42) failed` (the side panel
+  shows "build 42", clickable in the browser). Pingdom-style JSON
+  (`current_state`) works as it is. Everyone who follows the board, or is
+  near it, sees a green or red light in their side panel, and gets a message
+  when it goes down or comes back up. Staying up says nothing, and the first
+  word from something that's fine is quiet. A flapping check can't chatter:
+  a light speaks at most once a minute, and only to say where it ended up.
+  `clear CI` hides it until it next says something.
+  `curl -d 'down build 42 failed' https://world.example.com/hook/<secret>`
 
 The **Island Journal** is a special board at the spawn point. The first find of
 every species each week goes in it automatically, with a shout-out to the whole

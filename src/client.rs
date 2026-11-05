@@ -21,6 +21,7 @@ struct State {
     map: Vec<Line>,
     here: Vec<String>,
     progress: Vec<crate::protocol::Bar>,
+    lights: Vec<crate::protocol::Light>,
     hint: Option<String>,
     input: String,
     history: Vec<String>,
@@ -58,8 +59,9 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                                 let excess = st.log.len().saturating_sub(2000);
                                 st.log.drain(..excess);
                             }
-                            Ok(ToClient::Status { place, weather, clock, map, here, progress, .. }) => {
+                            Ok(ToClient::Status { place, weather, clock, map, here, progress, lights, .. }) => {
                                 st.progress = progress;
+                                st.lights = lights;
                                 st.place = place;
                                 st.weather = weather;
                                 st.clock = clock;
@@ -185,7 +187,20 @@ fn draw(f: &mut Frame, st: &mut State) {
             RSpan::styled(b.amount(), dim()),
         ]));
     }
-    if !st.progress.is_empty() {
+    // Up-or-down lights: ● CI down · build 42 failed
+    for l in &st.lights {
+        let (col, word) = if l.up { (Col::Green, "up") } else { (Col::Red, "down") };
+        let mut spans = vec![
+            RSpan::styled("● ", Style::default().fg(colour(col))),
+            RSpan::raw(format!("{} ", l.label)),
+            RSpan::styled(word, Style::default().fg(colour(col))),
+        ];
+        if let Some(n) = l.note.as_ref().filter(|_| !l.up) {
+            spans.push(RSpan::styled(format!(" · {}", crate::links::labels(n)), dim()));
+        }
+        side_lines.push(RLine::from(spans));
+    }
+    if !st.progress.is_empty() || !st.lights.is_empty() {
         side_lines.push(RLine::default());
     }
     if let Some(h) = &st.hint {

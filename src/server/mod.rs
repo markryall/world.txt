@@ -119,10 +119,12 @@ pub enum HookReply {
     Unknown,
     /// The same hook posted again too soon.
     TooFast,
-    /// Moved a progress bar along (or cleared it).
+    /// Moved a progress bar along, or set a status light (or cleared one).
     Progressed,
     /// A progress hook got something that isn't progress.
     NotProgress,
+    /// A status hook got something that isn't up or down.
+    NotStatus,
 }
 
 pub async fn run(
@@ -384,7 +386,10 @@ fn hook_text(body: &[u8]) -> Option<String> {
     let raw = raw.trim();
     let text = if raw.starts_with('{') {
         let v: serde_json::Value = serde_json::from_str(raw).ok()?;
-        ["text", "content", "message"].iter().find_map(|k| v.get(*k).and_then(|t| t.as_str()).map(str::to_string))?
+        let s = |k: &str| v.get(k).and_then(|t| t.as_str()).map(str::to_string);
+        // Pingdom-style alerts: {"current_state": "DOWN", "description": "…"}.
+        let state = s("current_state").map(|st| format!("{st} {}", s("description").or_else(|| s("check_name")).unwrap_or_default()));
+        ["text", "content", "message"].iter().find_map(|k| s(k)).or(state)?
     } else {
         raw.to_string()
     };
@@ -412,8 +417,9 @@ async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>,
                         events.send(Event::Hook { secret, text: t, reply })?;
                         match answer.await {
                             Ok(HookReply::Posted) => text("200 OK", "posted 📌"),
-                            Ok(HookReply::Progressed) => text("200 OK", "noted 📊"),
+                            Ok(HookReply::Progressed) => text("200 OK", "noted ✨"),
                             Ok(HookReply::NotProgress) => text("400 Bad Request", "send how far along it is: 37/100, 37%, '3 of 10 photos', or clear"),
+                            Ok(HookReply::NotStatus) => text("400 Bad Request", "send up or down (or ok, failed, passed…), with any words after it, or clear"),
                             Ok(HookReply::TooFast) => text("429 Too Many Requests", "one at a time, babe: wait a couple of seconds"),
                             Ok(HookReply::Unknown) | Err(_) => text("404 Not Found", "no hook here (it may have been stopped)"),
                         }
@@ -616,7 +622,7 @@ mod tests {
     }
 
     fn status() -> ToClient {
-        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1, people: vec![], progress: vec![] }
+        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1, people: vec![], progress: vec![], lights: vec![] }
     }
     fn words() -> ToClient {
         ToClient::Lines { lines: vec![] }
@@ -650,6 +656,7 @@ mod tests {
         assert_eq!(hook_text(br#"{"text":"build 42 passed"}"#).as_deref(), Some("build 42 passed"));
         assert_eq!(hook_text(br#"{"content":"hi from discord","username":"x"}"#).as_deref(), Some("hi from discord"));
         assert_eq!(hook_text(b"two\nlines\r\n  and   spaces").as_deref(), Some("two lines and spaces"));
+        assert_eq!(hook_text(br#"{"check_name":"site","current_state":"DOWN","description":"timeout"}"#).as_deref(), Some("DOWN timeout"));
         assert_eq!(hook_text(b"   "), None);
         assert_eq!(hook_text(br#"{"nope":1}"#), None);
         assert_eq!(hook_text(b"{not json"), None);

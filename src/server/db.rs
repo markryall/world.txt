@@ -217,6 +217,8 @@ impl Db {
         let _ = conn.execute("ALTER TABLE hooks ADD COLUMN done INTEGER", []);
         let _ = conn.execute("ALTER TABLE hooks ADD COLUMN total INTEGER", []);
         let _ = conn.execute("ALTER TABLE hooks ADD COLUMN label TEXT", []);
+        // Status hooks: up (1) or down (0), with `label` as what it last said.
+        let _ = conn.execute("ALTER TABLE hooks ADD COLUMN up INTEGER", []);
         Ok(Db { conn })
     }
 
@@ -1177,6 +1179,23 @@ impl Db {
         };
         self.conn.execute("UPDATE hooks SET done = ?2, total = ?3, label = ?4 WHERE id = ?1", params![id, done, total, label])?;
         Ok(())
+    }
+
+    /// Whether a status hook is up, and what it last said (or nothing, cleared).
+    pub fn set_light(&self, id: i64, light: Option<(bool, Option<&str>)>) -> anyhow::Result<()> {
+        let (up, note) = match light {
+            Some((u, n)) => (Some(u as i64), n),
+            None => (None, None),
+        };
+        self.conn.execute("UPDATE hooks SET up = ?2, label = ?3 WHERE id = ?1", params![id, up, note])?;
+        Ok(())
+    }
+
+    /// Every status light that's showing: (hook, board, name, up, note).
+    pub fn status_lights(&self) -> anyhow::Result<Vec<(i64, i64, String, bool, Option<String>)>> {
+        let mut stmt = self.conn.prepare("SELECT id, board, name, up, label FROM hooks WHERE kind = 'status' AND up IS NOT NULL ORDER BY id")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get::<_, i64>(3)? != 0, r.get(4)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     /// Every progress bar that's showing: (hook, board, name, done, total, label).
