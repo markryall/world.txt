@@ -11,6 +11,8 @@ primary_region = "syd"
 
 [env]
   WORLD_URL = "https://world.example.com"
+  # The world\'s clock: event times, festivals and Journal weeks follow it.
+  TZ = "Australia/Sydney"
 
 # The world, its backups and anything it replaced live here.
 [mounts]

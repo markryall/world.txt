@@ -50,7 +50,21 @@ pub fn hello(who: &str, server: &str, bot: bool, invite: Option<String>) -> crat
     // Accept a whole magic link as well as just its code.
     let invite = invite.map(|i| i.rsplit("invite=").next().unwrap_or(&i).split('&').next().unwrap_or("").trim().to_string());
     let token = if invite.is_some() { None } else { load_token(who, server) };
-    crate::protocol::ToServer::Hello { name: who.to_string(), bot, invite, token, passport: None, back: false }
+    crate::protocol::ToServer::Hello { name: who.to_string(), bot, invite, token, passport: None, back: false, tz: local_zone() }
+}
+
+/// This computer's timezone, as an IANA name: from TZ, or where
+/// /etc/localtime points (".../zoneinfo/Australia/Sydney").
+pub fn local_zone() -> Option<String> {
+    if let Ok(tz) = std::env::var("TZ") {
+        let tz = tz.trim_start_matches(':').to_string();
+        if !tz.is_empty() {
+            return Some(tz);
+        }
+    }
+    let target = std::fs::read_link("/etc/localtime").ok()?;
+    let path = target.to_string_lossy();
+    path.split_once("zoneinfo/").map(|(_, zone)| zone.to_string())
 }
 
 /// What to do with what the world said about signing in.

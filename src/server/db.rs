@@ -164,6 +164,8 @@ impl Db {
         let _ = conn.execute("ALTER TABLE events ADD COLUMN link TEXT", []);
         // Events for one place (and whoever's going) rather than the whole island.
         let _ = conn.execute("ALTER TABLE events ADD COLUMN local INTEGER NOT NULL DEFAULT 0", []);
+        // Where in the world someone last was, for times written to them while away.
+        let _ = conn.execute("ALTER TABLE players ADD COLUMN tz TEXT", []);
         Ok(Db { conn })
     }
 
@@ -954,6 +956,15 @@ impl Db {
                 Ok((r.get(0)?, r.get(1)?, r.get(2)?))
             })
             .ok()
+    }
+
+    pub fn zone(&self, name: &str) -> Option<String> {
+        self.conn.query_row("SELECT tz FROM players WHERE name = ?1", [name], |r| r.get(0)).ok().flatten()
+    }
+
+    pub fn set_zone(&self, name: &str, tz: &str) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE players SET tz = ?2 WHERE name = ?1", params![name, tz])?;
+        Ok(())
     }
 
     pub fn save_player(&self, name: &str, x: i64, y: i64, tutorial: u8) -> anyhow::Result<()> {

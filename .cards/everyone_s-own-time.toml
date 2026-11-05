@@ -1,0 +1,7 @@
+name = "Everyone's own time"
+status = "done"
+description = "Browsers (Intl) and the terminal client (TZ or /etc/localtime) tell the world their IANA timezone on hello; kept per player and remembered. Event times typed are the planner's own; everyone sees them in theirs; shared notes name the zone; past times say so. Side panel and 'events' show your real date and time; 'who' shows everyone's local time; 'time Corey' works even while they're away. World TZ still drives festivals and Journal weeks (Fly worlds set TZ, image has tzdata). Also fixed: dropped connections now leave instead of lingering as ghosts."
+created_at = "2026-11-05T00:07:44.353237Z"
+updated_at = "2026-11-05T00:11:01.988761Z"
+tags = ["practical"]
+priority = "high"

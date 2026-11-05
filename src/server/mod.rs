@@ -93,9 +93,9 @@ impl ClientTx {
 }
 
 pub enum Event {
-    Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, back: bool, tx: ClientTx },
+    Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, back: bool, tz: Option<String>, tx: ClientTx },
     /// Someone from another world, with a checked passport.
-    Visit { id: u64, passport: federation::Passport, tx: ClientTx },
+    Visit { id: u64, passport: federation::Passport, tz: Option<String>, tx: ClientTx },
     Cmd { id: u64, text: String },
     /// Music from a browser playing a gramophone.
     Audio { id: u64, frames: Vec<String>, title: Option<String> },
@@ -223,16 +223,18 @@ async fn connection(
 
     let mut joined = false;
     while let Some(msg) = source.next().await {
-        let text = match msg? {
-            Message::Text(t) => t,
-            Message::Close(_) => break,
-            _ => continue,
+        // A connection that drops without a goodbye (a phone losing signal)
+        // is an error here: it still has to leave, not linger as a ghost.
+        let text = match msg {
+            Ok(Message::Text(t)) => t,
+            Ok(Message::Close(_)) | Err(_) => break,
+            Ok(_) => continue,
         };
         let Ok(parsed) = serde_json::from_str::<ToServer>(text.as_str()) else {
             continue;
         };
         match parsed {
-            ToServer::Hello { passport: Some(p), .. } if !joined => {
+            ToServer::Hello { passport: Some(p), tz, .. } if !joined => {
                 // Check it here, so the game never waits on another world.
                 let checked = match info.as_ref() {
                     Some(me) => federation::verify(&p, &me.url, accounts::now()).await,
@@ -241,7 +243,7 @@ async fn connection(
                 match checked {
                     Ok(passport) => {
                         joined = true;
-                        events.send(Event::Visit { id, passport, tx: tx.clone() })?;
+                        events.send(Event::Visit { id, passport, tz, tx: tx.clone() })?;
                     }
                     Err(e) => {
                         let _ = tx.send(ToClient::Bye { reason: format!("🛂 Sorry: {e}.") });
@@ -249,9 +251,9 @@ async fn connection(
                     }
                 }
             }
-            ToServer::Hello { bot, invite, token, back, .. } if !joined => {
+            ToServer::Hello { bot, invite, token, back, tz, .. } if !joined => {
                 joined = true;
-                events.send(Event::Join { id, bot, invite, token, back, tx: tx.clone() })?;
+                events.send(Event::Join { id, bot, invite, token, back, tz, tx: tx.clone() })?;
             }
             ToServer::Cmd { text } if joined => {
                 events.send(Event::Cmd { id, text })?;

@@ -68,6 +68,11 @@ struct Player {
     walk_to: Option<(i64, i64, String)>,
     /// Out on the water in a rowing boat.
     voyage: Option<sailing::Voyage>,
+    /// Their timezone, so times read as theirs.
+    tz: chrono_tz::Tz,
+    /// Whether that's really theirs (their device said, now or before), not
+    /// just the world's.
+    tz_known: bool,
     /// Their animal friend: (animal id, nickname).
     companion: Option<(String, Option<String>)>,
     /// The last little bit of scenery they were told, so it isn't said twice running.
@@ -122,6 +127,8 @@ struct Game {
     radio_news: HashMap<i64, radio::News>,
     /// Meeting spots' call links, by thing id.
     meeting_links: HashMap<i64, String>,
+    /// Timezones connections said they're in, until they're on the island.
+    zones: HashMap<u64, chrono_tz::Tz>,
     /// When each hook last posted, so one can't flood its board.
     hook_last: HashMap<i64, std::time::Instant>,
     /// For work done elsewhere (looking up what's on) to report back.
@@ -130,7 +137,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), meeting_links: HashMap::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), meeting_links: HashMap::new(), zones: HashMap::new() };
     game.load_meetings();
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
@@ -160,9 +167,18 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
 impl Game {
     fn handle(&mut self, ev: Event) {
         match ev {
-            Event::Join { id, bot, invite, token, back, tx } => self.join(id, bot, invite, token, back, tx),
-            Event::Visit { id, passport, tx } => self.visit(id, passport, tx),
-            Event::Leave { id } => self.leave(id),
+            Event::Join { id, bot, invite, token, back, tz, tx } => {
+                self.note_zone(id, tz);
+                self.join(id, bot, invite, token, back, tx)
+            }
+            Event::Visit { id, passport, tz, tx } => {
+                self.note_zone(id, tz);
+                self.visit(id, passport, tx)
+            }
+            Event::Leave { id } => {
+                self.zones.remove(&id);
+                self.leave(id)
+            }
             Event::Audio { id, frames, title } => self.audio(id, frames, title),
             Event::RadioNews { thing, title } => self.radio_news(thing, title),
             Event::Shutdown => self.shutdown(),
@@ -384,8 +400,16 @@ impl Game {
         let companion = self.world.db.companion(&user);
         let muted = self.world.db.mutes(&user).unwrap_or_default().into_iter().map(|m| m.to_lowercase()).collect();
         let full = super::names::full(&name, &user);
+        // Their timezone: what this device says, or where they were last time.
+        let (tz, tz_known) = match self.zones.remove(&id) {
+            Some(tz) => {
+                let _ = self.world.db.set_zone(&user, tz.name());
+                (tz, true)
+            }
+            None => (self.zone_of(&user), self.world.db.zone(&user).is_some()),
+        };
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
 
         self.send(
             id,
@@ -522,6 +546,7 @@ impl Game {
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "who" => self.cmd_who(id),
+            "time" | "clock" => self.cmd_time(id, rest),
             "sail" | "row" | "boat" => return self.cmd_sail(id, rest.trim_start_matches("to ")),
             "befriend" | "feed" | "tame" => return self.cmd_befriend(id, rest),
             "petname" => return self.cmd_nickname(id, rest),
@@ -986,11 +1011,35 @@ impl Game {
                     .b(Col::Cyan, &p.name)
                     .c(Col::Dim, format!(" {}", p.user))
                     .c(Col::Dim, format!("  · {}", self.world.place_title(p.x, p.y)))
-                    .c(Col::Dim, if p.bot { "  island resident" } else { "" }),
+                    .c(Col::Dim, if p.bot { "  island resident".to_string() } else if p.tz_known { format!("  · {}", time_there(p.tz)) } else { String::new() }),
             );
         }
         lines.push(Line::col(Col::Dim, "Talk to anyone, anywhere: @Name hello"));
         self.send(id, lines);
+    }
+
+    /// `time`: the real time where you are; `time Corey`: where they are
+    /// (or were last), even while they're away.
+    fn cmd_time(&self, id: u64, who: &str) {
+        let Some(me) = self.players.get(&id) else { return };
+        let who = who.trim().trim_start_matches('@');
+        if who.is_empty() || who.eq_ignore_ascii_case("me") {
+            let now = chrono::Utc::now().with_timezone(&me.tz);
+            self.say1(id, Line::col(Col::Cyan, format!("🕰 It's {} where you are ({}). The island's own clock says {}.", now.format("%a %-d %b, %-I:%M%P"), now.format("%Z"), Clock::label())));
+            return;
+        }
+        let Some(user) = self.find_player(who).map(|pid| self.players[&pid].user.clone()).or_else(|| self.world.db.resolve_user(who)) else {
+            self.say1(id, Line::plain(format!("There's nobody called {who}. Try 'who'.")));
+            return;
+        };
+        let name = self.world.nick(&user);
+        let here = self.players.values().find(|p| p.user == user);
+        let line = match (here, self.world.db.zone(&user).and_then(|z| z.parse::<chrono_tz::Tz>().ok())) {
+            (Some(p), _) if p.tz_known => format!("🕰 It's {} for {name}.", time_there(p.tz)),
+            (None, Some(tz)) => format!("🕰 It's {} for {name}, as far as the island knows (they're away just now).", time_there(tz)),
+            _ => format!("🕰 The island doesn't know where in the world {name} is yet: their device hasn't said."),
+        };
+        self.say1(id, Line::col(Col::Cyan, line));
     }
 
     fn cmd_examine(&self, id: u64, what: &str) {
@@ -1242,6 +1291,24 @@ impl Game {
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("✨ {who} makes {name}.")));
         self.status_all();
         Ok(())
+    }
+
+    /// Keep the timezone a connection says it's in, if it's a real one.
+    fn note_zone(&mut self, id: u64, tz: Option<String>) {
+        if let Some(tz) = tz.and_then(|t| t.parse::<chrono_tz::Tz>().ok()) {
+            self.zones.insert(id, tz);
+        }
+    }
+
+    /// Someone's timezone: theirs if they're here, where they last were if
+    /// not, or the world's own.
+    fn zone_of(&self, user: &str) -> chrono_tz::Tz {
+        self.players
+            .values()
+            .find(|p| p.user == user)
+            .map(|p| p.tz)
+            .or_else(|| self.world.db.zone(user).and_then(|t| t.parse().ok()))
+            .unwrap_or_else(world_zone)
     }
 
     fn is_keeper(&self, user: &str) -> bool {
@@ -1995,6 +2062,20 @@ fn parse_make(text: &str) -> (String, Option<String>, Trigger) {
 }
 
 /// "a frog" → "the frog"
+/// "3:12am Fri in London": the time somewhere, and where (from the zone's name).
+fn time_there(tz: chrono_tz::Tz) -> String {
+    let now = chrono::Utc::now().with_timezone(&tz);
+    let city = tz.name().rsplit('/').next().unwrap_or("").replace('_', " ");
+    let place = if city.is_empty() || city.eq_ignore_ascii_case("UTC") { now.format("%Z").to_string() } else { city };
+    format!("{} {} in {place}", now.format("%-I:%M%P"), now.format("%a"))
+}
+
+/// The world's own timezone (TZ, or the machine's), for anyone who hasn't
+/// said theirs.
+fn world_zone() -> chrono_tz::Tz {
+    crate::identity::local_zone().and_then(|t| t.parse().ok()).unwrap_or(chrono_tz::UTC)
+}
+
 fn the(name: &str) -> String {
     for a in ["a ", "an ", "some "] {
         if let Some(rest) = name.strip_prefix(a) {
@@ -2043,7 +2124,8 @@ const HELP: &[HelpTopic] = &[
             ("n s e w ne nw se sw", "walk about"),
             ("look / look <thing>", "take it all in"),
             ("map", "the whole island, with friends and named places"),
-            ("who", "who's out in the world"),
+            ("who", "who's out in the world, and what time it is for them"),
+            ("time / time Corey", "the real time where you are, or where they are (even if they're away)"),
             ("find Poppy", "which way to walk to them"),
             ("join Poppy / stop", "walk to them automatically"),
             ("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
@@ -2291,6 +2373,13 @@ mod tests {
                 assert!(seen.insert(*n), "'{n}' is used twice");
             }
         }
+    }
+
+    #[test]
+    fn says_whose_time_where() {
+        assert!(time_there(chrono_tz::America::New_York).ends_with(" in New York"));
+        assert!(time_there(chrono_tz::Europe::London).ends_with(" in London"));
+        assert!(time_there(chrono_tz::UTC).ends_with(" in UTC"));
     }
 
     #[test]

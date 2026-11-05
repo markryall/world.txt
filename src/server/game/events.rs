@@ -5,14 +5,15 @@
 use super::Game;
 use crate::protocol::{Col, Line};
 use crate::server::db::EventRow;
-use chrono::{Datelike, Duration, Local, NaiveTime, TimeZone, Weekday};
+use chrono::{Datelike, Duration, NaiveTime, TimeZone, Weekday};
+use chrono_tz::Tz;
 
 const REMIND_BEFORE: i64 = 10 * 60;
 const KEEP_AFTER: i64 = 3 * 3600;
 
 /// Read "sat 4pm", "tomorrow 10:30am", "16:00", "noon" from the start of the
 /// text. Returns when, and the rest of the text (the event's name).
-pub fn parse_when(text: &str, now: chrono::DateTime<Local>) -> Option<(i64, String)> {
+pub fn parse_when<Z: TimeZone>(text: &str, now: chrono::DateTime<Z>) -> Option<(i64, String)> {
     let mut words: Vec<&str> = text.split_whitespace().collect();
     let day = words.first().and_then(|w| day_word(w, now.weekday()));
     if day.is_some() {
@@ -29,7 +30,7 @@ pub fn parse_when(text: &str, now: chrono::DateTime<Local>) -> Option<(i64, Stri
         Some(ahead) => today + Duration::days(ahead),
         None => today,
     };
-    let mut at = Local.from_local_datetime(&date.and_time(time)).earliest()?;
+    let mut at = now.timezone().from_local_datetime(&date.and_time(time)).earliest()?;
     if day.is_none() && at <= now {
         at += Duration::days(1); // no day given: the next time it's that hour
     }
@@ -84,10 +85,14 @@ fn with_call(line: Line, link: &Option<String>) -> Line {
     }
 }
 
-/// "Sat 7 Nov, 4:00pm"
-pub fn when_label(at: i64) -> String {
-    let t = Local.timestamp_opt(at, 0).single().unwrap_or_else(Local::now);
-    t.format("%a %-d %b, %-I:%M%P").to_string()
+/// "Sat 7 Nov, 4:00pm", in someone's own time.
+pub fn when_label(at: i64, tz: Tz) -> String {
+    tz.timestamp_opt(at, 0).single().map_or_else(String::new, |t| t.format("%a %-d %b, %-I:%M%P").to_string())
+}
+
+/// "Sat 7 Nov, 4:00pm AEDT": for words everyone reads alike (a board's note).
+pub fn when_zoned(at: i64, tz: Tz) -> String {
+    tz.timestamp_opt(at, 0).single().map_or_else(String::new, |t| t.format("%a %-d %b, %-I:%M%P %Z").to_string())
 }
 
 /// How far away people hear about a place event: about as far as a shout.
@@ -166,12 +171,19 @@ impl Game {
             || ((x - e.x).abs().max((y - e.y).abs()) <= NEARBY && island_at(x, y).id == island_at(e.x, e.y).id)
     }
 
-    fn tell_audience(&self, e: &EventRow, except: Option<u64>, line: Line) {
+    /// Tell everyone who's in on an event, each in their own time.
+    fn tell_audience(&self, e: &EventRow, except: Option<u64>, line: impl Fn(Tz) -> Line) {
         for id in self.audience(e) {
             if Some(id) != except {
-                self.say1(id, line.clone());
+                if let Some(p) = self.players.get(&id) {
+                    self.say1(id, line(p.tz));
+                }
             }
         }
+    }
+
+    fn my_zone(&self, id: u64) -> Tz {
+        self.players.get(&id).map_or(chrono_tz::UTC, |p| p.tz)
     }
 
     pub(super) fn cmd_event(&mut self, id: u64, text: &str) -> anyhow::Result<()> {
@@ -184,7 +196,16 @@ impl Game {
         }
         let (text, link) = super::meetings::split_link(text);
         let link = link.or_else(|| self.meeting_link_at(x, y));
-        let Some((at, name)) = parse_when(&text, Local::now()) else {
+        // Times are the planner's own: 2pm is 2pm where they are.
+        let tz = self.my_zone(id);
+        let now_there = chrono::Utc::now().with_timezone(&tz);
+        let Some((at, name)) = parse_when(&text, now_there) else {
+            // A time earlier today reads fine from midnight: it's just gone.
+            let midnight = now_there.date_naive().and_hms_opt(0, 0, 0).and_then(|m| tz.from_local_datetime(&m).earliest());
+            if let Some((at, _)) = midnight.and_then(|m| parse_when(&text, m)) {
+                self.say1(id, Line::plain(format!("{} has already gone by (it's {} where you are). Try a later time, or tomorrow.", when_label(at, tz), now_there.format("%-I:%M%P"))));
+                return Ok(());
+            }
             self.say1(id, Line::plain("When, and what? e.g. 'event sat 4pm Beach party', or just for this place: 'event here fri 10am Standup'. It happens right here."));
             return Ok(());
         };
@@ -203,7 +224,7 @@ impl Game {
         for u in &invited {
             self.world.db.set_going(event, u, true)?;
         }
-        let when = when_label(at);
+        let when = when_label(at, tz);
         let call = link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"));
         let now = super::boards::now();
         let who = if local {
@@ -223,25 +244,33 @@ impl Game {
         if let Some(board) = board {
             // Anyone can read a board, so a place event's call link stays off it.
             let call = if local { "" } else { call.as_str() };
+            // Everyone reads a note alike, so it names the zone.
+            let when = when_zoned(at, tz);
             self.world.db.add_note(board, &host, &format!("📅 {name} · {when} at {place}{call}"), now, &super::boards::week_key(now), None)?;
         }
         let row = self.world.db.upcoming_events(at)?.into_iter().find(|e| e.id == event);
         let invite = if local { " (going to say you'll come)" } else { "" };
-        let line = Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}")).c(Col::Dim, invite);
+        let line = |tz: Tz| Line::new().c(Col::Yellow, "📅 Coming up: ").b(Col::Yellow, &name).c(Col::Yellow, format!(" · {} at {place}{call}", when_label(at, tz))).c(Col::Dim, invite);
         if let Some(e) = row {
-            self.tell_audience(&e, Some(id), line);
+            // The invited get their invite (below) instead.
+            for pid in self.audience(&e) {
+                if let Some(p) = self.players.get(&pid).filter(|p| pid != id && !invited.contains(&p.user)) {
+                    self.say1(pid, line(p.tz));
+                }
+            }
             // The invited who are away: a note waiting for when they arrive.
             let hostname = self.world.nick(&host);
             for u in &invited {
                 if *u != host && !self.players.values().any(|p| p.user == *u) {
+                    let when = when_zoned(at, self.zone_of(u));
                     let note = format!("📅 invited you to {name} · {when} at {place}{call} (not going drops out)");
                     self.world.db.send_mail(u, &host, &note, now)?;
                 }
             }
-            let line = Line::col(Col::Yellow, format!("📅 {hostname} has invited you to {name}. (not going drops out)"));
             for (&pid, p) in &self.players {
                 if pid != id && invited.contains(&p.user) {
-                    self.say1(pid, line.clone());
+                    let when = when_label(at, p.tz);
+                    self.say1(pid, Line::new().c(Col::Yellow, format!("📅 {hostname} has invited you to ")).b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}")).c(Col::Dim, " (not going drops out)"));
                 }
             }
         }
@@ -252,14 +281,19 @@ impl Game {
         let events = self.world.db.upcoming_events(super::boards::now() - KEEP_AFTER)?;
         let me = self.user(id);
         let (mx, my) = self.players.get(&id).map_or((-1, -1), |p| (p.x, p.y));
-        let mut lines = vec![Line::new().b(Col::Magenta, "📅 Coming up on the island")];
+        let tz = self.my_zone(id);
+        let now_there = chrono::Utc::now().with_timezone(&tz);
+        let mut lines = vec![
+            Line::new().b(Col::Magenta, "📅 Coming up on the island"),
+            Line::col(Col::Dim, format!("  It's {} where you are ({}). Times here are yours.", now_there.format("%a %-d %b, %-I:%M%P"), now_there.format("%Z"))),
+        ];
         if events.is_empty() {
             lines.push(Line::col(Col::Dim, "  Nothing planned yet. Plan one just for here: event here fri 10am Standup"));
         }
         for (i, e) in events.iter().enumerate() {
             let place = self.world.place_title(e.x, e.y);
             let now = super::boards::now();
-            let when = if e.at <= now { "happening now!".to_string() } else { when_label(e.at) };
+            let when = if e.at <= now { "happening now!".to_string() } else { when_label(e.at, self.my_zone(id)) };
             let pin = if e.local { "📍 " } else { "" };
             lines.push(
                 Line::new()
@@ -314,7 +348,7 @@ impl Game {
             (true, true) => format!(
                 "📅 You're going to {} ({} at {place}{}). You'll get a reminder wherever you are.",
                 e.name,
-                when_label(e.at),
+                when_label(e.at, self.my_zone(id)),
                 e.link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"))
             ),
             (true, false) => format!("📅 You're already going to {}.", e.name),
@@ -357,7 +391,7 @@ impl Game {
             return Ok(());
         }
         // Tell the same people who'd have heard about it, before it's gone.
-        self.tell_audience(&e, None, Line::col(Col::Dim, format!("📅 {} has been cancelled.", e.name)));
+        self.tell_audience(&e, None, |_| Line::col(Col::Dim, format!("📅 {} has been cancelled.", e.name)));
         if !self.audience(&e).contains(&id) {
             self.say1(id, Line::col(Col::Dim, format!("📅 {} has been cancelled.", e.name)));
         }
@@ -389,7 +423,7 @@ impl Game {
             } else {
                 continue;
             };
-            self.tell_audience(&e, None, line);
+            self.tell_audience(&e, None, |_| line.clone());
         }
         let _ = self.world.db.forget_events_before(now - KEEP_AFTER);
     }
@@ -402,17 +436,31 @@ mod tests {
     #[test]
     fn reads_friendly_times() {
         // A Wednesday morning.
-        let now = Local.with_ymd_and_hms(2026, 11, 4, 9, 0, 0).unwrap();
+        let now = chrono_tz::Australia::Sydney.with_ymd_and_hms(2026, 11, 4, 9, 0, 0).unwrap();
+        let sydney = chrono_tz::Australia::Sydney;
         let (at, name) = parse_when("sat 4pm Beach party", now).unwrap();
-        let t = Local.timestamp_opt(at, 0).unwrap();
+        let t = sydney.timestamp_opt(at, 0).unwrap();
         assert_eq!((t.weekday(), t.format("%H:%M").to_string(), name.as_str()), (Weekday::Sat, "16:00".into(), "Beach party"));
         let (at, _) = parse_when("8am Breakfast", now).unwrap();
-        assert_eq!(Local.timestamp_opt(at, 0).unwrap().day(), 5, "8am has passed today, so tomorrow");
+        assert_eq!(sydney.timestamp_opt(at, 0).unwrap().day(), 5, "8am has passed today, so tomorrow");
         let (at, _) = parse_when("tomorrow 10:30am Treasure hunt", now).unwrap();
-        assert_eq!(Local.timestamp_opt(at, 0).unwrap().format("%d %H:%M").to_string(), "05 10:30");
+        assert_eq!(sydney.timestamp_opt(at, 0).unwrap().format("%d %H:%M").to_string(), "05 10:30");
         assert!(parse_when("sat Beach party", now).is_none(), "needs a time");
         assert!(parse_when("4pm", now).is_none(), "needs a name");
         assert!(parse_when("4 Beach", now).is_none(), "a bare number is too vague");
+    }
+
+    #[test]
+    fn times_are_the_planners_own_and_shown_in_yours() {
+        use chrono_tz::{Australia::Sydney, Europe::London};
+        // 10:52am Thursday in Sydney is still Wednesday night in UTC.
+        let sydney = Sydney.with_ymd_and_hms(2026, 11, 5, 10, 52, 0).unwrap();
+        let (at, name) = parse_when("today 2pm 1:1 with Corey", sydney).expect("2pm today hasn't happened yet in Sydney");
+        assert_eq!(name, "1:1 with Corey");
+        assert_eq!(when_label(at, Sydney), "Thu 5 Nov, 2:00pm");
+        assert_eq!(when_label(at, London), "Thu 5 Nov, 3:00am");
+        assert_eq!(when_zoned(at, Sydney), "Thu 5 Nov, 2:00pm AEDT");
+        assert!(parse_when("today 9am Standup", sydney).is_none(), "9am has gone by");
     }
 
     #[test]

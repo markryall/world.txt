@@ -237,7 +237,10 @@ names and addresses stay on your machine.
 
 1. Install `flyctl` (`brew install flyctl`) and `fly auth login`.
 2. Copy the template and fill it in: `app` (a name of your own, unique on Fly),
-   `primary_region` (one near your people) and `WORLD_URL` (the world's address).
+   `primary_region` (one near your people), `WORLD_URL` (the world's address)
+   and `TZ` (the world's own clock, e.g. `Australia/Sydney`: festivals and the
+   Journal's weeks follow it, as do times for anyone whose device hasn't said
+   its timezone; Fly machines are UTC otherwise).
 
    ```
    cp deploy/fly/example.toml deploy/fly/home.toml
@@ -445,7 +448,14 @@ island that glow once placed. (`WORLD_SEASON=autumn` and `WORLD_FESTIVAL=1`
 force them, for testing or a treat.)
 
 Keepers plan events where they're standing: `event sat 4pm Beach party` (or
-`tomorrow 10:30am`, `noon`...). It goes in the Island Journal, everyone hears a
+`tomorrow 10:30am`, `noon`...). Times are your own: browsers (and the terminal
+client) tell the world which timezone they're in, so 2pm means 2pm where you
+are, and everyone sees event times in theirs. Notes everyone reads alike (the
+Island Journal, a board) name the zone: "2:00pm AEST". The side panel shows your real
+date and time (🕰 … your time) under the island's own clock, and `events` starts
+with it too. `who` shows what time it is for everyone online
+("3:12am Fri in London"), and `time Corey` tells you Corey's, from where they
+last were if they're away. It goes in the Island Journal, everyone hears a
 reminder ten minutes before and a shout when it starts, `events` lists what's
 coming up, and `go event` walks you there. `cancel event 1` for its host or a keeper.
 

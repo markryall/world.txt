@@ -161,6 +161,8 @@ fn draw(f: &mut Frame, st: &mut State) {
     side_lines.push(RLine::from(RSpan::styled(st.place.clone(), magenta().add_modifier(Modifier::BOLD))));
     side_lines.push(RLine::from(RSpan::styled(st.weather.clone(), Style::default().fg(colour(Col::Blue)))));
     side_lines.push(RLine::from(RSpan::styled(st.clock.clone(), dim())));
+    // The real date and time here, which event times are in.
+    side_lines.push(RLine::from(RSpan::styled(chrono::Local::now().format("🕰 %a %-d %b, %-I:%M%P · your time").to_string(), dim())));
     side_lines.push(RLine::default());
     side_lines.extend(st.map.iter().map(|l| to_rline(l).centered()));
     side_lines.push(RLine::default());

@@ -88,7 +88,7 @@
     #chips { display: flex; }
     #input { border-top: 0; }
     /* While typing, the keyboard needs the room: keep just the place name. */
-    body.typing #map, body.typing #pad, body.typing #weather, body.typing #clock,
+    body.typing #map, body.typing #pad, body.typing #weather, body.typing #clock, body.typing #now,
     body.typing #here, body.typing #sound { display: none; }
     body.typing #side { padding: 6px 12px; }
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -109,6 +109,7 @@
       <div id="place">…</div>
       <div class="meta" id="weather"></div>
       <div class="meta" id="clock"></div>
+      <div class="meta" id="now" title="the real date and time where you are: event times are in this"></div>
       <div class="meta" id="here"></div>
       <button id="sound" type="button">🔇 sound off</button>
     </div>
@@ -313,13 +314,31 @@ function lost() {
   retryTimer = setTimeout(connect, wait);
 }
 
+// The real date and time where you are, beside the island's own clock, so
+// event times (which are in your time) are easy to place.
+function showNow() {
+  const d = new Date();
+  const day = d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '');
+  let zone = '';
+  try { zone = new Intl.DateTimeFormat([], { timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value || ''; } catch { /* no zone name */ }
+  $('#now').textContent = `🕰 ${day}, ${time}${zone ? ' ' + zone : ''} · your time`;
+}
+showNow();
+setInterval(showNow, 15000);
+
+// This browser's timezone ("Australia/Sydney"), so event times can be yours.
+function zone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { return null; }
+}
+
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   byeSeen = false;
   ws = new WebSocket(`${proto}://${location.host}/`);
   ws.onopen = () => ws.send(JSON.stringify({
     // A device token for this world wins: they've been here before.
-    type: 'hello', invite, token: invite ? null : stored('world.token'), back: lostSaid || restarting,
+    type: 'hello', invite, token: invite ? null : stored('world.token'), back: lostSaid || restarting, tz: zone(),
     passport: invite || stored('world.token') ? null : passport,
   }));
   ws.onmessage = (e) => {

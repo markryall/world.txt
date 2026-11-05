@@ -13,7 +13,7 @@ RUN touch src/main.rs && cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libssl3 sqlite3 \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3 sqlite3 tzdata \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/target/release/world-txt /usr/local/bin/world.txt
 COPY deploy/fly-start.sh /usr/local/bin/fly-start.sh

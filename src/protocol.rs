@@ -188,6 +188,10 @@ pub enum ToServer {
         /// phone waking up), so there's no need to announce it.
         #[serde(default)]
         back: bool,
+        /// Where in the world this person is, as an IANA zone
+        /// ("Australia/Sydney"), so times can be theirs.
+        #[serde(default)]
+        tz: Option<String>,
     },
     Cmd { text: String },
     /// Music for the gramophone this browser is playing: Opus frames (base64),
