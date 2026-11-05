@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased
+
+Reasons to come back, and a world that works across timezones. Still no
+points, coins or streaks: just more to potter about with.
+
+### Meetings and events
+- **Meeting tables:** `make a meeting table` (or a gazebo) and give it a video
+  call link with `meet https://…`. Anyone there sees the link, and `meet` hands
+  it to you and tells everyone nearby you've gone into the call: the island as
+  the hallway outside the meeting.
+- **Events can carry a call link** (`event fri 10am Standup https://…`), shown
+  in `events`, the reminder and the "starting now" shout. At a meeting table,
+  the table's link is used.
+- **Place events:** `event here fri 10am Standup` is just for that spot. Only
+  its host, people who've said `going 2`, followers of a noticeboard there and
+  anyone nearby hear about it, so a team's standup doesn't ping the whole
+  island. Anyone can plan one; whole-island events are still for keepers.
+- **Invites:** `event here today 2pm 1:1 with Corey` signs Corey up as going,
+  with a note waiting if they're away. A place event's call link only shows to
+  people who are in on it.
+- **Everyone's own time:** browsers and the terminal client tell the world
+  their timezone. 2pm means 2pm where you are, and everyone sees event times in
+  theirs. A time that's already gone by says so. Your real date and time shows
+  under the island's own clock, and `time Corey` tells you what time it is for
+  someone else, even while they're away.
+
+### Noticeboards
+- **Hooks:** `hook CI` at a board gives a secret address that outside tools
+  (builds, deploys, a calendar) can POST notes to: plain text, or Slack- or
+  Discord-style JSON. `hooks` lists them and `unhook` stops one.
+- **Boards as groups:** anyone who follows a board can `add Poppy, Sam to
+  board`, like adding someone to a group chat. `boards` numbers them, and
+  `unfollow 2` leaves one from anywhere.
+
+### Growing things
+- **Gardens that grow:** trees go from sapling to young, tall and old over real
+  days, and flowers from shoots to bloom over hours. Choose what you plant
+  (`plant apple tree`, `plant bluebells`, and more). Nothing wilts, and you hear
+  how your garden has grown, under "While you were away" if you've been gone.
+- **The lighthouse:** an old ruin on Driftwood Isle that everyone mends
+  together with `mend lighthouse`: a driftwood door, pebble stairs, a quartz
+  lens, and a light. Progress is told in words, everyone who helped is
+  thanked, and once it's lit its beam sweeps the water at night.
+
+### The browser
+- Everyone online is listed at the foot of the side panel with their local
+  time; tap a name to talk to them. The buttons under the arrows are trimmed
+  to help and the emoji ones.
+- The side panel's top lines stay one line each, so a long place name can't
+  push the map about.
+- https links (a call, a build) are clickable and open in a new tab.
+
+### Fixes
+- Someone whose connection drops without a goodbye (a phone losing signal) now
+  leaves the island, rather than lingering as a ghost until they come back.
+- Hosted worlds keep their own clock (`TZ`), so festivals and the Journal's
+  weeks follow your actual Saturdays and Mondays rather than UTC's.
+
 ## 0.2.1 (2026-11-03)
 
 - **Restarts and dropped connections don't throw you out any more.** When the
