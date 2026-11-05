@@ -1,0 +1,7 @@
+name = "Silly hats and things to wear"
+status = "done"
+description = "'wear <something you have>' (a find, a keepsake, a made thing you're carrying, or just words like 'a seashell crown') puts it on; 'take off' removes it. It shows when people look at you and in 'who' ('Poppy, wearing a daisy chain'). Words only, kept to 40 characters, one thing at a time. Pure fashion: no effects."
+created_at = "2026-11-05T06:38:01.440698Z"
+updated_at = "2026-11-05T06:48:01.754073Z"
+tags = ["fun"]
+priority = "medium"

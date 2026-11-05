@@ -1,0 +1,7 @@
+name = "Messages in bottles"
+status = "done"
+description = """On a shore, 'bottle <words>' corks a note into a bottle and throws it out to sea. Some hours to a couple of days later it washes up on a random beach (any island), not where it was thrown. Whoever next stands there finds it: '🍾 A bottle has washed up here. Inside, a note: "..." (from Poppy, thrown off Driftwood Isle 2 days ago)'. The thrower gets a quiet note when it's found (or waiting if away). One bottle at a time per person at sea; notes trimmed to 200 characters. No counting, no collecting."""
+created_at = "2026-11-05T06:38:01.421997Z"
+updated_at = "2026-11-05T06:48:01.728366Z"
+tags = ["fun"]
+priority = "medium"

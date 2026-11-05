@@ -44,6 +44,16 @@ pub struct EventRow {
     pub tz: Option<String>,
 }
 
+/// A message in a bottle, washed up somewhere.
+pub struct Bottle {
+    pub id: i64,
+    pub by: String,
+    pub text: String,
+    pub thrown_at: i64,
+    pub from: (i64, i64),
+    pub at: (i64, i64),
+}
+
 /// Something someone planted, growing over real days.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlantingRow {
@@ -147,6 +157,14 @@ impl Db {
              CREATE TABLE IF NOT EXISTS event_skips (
                  event INTEGER NOT NULL, player TEXT NOT NULL, at INTEGER NOT NULL,
                  PRIMARY KEY (event, player, at));
+             CREATE TABLE IF NOT EXISTS bottles (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, by TEXT NOT NULL, text TEXT NOT NULL,
+                 thrown_at INTEGER NOT NULL, from_x INTEGER NOT NULL, from_y INTEGER NOT NULL,
+                 lands_at INTEGER NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL,
+                 found_by TEXT, found_at INTEGER);
+             CREATE TABLE IF NOT EXISTS snowmen (
+                 x INTEGER NOT NULL, y INTEGER NOT NULL, builders TEXT NOT NULL, bits TEXT NOT NULL,
+                 at INTEGER NOT NULL, PRIMARY KEY (x, y));
              CREATE TABLE IF NOT EXISTS project_gifts (
                  project TEXT NOT NULL, stage INTEGER NOT NULL, player TEXT NOT NULL,
                  n INTEGER NOT NULL, at INTEGER NOT NULL);",
@@ -176,6 +194,8 @@ impl Db {
         // Repeating events: which days ("mon,tue,wed,thu,fri"), in whose timezone.
         let _ = conn.execute("ALTER TABLE events ADD COLUMN repeat TEXT", []);
         let _ = conn.execute("ALTER TABLE events ADD COLUMN tz TEXT", []);
+        // What someone's wearing, just for show.
+        let _ = conn.execute("ALTER TABLE players ADD COLUMN wearing TEXT", []);
         Ok(Db { conn })
     }
 
@@ -232,6 +252,8 @@ impl Db {
             ("meeting_links", "by"),
             ("plantings", "by"),
             ("project_gifts", "player"),
+            ("bottles", "by"),
+            ("bottles", "found_by"),
         ] {
             tx.execute(&format!("UPDATE {table} SET {col} = ?2 WHERE {col} = ?1"), [old, new])?;
         }
@@ -1005,6 +1027,70 @@ impl Db {
 
     pub fn zone(&self, name: &str) -> Option<String> {
         self.conn.query_row("SELECT tz FROM players WHERE name = ?1", [name], |r| r.get(0)).ok().flatten()
+    }
+
+    pub fn wearing(&self, name: &str) -> Option<String> {
+        self.conn.query_row("SELECT wearing FROM players WHERE name = ?1", [name], |r| r.get(0)).ok().flatten()
+    }
+
+    pub fn set_wearing(&self, name: &str, what: Option<&str>) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE players SET wearing = ?2 WHERE name = ?1", params![name, what])?;
+        Ok(())
+    }
+
+    // ---- bottles and snowmen -------------------------------------------------
+
+    /// Is one of theirs still out on the water?
+    pub fn bottle_afloat(&self, by: &str, now: i64) -> anyhow::Result<bool> {
+        Ok(self.conn.query_row("SELECT COUNT(*) FROM bottles WHERE by = ?1 AND lands_at > ?2", params![by, now], |r| r.get::<_, i64>(0))? > 0)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn throw_bottle(&self, by: &str, text: &str, at: i64, from: (i64, i64), lands_at: i64, to: (i64, i64)) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO bottles (by, text, thrown_at, from_x, from_y, lands_at, x, y) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![by, text, at, from.0, from.1, lands_at, to.0, to.1],
+        )?;
+        Ok(())
+    }
+
+    /// Bottles washed up and waiting within `r` steps of (x, y), nearest first.
+    pub fn bottles_near(&self, x: i64, y: i64, r: i64, now: i64) -> anyhow::Result<Vec<Bottle>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, by, text, thrown_at, from_x, from_y, x, y FROM bottles
+             WHERE found_by IS NULL AND lands_at <= ?3 AND x BETWEEN ?1 - ?4 AND ?1 + ?4 AND y BETWEEN ?2 - ?4 AND ?2 + ?4
+             ORDER BY MAX(ABS(x - ?1), ABS(y - ?2)), lands_at",
+        )?;
+        let rows = stmt.query_map(params![x, y, now, r], |r| {
+            Ok(Bottle { id: r.get(0)?, by: r.get(1)?, text: r.get(2)?, thrown_at: r.get(3)?, from: (r.get(4)?, r.get(5)?), at: (r.get(6)?, r.get(7)?) })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn find_bottle(&self, id: i64, by: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE bottles SET found_by = ?2, found_at = ?3 WHERE id = ?1", params![id, by, at])?;
+        Ok(())
+    }
+
+    /// Every snowman: (x, y, builders, bits).
+    pub fn snowmen(&self) -> anyhow::Result<Vec<(i64, i64, String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT x, y, builders, bits FROM snowmen")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn set_snowman(&self, x: i64, y: i64, builders: &str, bits: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO snowmen (x, y, builders, bits, at) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (x, y) DO UPDATE SET builders = excluded.builders, bits = excluded.bits",
+            params![x, y, builders, bits, at],
+        )?;
+        Ok(())
+    }
+
+    pub fn melt_snowmen(&self) -> anyhow::Result<()> {
+        self.conn.execute("DELETE FROM snowmen", [])?;
+        Ok(())
     }
 
     pub fn set_zone(&self, name: &str, tz: &str) -> anyhow::Result<()> {

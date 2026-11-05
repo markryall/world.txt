@@ -270,6 +270,11 @@ impl Weather {
         names[i]
     }
 
+    /// How hard the wind's blowing, from about 0.08 (still) to 0.5.
+    pub fn speed(&self) -> f64 {
+        self.speed
+    }
+
     pub fn breezy(&self) -> bool {
         self.speed > 0.3
     }

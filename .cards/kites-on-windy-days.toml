@@ -1,0 +1,7 @@
+name = "Kites on windy days"
+status = "done"
+description = "When the weather is windy (or breezy), 'fly kite' sends a kite up over you. Everyone nearby sees it in look and the occasional line ('Poppy's kite swoops and loops above'). It stays up while you stand still and comes down when you move or the wind drops. Now and then (rarely) it tangles in a tree if there's one near; someone else typing 'help Poppy' or 'untangle' frees it. Without wind: 'There's not a breath of wind. Your kite flops.'"
+created_at = "2026-11-05T06:38:01.431458Z"
+updated_at = "2026-11-05T06:48:01.739975Z"
+tags = ["fun"]
+priority = "medium"

@@ -1,0 +1,7 @@
+name = "Stone skimming"
+status = "done"
+description = "At the water's edge, 'skim' (or 'skim a stone') throws a flat pebble. How it goes is told in words, never as a score: 'It skips five times and a duck looks deeply offended', 'It goes plop.', 'It skips so far you lose sight of it'. Nearby people see it. No best, no record."
+created_at = "2026-11-05T06:38:01.449479Z"
+updated_at = "2026-11-05T06:48:01.765381Z"
+tags = ["fun"]
+priority = "low"

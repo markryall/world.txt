@@ -15,6 +15,7 @@ mod jukebox;
 mod lighthouse;
 mod meetings;
 mod music;
+mod play;
 mod radio;
 pub(crate) use radio::clean_station_name;
 mod sailing;
@@ -87,6 +88,8 @@ struct Player {
     ambient_quiet: u8,
     /// When each thing last did its thing for them, so a frog doesn't croak on and on.
     seen_acts: HashMap<i64, std::time::Instant>,
+    /// Kites, seagulls, silly hats.
+    fun: play::Fun,
     /// Their side panel is out of date, and goes with the next stride.
     status_due: std::cell::Cell<bool>,
     /// The radio this browser has been told it can hear: (how loud, stream).
@@ -136,14 +139,23 @@ struct Game {
     zones: HashMap<u64, chrono_tz::Tz>,
     /// When each hook last posted, so one can't flood its board.
     hook_last: HashMap<i64, std::time::Instant>,
+    /// Sandcastles, until the tide comes in.
+    castles: HashMap<(i64, i64), play::Built>,
+    /// Snowmen, until winter's over.
+    snowmen: HashMap<(i64, i64), play::Built>,
+    /// Snow angels, until fresh snow fills them in.
+    angels: HashMap<(i64, i64), play::Angels>,
+    /// When the tide next comes in.
+    next_tide: std::time::Instant,
     /// For work done elsewhere (looking up what's on) to report back.
     inbox: tokio::sync::mpsc::UnboundedSender<Event>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), meeting_links: HashMap::new(), zones: HashMap::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
     game.load_meetings();
+    game.load_snowmen();
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
@@ -342,6 +354,7 @@ impl Game {
         lines.extend(self.garden_lines_here(id));
         lines.extend(self.lighthouse_lines_here(id));
         lines.extend(self.meeting_lines_here(id));
+        lines.extend(self.play_lines_here(id));
         lines.extend(self.animal_lines(id));
         lines.extend(self.find_lines(p.x, p.y));
         lines.extend(exits);
@@ -434,7 +447,7 @@ impl Game {
             None => (self.zone_of(&user), self.world.db.zone(&user).is_some()),
         };
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false), fun: play::Fun::wearing(self.world.db.wearing(&user)) });
 
         self.send(
             id,
@@ -537,6 +550,9 @@ impl Game {
             }
             self.stop_travelling(id, false);
             return self.walk(id, dx, dy);
+        }
+        if let Some(done) = self.play_command(id, &verb, rest) {
+            return done;
         }
         if homes::BUILDING.contains(&verb.as_str()) && !self.may_build_here(id) {
             return Ok(());
@@ -733,6 +749,7 @@ impl Game {
         }
         let dir = DIRS.iter().find(|d| d.2 == dx && d.3 == dy).map_or("away", |d| d.1);
         let back = DIRS.iter().find(|d| d.2 == -dx && d.3 == -dy).map_or("somewhere", |d| d.1);
+        self.kite_walks(id);
         let with = self.with_companion(id);
         self.tell_here(ox, oy, id, Line::col(Col::Cyan, format!("{name} wanders off to the {dir}{with}.")));
         if let Some(p) = self.players.get_mut(&id) {
@@ -1046,6 +1063,7 @@ impl Game {
                     .c(Col::Cyan, if p.bot { "  🐾 " } else { "  ☺ " })
                     .b(Col::Cyan, &p.name)
                     .c(Col::Dim, format!(" {}", p.user))
+                    .c(Col::Magenta, p.fun.wearing.as_ref().map_or(String::new(), |w| format!(" (wearing {w})")))
                     .c(Col::Dim, format!("  · {}", self.world.place_title(p.x, p.y)))
                     .c(Col::Dim, if p.bot { "  island resident".to_string() } else if p.tz_known { format!("  · {}", time_there(p.tz)) } else { String::new() }),
             );
@@ -1850,10 +1868,13 @@ impl Game {
         self.world.weather.step();
         self.growing_tick();
         self.lighthouse_tick();
+        self.play_tick();
 
         let season = Clock::season();
         if season != self.season {
+            let was = self.season;
             self.season = season;
+            self.play_season(was);
             for p in self.players.values() {
                 let _ = p.tx.send(ToClient::Lines { lines: vec![Line::new().b(Col::Magenta, season.arrival())] });
             }
@@ -1898,7 +1919,8 @@ impl Game {
             } else if p.ambient_quiet < AMBIENT_WHILE_IDLE && self.rng.chance(1.0 / 14.0) {
                 let terrain = self.world.terrain(x, y);
                 let last = p.last_ambient;
-                if let Some(line) = ambient(&mut self.rng, terrain, sky, phase, Clock::season()).filter(|l| Some(*l) != last) {
+                let hint = if self.rng.chance(0.3) { self.hint(id, sky) } else { None };
+                if let Some(line) = hint.or_else(|| ambient(&mut self.rng, terrain, sky, phase, Clock::season())).filter(|l| Some(*l) != last) {
                     self.say1(id, Line::col(Col::Dim, line));
                     if let Some(p) = self.players.get_mut(&id) {
                         p.last_ambient = Some(line);
@@ -2156,6 +2178,9 @@ struct HelpTopic {
     also: &'static [&'static str],
     title: &'static str,
     keepers: bool,
+    /// On the help front page. The rest still answer if asked (and in
+    /// help all), but are mostly there to be stumbled on.
+    listed: bool,
     items: &'static [(&'static str, &'static str)],
     footer: Option<&'static str>,
 }
@@ -2166,6 +2191,7 @@ const HELP: &[HelpTopic] = &[
         also: &["move", "walking", "walk", "travel", "sailing", "sail", "map"],
         title: "🧭 getting about",
         keepers: false,
+        listed: false,
         items: &[
             ("n s e w ne nw se sw", "walk about"),
             ("look / look <thing>", "take it all in"),
@@ -2192,6 +2218,7 @@ const HELP: &[HelpTopic] = &[
         also: &["talk", "chat", "people", "friends"],
         title: "💬 talking",
         keepers: false,
+        listed: false,
         items: &[
             ("say hi  (or 'hi)", "talk to people here"),
             ("emote waves  (or :waves)", "do a little something"),
@@ -2211,6 +2238,7 @@ const HELP: &[HelpTopic] = &[
         also: &["sound", "songs", "radio", "gramophone", "tunes"],
         title: "🎶 music",
         keepers: false,
+        listed: true,
         items: &[
             ("hum C E G", "a little tune (hum together to jam!)"),
             ("make a music box / teach C E G / play", "a box that remembers your tune"),
@@ -2227,6 +2255,7 @@ const HELP: &[HelpTopic] = &[
         also: &["shaping", "shape", "digging", "dig", "planting", "garden", "gardening"],
         title: "🌱 shaping the land",
         keepers: false,
+        listed: false,
         items: &[
             ("dig / fill", "ponds, earth, sandbanks (and chip rock down to hills)"),
             ("plant tree|flowers|grass", "make things grow (slowly: trees over days, flowers over hours)"),
@@ -2241,6 +2270,7 @@ const HELP: &[HelpTopic] = &[
         also: &["forage", "gather", "picking", "fishing", "fish", "satchel", "journal", "crafting", "craft"],
         title: "🧺 foraging and crafting",
         keepers: false,
+        listed: false,
         items: &[
             ("gather  (or pick, catch)", "take what's here: look for pink • on the map"),
             ("fish", "by the water, then wait for a bite"),
@@ -2258,6 +2288,7 @@ const HELP: &[HelpTopic] = &[
         also: &["cook", "food", "kitchen", "eat", "baking", "bake"],
         title: "🍳 cooking",
         keepers: false,
+        listed: false,
         items: &[
             ("make a campfire / make a clay oven", "somewhere to cook, wherever you like"),
             ("cook / cook mint tea", "what you could make, then make it (a few moments)"),
@@ -2270,6 +2301,7 @@ const HELP: &[HelpTopic] = &[
         also: &["companions", "companion", "pets", "pet"],
         title: "🦊 animal friends",
         keepers: false,
+        listed: false,
         items: &[
             ("befriend fox", "offer a wild animal a berry (it may take a few)"),
             ("petname Rusty / pet / let go", "your friend follows you everywhere"),
@@ -2281,6 +2313,7 @@ const HELP: &[HelpTopic] = &[
         also: &["make", "build", "things"],
         title: "✨ making things",
         keepers: false,
+        listed: false,
         items: &[
             ("make a frog that croaks when it rains", "also: at night, during the day, when it's sunny, when someone arrives"),
             ("make a gathering table / meet https://…", "a spot that holds links for gatherings there (up to three); meet hands them over (meet off clears them)"),
@@ -2294,6 +2327,7 @@ const HELP: &[HelpTopic] = &[
         also: &["homes", "claim"],
         title: "🏡 home",
         keepers: false,
+        listed: false,
         items: &[
             ("claim", "make the patch around you your home (one each)"),
             ("home  (or go home)", "walk home from anywhere, rowing across if need be"),
@@ -2307,6 +2341,7 @@ const HELP: &[HelpTopic] = &[
         also: &["gathering", "meetings", "meeting", "meet", "events", "event", "group", "groups", "team", "get-togethers", "together"],
         title: "🫖 gatherings: a spot for your group",
         keepers: false,
+        listed: true,
         items: &[
             ("name The Frog Pond Gazebo", "1. find a spot and name it, so it's easy to find (places, go to)"),
             ("make a gathering table", "2. somewhere to gather (a gazebo works too)"),
@@ -2325,6 +2360,7 @@ const HELP: &[HelpTopic] = &[
         also: &["noticeboards", "noticeboard", "notes", "board"],
         title: "📌 noticeboards",
         keepers: false,
+        listed: true,
         items: &[
             ("make a noticeboard", "put one up for everyone"),
             ("read / read more", "the notes here, then older ones"),
@@ -2341,6 +2377,7 @@ const HELP: &[HelpTopic] = &[
         also: &["keeper", "admin"],
         title: "🗝 island keepers",
         keepers: true,
+        listed: true,
         items: &[
             ("invite Poppy", "make an account for someone new, and get their magic link"),
             ("link Poppy", "a new magic link for someone's new device (anyone can: link me)"),
@@ -2397,24 +2434,27 @@ fn help(topic: &str, keeper: bool) -> Vec<Line> {
         lines.extend(
             [
                 ("n s e w  (and ne nw se sw)", "walk about"),
-                ("look", "take it all in"),
-                ("say hi", "talk to people here"),
-                ("who / map", "who's around, and the whole island"),
-                ("tutorial / skip", "first steps again, or hide them"),
+                ("look / map", "take it all in, or the whole island"),
+                ("say hi  (or 'hi)", "talk to people here"),
+                ("@Poppy hi / who", "talk to anyone, anywhere, and see who's about"),
+                ("gather / satchel", "pick up what you find (pink • on the map), and see what you carry"),
+                ("make a frog that croaks when it rains", "make anything you can imagine"),
+                ("claim / home", "make a spot your home, and wander back to it"),
+                ("mute Sam", "stop hearing from someone (they aren't told)"),
             ]
             .iter()
             .map(|(c, w)| help_item(c, w)),
         );
         lines.push(Line::col(Col::Dim, "  ↑ for things you've typed before, Ctrl-R to search them (browser)"));
+        lines.push(Line::col(Col::Pink, "  …and lots more to stumble on. Poke around, try things, see what happens. 🌿"));
     } else {
         lines.push(Line::plain(format!("There's no help on '{topic}'. Try one of these:")));
     }
     lines.push(Line::col(Col::Pink, "more help"));
-    for t in topics() {
+    for t in topics().filter(|t| t.listed) {
         let blurb = t.title.split_once(' ').map_or(t.title, |(_, rest)| rest);
         lines.push(help_item(&format!("help {}", t.name), blurb));
     }
-    lines.push(help_item("help all", "everything at once"));
     lines
 }
 
@@ -2426,7 +2466,9 @@ mod tests {
     fn help_comes_a_topic_at_a_time() {
         let text = |lines: Vec<Line>| lines.iter().map(|l| l.0.iter().map(|s| s.t.as_str()).collect::<String>()).collect::<Vec<_>>().join("\n");
         let short = text(help("", false));
-        assert!(short.contains("help music") && short.contains("help all"));
+        assert!(short.contains("help music") && short.contains("help gatherings") && short.contains("mute"));
+        assert!(!short.contains("help cooking") && !short.contains("help all"), "the rest are for stumbling on");
+        assert!(text(help("cooking", false)).contains("make a campfire"), "but still answer if asked");
         assert!(!short.contains("help keepers"), "keepers' topic only for keepers");
         assert!(text(help("", true)).contains("help keepers"));
         assert!(text(help("radio", false)).contains("tune radio"));

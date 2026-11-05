@@ -1,0 +1,7 @@
+name = "Weather toys: puddles, snow angels, snowmen"
+status = "done"
+description = "When it's raining, 'jump in puddle' (or 'splash') splashes anyone standing with you. In winter or snow, 'make a snow angel' leaves one on the spot until the weather changes, and 'build a snowman' makes one that stands there for the rest of winter (others can 'look' at it, and it melts away when the season turns, told to anyone near). Lines vary."
+created_at = "2026-11-05T06:38:01.444885Z"
+updated_at = "2026-11-05T06:48:01.760149Z"
+tags = ["fun"]
+priority = "medium"

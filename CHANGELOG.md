@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Things to stumble on
+A handful of new bits of nonsense, left out of `help` on purpose: the scenery
+drops the odd hint, and the rest is for finding. A beach, a windy day, a
+puddle, a pond and a snowy week each have something going on. Anything that
+pipes up by itself stays quiet for someone who's stepped away.
+
+### A shorter help
+`help` is down to the essentials (walking, talking, gathering, making, home
+and `mute`), plus the topics that need explaining: gatherings, noticeboards,
+music and, for keepers, keeping. Everything else is there to be found: the
+scenery now and then nudges you towards something you could do where you're
+standing (a dig, a name, a boat to row, an animal that might like a berry),
+never the same nudge twice in a visit. The other topics still answer if you
+ask (`help cooking`), and `help all` still has everything.
+
 ## 0.3.0 (2026-11-05)
 
 Reasons to come back, and a world that works across timezones. Still no

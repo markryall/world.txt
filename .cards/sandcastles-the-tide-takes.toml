@@ -1,0 +1,7 @@
+name = "Sandcastles the tide takes"
+status = "done"
+description = "On sand, 'build a sandcastle' (or 'make a sandcastle') puts one on that spot, described in words that vary (turrets, a moat, a shell flag). Anyone passing sees it in look. The next tide (every few hours, island-wide) gently washes them all away, told to anyone standing by one: 'A wave creeps up and smooths Poppy's sandcastle back into the beach.' Not kept as a made thing; nothing lost for being away."
+created_at = "2026-11-05T06:38:01.426778Z"
+updated_at = "2026-11-05T06:48:01.734192Z"
+tags = ["fun"]
+priority = "medium"
