@@ -21,6 +21,9 @@
   #log .ln.was { opacity: 0.7; }
   #side { background: var(--panel); border-left: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
   #place { color: var(--magenta); font-weight: bold; }
+  /* One line each, so a long place name never pushes the map about: anything
+     too long ends in … (the whole of it shows on hover). */
+  #place, #weather, #clock, #now { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; flex-shrink: 0; }
   #map { font-size: 16px; line-height: 1.15; white-space: pre; text-align: center; padding: 6px 0; }
   .meta { color: var(--dim); font-size: 13px; }
   #pad { display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; }
@@ -243,9 +246,10 @@ function linkify(el, text) {
 const textStyle = (s) => ({ ...s, t: s.t.replace(/([\u2600-\u27BF])(?!\uFE0E)/g, '$1\uFE0E') });
 
 function status(m) {
-  $('#place').textContent = m.place;
-  $('#weather').textContent = m.weather;
-  $('#clock').textContent = m.clock;
+  for (const [el, text] of [['#place', m.place], ['#weather', m.weather], ['#clock', m.clock]]) {
+    $(el).textContent = text;
+    $(el).title = text;
+  }
   const here = $('#here');
   here.replaceChildren();
   if (m.here.length) here.append('☺ ');
@@ -320,9 +324,7 @@ function showNow() {
   const d = new Date();
   const day = d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
   const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '');
-  let zone = '';
-  try { zone = new Intl.DateTimeFormat([], { timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value || ''; } catch { /* no zone name */ }
-  $('#now').textContent = `🕰 ${day}, ${time}${zone ? ' ' + zone : ''} · your time`;
+  $('#now').textContent = `🕰 ${day}, ${time} · your time`;
 }
 showNow();
 setInterval(showNow, 15000);
