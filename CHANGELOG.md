@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-11-05)
 
 Reasons to come back, and a world that works across timezones. Still no
 points, coins or streaks: just more to potter about with.
