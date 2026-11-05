@@ -20,7 +20,7 @@ impl Game {
         self.world.things_at(x, y).any(|t| t.is_dock())
     }
 
-    fn dock_on(&self, island: &islands::Island) -> Option<(i64, i64)> {
+    pub(super) fn dock_on(&self, island: &islands::Island) -> Option<(i64, i64)> {
         self.world.things.iter().find(|t| t.is_dock() && island.covers(t.x, t.y)).map(|t| (t.x, t.y))
     }
 
@@ -111,6 +111,17 @@ impl Game {
             self.look(id);
             self.save_progress(id);
             self.status_near(id, &[left, to]);
+            // On the way somewhere further: walk on from the dock.
+            if let Some((hx, hy, place)) = self.players.get_mut(&id).and_then(|p| p.heading.take()) {
+                if (hx, hy) != to {
+                    if let Some(p) = self.players.get_mut(&id) {
+                        p.walk_to = Some((hx, hy, place.clone()));
+                    }
+                    self.say1(id, Line::col(Col::Cyan, format!("🚶 On you go to {place}. (stop to stop)")));
+                } else {
+                    self.say1(id, Line::col(Col::Cyan, format!("🎉 You've arrived at {place}!")));
+                }
+            }
         }
     }
 

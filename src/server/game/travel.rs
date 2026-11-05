@@ -61,7 +61,88 @@ impl Game {
         Ok(())
     }
 
+    /// `places`: every named spot and home, on every island, numbered.
+    pub(super) fn cmd_places(&mut self, id: u64) -> anyhow::Result<()> {
+        let places = self.world.places();
+        let mut lines = vec![Line::new().b(Col::Magenta, "🗺  Places to go")];
+        if places.is_empty() {
+            lines.push(Line::col(Col::Dim, "  Nowhere has a name yet. Stand somewhere lovely and name it: name The Willow Bank"));
+        }
+        let mut island = None;
+        for (i, (_, _, name, isl)) in places.iter().enumerate() {
+            if island != Some(isl.id) {
+                island = Some(isl.id);
+                lines.push(Line::col(Col::Pink, format!("  {}", isl.name)));
+            }
+            lines.push(Line::new().c(Col::Yellow, format!("   {:>2}. ", i + 1)).t(name.clone()));
+        }
+        if !places.is_empty() {
+            lines.push(Line::col(Col::Dim, "  go to The Greenhouse (part of a name will do) or go 3 walks you there, rowing across if need be"));
+        }
+        self.send(id, lines);
+        Ok(())
+    }
+
+    /// `go [to] The Greenhouse` or `go 3`: walk there, by boat if it's on
+    /// another island.
+    pub(super) fn cmd_go_place(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
+        let want = rest.trim();
+        let want = want.strip_prefix("to ").unwrap_or(want).trim();
+        if want.is_empty() {
+            self.say1(id, Line::plain("Go where? A direction (n, se…), or a place: go to The Greenhouse ('places' lists them)."));
+            return Ok(());
+        }
+        let places = self.world.places();
+        let Some((tx, ty, name, island)) = pick_place(&places, want) else {
+            self.say1(id, Line::plain(format!("There's nowhere called {want}. 'places' lists everywhere with a name.")));
+            return Ok(());
+        };
+        if (tx, ty) == (x, y) {
+            self.say1(id, Line::plain(format!("You're already at {name}. 💅")));
+            return Ok(());
+        }
+        let here = crate::server::islands::island_at(x, y);
+        if here.id == island.id {
+            if let Some(p) = self.players.get_mut(&id) {
+                p.travel = None;
+                p.heading = None;
+                p.walk_to = Some((tx, ty, name.clone()));
+            }
+            self.say1(id, Line::col(Col::Cyan, format!("🚶 You set off for {name}. (stop to stop)")));
+        } else {
+            // Over the water: down to the dock, row across, then walk on.
+            let Some((dx, dy)) = self.dock_on(here) else {
+                self.say1(id, Line::plain("There's no dock on this island to row from."));
+                return Ok(());
+            };
+            let dock = self.world.place_title(dx, dy);
+            if let Some(p) = self.players.get_mut(&id) {
+                p.travel = None;
+                p.heading = Some((tx, ty, name.clone()));
+                p.walk_to = ((dx, dy) != (x, y)).then(|| (dx, dy, dock.clone()));
+            }
+            self.say1(id, Line::col(Col::Cyan, format!("🚶 You set off for {name}, over on {}: down to {dock} first, then a row across. (stop to stop)", island.name)));
+            if (dx, dy) == (x, y) {
+                self.carry_on(id);
+            }
+        }
+        self.step_travellers();
+        Ok(())
+    }
+
+    /// At a dock on the way somewhere over the water: row on across.
+    fn carry_on(&mut self, id: u64) {
+        let Some((tx, ty, _)) = self.players.get(&id).and_then(|p| p.heading.clone()) else { return };
+        let dest = crate::server::islands::island_at(tx, ty);
+        let word = dest.name.split(' ').next().unwrap_or(dest.name).to_string();
+        let _ = self.cmd_sail(id, &word);
+    }
+
     pub(super) fn stop_travelling(&mut self, id: u64, say: bool) {
+        if let Some(p) = self.players.get_mut(&id) {
+            p.heading = None;
+        }
         let place = self.players.get_mut(&id).and_then(|p| p.walk_to.take());
         let was = self.players.get_mut(&id).and_then(|p| p.travel.take()).map(|_| ()).or(place.map(|_| ()));
         if was.is_some() && say {
@@ -89,6 +170,11 @@ impl Game {
             if (self.players[&id].x, self.players[&id].y) == (tx, ty) {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.walk_to = None;
+                }
+                if self.players.get(&id).is_some_and(|p| p.heading.is_some()) {
+                    // Only the dock so far: on across the water.
+                    self.carry_on(id);
+                    continue;
                 }
                 self.say1(id, Line::col(Col::Cyan, format!("🎉 You've arrived at {place}!")));
                 self.look(id);
@@ -125,5 +211,45 @@ impl Game {
                 }
             }
         }
+    }
+}
+
+/// The place someone means: its number from `places`, or its name (whole,
+/// then the start of it, then any part), with or without "the".
+fn pick_place<'a>(places: &'a [(i64, i64, String, &'static crate::server::islands::Island)], want: &str) -> Option<(i64, i64, String, &'static crate::server::islands::Island)> {
+    if let Ok(n) = want.parse::<usize>() {
+        return places.get(n.checked_sub(1)?).cloned();
+    }
+    let norm = |s: &str| {
+        let s = s.trim().to_lowercase();
+        s.strip_prefix("the ").map(str::to_string).unwrap_or(s)
+    };
+    let w = norm(want);
+    let by = |f: &dyn Fn(&str) -> bool| places.iter().find(|p| f(&norm(&p.2))).cloned();
+    by(&|n| n == w).or_else(|| by(&|n| n.starts_with(&w))).or_else(|| by(&|n| n.contains(&w)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::server::islands::ISLANDS;
+
+    #[test]
+    fn finds_a_place_by_number_or_name() {
+        let places = vec![
+            (1, 1, "The Greenhouse".to_string(), &ISLANDS[0]),
+            (2, 2, "The Farmhouse".to_string(), &ISLANDS[0]),
+            (70, 3, "Lighthouse Point".to_string(), &ISLANDS[1]),
+            (4, 4, "Greenhouse Annex".to_string(), &ISLANDS[0]),
+        ];
+        let name = |w: &str| pick_place(&places, w).map(|p| p.2);
+        assert_eq!(name("2").as_deref(), Some("The Farmhouse"));
+        assert_eq!(name("greenhouse").as_deref(), Some("The Greenhouse"), "the whole name wins, 'the' or not");
+        assert_eq!(name("the farm").as_deref(), Some("The Farmhouse"));
+        assert_eq!(name("lighthouse").as_deref(), Some("Lighthouse Point"));
+        assert_eq!(name("annex").as_deref(), Some("Greenhouse Annex"));
+        assert_eq!(name("9"), None);
+        assert_eq!(name("0"), None);
+        assert_eq!(name("narnia"), None);
     }
 }

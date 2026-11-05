@@ -367,6 +367,26 @@ impl World {
         Ok(())
     }
 
+    /// Every named place and home on every island, by island then name:
+    /// (x, y, name, island).
+    pub fn places(&self) -> Vec<(i64, i64, String, &'static super::islands::Island)> {
+        let mut out: Vec<(i64, i64, String, &'static super::islands::Island)> = Vec::new();
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                if let Some(n) = self.tile(x, y).and_then(|t| t.name.clone()) {
+                    out.push((x, y, n, super::islands::island_at(x, y)));
+                }
+            }
+        }
+        for h in &self.homes {
+            if !out.iter().any(|p| (p.0, p.1) == (h.x, h.y)) {
+                out.push((h.x, h.y, self.place_title(h.x, h.y), super::islands::island_at(h.x, h.y)));
+            }
+        }
+        out.sort_by_key(|p| (p.3.id, p.2.to_lowercase()));
+        out
+    }
+
     /// Whether everyone's mended and lit the lighthouse yet.
     pub fn lighthouse_lit(&self) -> bool {
         self.db.meta("lighthouse_stage").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0) >= 4

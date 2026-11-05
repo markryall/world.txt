@@ -333,6 +333,9 @@ Progress is saved by name, so returning visitors never see it again
   shown when they next arrive), `reply` answers them, `chat` (or `@all`) reaches
   everyone, `find Poppy` tells you which way to walk, and `join Poppy` walks you
   there automatically (around the water, following if they move; `stop` to stop).
+  `places` lists every named spot and home on every island, and `go to The
+  Greenhouse` (or `go 3`, or part of the name; "to" is optional) walks you
+  there, down to the dock and rowing across first if it's on another island.
   In the browser, tap a name to message them.
 - `dig`, `fill`, `plant birch|bluebells|grass` (see Gardens), `raise`, `path`, `name The Willow Bank`
 - `make a frog that croaks when it rains`, `push frog north`, `unmake frog`

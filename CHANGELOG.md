@@ -33,6 +33,11 @@ points, coins or streaks: just more to potter about with.
   under the island's own clock, and `time Poppy` tells you what time it is for
   someone else, even while they're away.
 
+### Getting about
+- **`places`** lists every named spot and home on every island, and **`go to
+  The Greenhouse`** (or `go 3`, or part of a name) walks you there, rowing
+  across from the dock if it's on another island.
+
 ### Noticeboards
 - **Hooks:** `hook CI` at a board gives a secret address that outside tools
   (builds, deploys, a calendar) can POST notes to: plain text, or Slack- or

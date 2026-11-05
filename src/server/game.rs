@@ -66,6 +66,9 @@ struct Player {
     travel: Option<String>,
     /// Where they're walking to, with `go event`: (x, y, place name).
     walk_to: Option<(i64, i64, String)>,
+    /// Where they're headed in the end, when it's over the water: walk to the
+    /// dock, row across, then walk on.
+    heading: Option<(i64, i64, String)>,
     /// Out on the water in a rowing boat.
     voyage: Option<sailing::Voyage>,
     /// Their timezone, so times read as theirs.
@@ -429,7 +432,7 @@ impl Game {
             None => (self.zone_of(&user), self.world.db.zone(&user).is_some()),
         };
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
 
         self.send(
             id,
@@ -544,10 +547,10 @@ impl Game {
             }
             "look" | "l" | "examine" | "x" if rest.is_empty() => self.look(id),
             "look" | "l" | "examine" | "x" => self.cmd_examine(id, rest),
-            "go" | "walk" if rest.trim_start_matches("to the ").trim_start_matches("to ").starts_with("dock") => {
+            "go" | "walk" if matches!(rest.trim_start_matches("to the ").trim_start_matches("to ").trim(), "dock" | "the dock") => {
                 return self.cmd_go_dock(id);
             }
-            "go" | "walk" if rest.trim_start_matches("to ").starts_with("event") => {
+            "go" | "walk" if is_go_event(rest) => {
                 return self.cmd_go_event(id, rest.trim_start_matches("to ").trim_start_matches("event"));
             }
             "event" | "plan" => return self.cmd_event(id, rest),
@@ -557,8 +560,10 @@ impl Game {
             "cancel" => return self.cmd_cancel_event(id, rest),
             "go" | "walk" => match DIRS.iter().find(|d| d.0 == rest || d.1 == rest) {
                 Some(&(_, _, dx, dy)) => return self.walk(id, dx, dy),
-                None => self.say1(id, Line::plain("Go where? Try north, south, east, west, or ne/nw/se/sw.")),
+                None if rest.trim_start_matches("to ").trim() == "home" => return self.cmd_home(id),
+                None => return self.cmd_go_place(id, rest),
             },
+            "places" | "where-to" => return self.cmd_places(id),
             "say" => return self.cmd_say(id, rest),
             "emote" | "me" => return self.cmd_emote(id, rest),
             "call" if rest.starts_with("https://") || rest == "off" || (rest.is_empty() && self.meeting_here(id)) => return self.cmd_meet(id, rest),
@@ -2104,6 +2109,12 @@ fn world_zone() -> chrono_tz::Tz {
     crate::identity::local_zone().and_then(|t| t.parse().ok()).unwrap_or(chrono_tz::UTC)
 }
 
+/// `go event` or `go to event 2`, but not `go to Eventide Cove`.
+fn is_go_event(rest: &str) -> bool {
+    let r = rest.trim().trim_start_matches("to ").trim();
+    r == "event" || r.strip_prefix("event ").is_some_and(|n| n.trim().parse::<usize>().is_ok())
+}
+
 fn the(name: &str) -> String {
     for a in ["a ", "an ", "some "] {
         if let Some(rest) = name.strip_prefix(a) {
@@ -2159,6 +2170,7 @@ const HELP: &[HelpTopic] = &[
             ("go dock / sail Driftwood", "walk to the dock ⚓, then row to another island"),
             ("sail to other.world", "visit another world (their keepers let you in)"),
             ("events / go event", "what's coming up on the island, and walk there"),
+            ("places / go to The Greenhouse", "every named spot on every island, and walk there (rowing across if need be; go 3 works too)"),
             ("event here fri 4pm Tea party", "plan an event just for this place: only whoever's going, a board's followers here and people nearby hear about it"),
             ("event here fridays 5pm Frog choir", "a repeating one (also weekdays, daily, every mon wed)"),
             ("going 2 / not going 2", "say you'll come to a 📍 event, so you're reminded wherever you are"),
@@ -2420,6 +2432,12 @@ mod tests {
                 assert!(seen.insert(*n), "'{n}' is used twice");
             }
         }
+    }
+
+    #[test]
+    fn go_event_isnt_a_place_starting_event() {
+        assert!(is_go_event("event") && is_go_event("to event 2") && is_go_event("event 3"));
+        assert!(!is_go_event("to Eventide Cove") && !is_go_event("eventide"));
     }
 
     #[test]
