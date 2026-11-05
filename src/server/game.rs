@@ -591,6 +591,14 @@ impl Game {
             "cook" | "bake" | "brew" | "grill" | "roast" | "toast" => return self.cmd_cook(id, rest),
             "eat" | "drink" | "sip" | "nibble" => return self.cmd_eat(id, rest),
             "serve" => return self.cmd_serve(id, rest),
+            "add" | "invite" if events::names_and_event(rest, "to").is_some() => {
+                let (who, which) = events::names_and_event(rest, "to").unwrap_or_default();
+                return self.cmd_add_to_event(id, who, which);
+            }
+            "remove" | "uninvite" if events::names_and_event(rest, "from").is_some() => {
+                let (who, which) = events::names_and_event(rest, "from").unwrap_or_default();
+                return self.cmd_remove_from_event(id, who, which);
+            }
             "add" if self.adding_to_board(id, rest) => return self.cmd_add_to_board(id, rest),
             "add" | "queue" if self.has_jukebox_here(id) => return self.cmd_add_songs(id),
             "jukebox" | "juke" => return self.cmd_jukebox(id),
@@ -1295,11 +1303,7 @@ impl Game {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(meetings::kind()))?;
             self.say1(id, Line::new().c(Col::Cyan, "🔗 You make ").b(Col::Cyan, &name).c(Col::Cyan, ". Give it a link or two for whatever happens here: meet https://…"));
             self.say1(id, Line::col(Col::Dim, "Then anyone here can type meet to get them. Events planned here use them too."));
-            if self.world.things_at(x, y).any(|t| t.is_board()) {
-                self.say1(id, Line::col(Col::Dim, "The noticeboard here is its group: its followers hear about events planned here. (help gatherings)"));
-            } else {
-                self.say1(id, Line::col(Col::Dim, "Tip: put up a noticeboard here too, and its followers become this table's group: they'll hear about everything planned here. (help gatherings)"));
-            }
+            self.say1(id, Line::col(Col::Dim, "Next: plan something here (event here fri 4pm Tea party), then bring your people: add Poppy, Sam to event 1. (help gatherings)"));
             self.tell_here(x, y, id, Line::col(Col::Cyan, format!("🔗 {who} makes {name}.")));
             self.status_all();
             return Ok(());
@@ -2173,6 +2177,7 @@ const HELP: &[HelpTopic] = &[
             ("places / go to The Greenhouse", "every named spot on every island, and walk there (rowing across if need be; go 3 works too)"),
             ("event here fri 4pm Tea party", "plan an event just for this place: only whoever's going, a board's followers here and people nearby hear about it"),
             ("event here fridays 5pm Frog choir", "a repeating one (also weekdays, daily, every mon wed)"),
+            ("add Poppy, Sam to event 2", "sign people up to a 📍 event (its host, or anyone going); remove Poppy from event 2 for the host"),
             ("going 2 / not going 2", "say you'll come to a 📍 event, so you're reminded wherever you are"),
             ("meet", "get the links for the gathering here (at a gathering table, or an event that has some)"),
         ],
@@ -2299,15 +2304,14 @@ const HELP: &[HelpTopic] = &[
         title: "🫖 gatherings: a spot for your group",
         keepers: false,
         items: &[
-            ("name The Frog Pond Gazebo", "1. find a spot and name it, so it's easy to find on the map"),
+            ("name The Frog Pond Gazebo", "1. find a spot and name it, so it's easy to find (places, go to)"),
             ("make a gathering table", "2. somewhere to gather (a gazebo works too)"),
             ("meet https://… https://…", "3. leave links there for whatever you get up to (up to three)"),
-            ("make a noticeboard", "4. on the same spot: its followers are your group"),
-            ("add Poppy, Sam to board", "5. bring your group in (anyone can also walk up and follow)"),
-            ("event here fri 4pm Tea party", "plan one at the table: the group hears about it from anywhere, with the links"),
-            ("event here weekdays 7am Sunrise stretch", "or a repeating one (also daily, weekends, every mon wed, fridays)"),
-            ("event here sun 10am Pancakes with Jo", "invite someone who isn't in the group"),
-            ("events / go event / meet", "what's coming up, walk there, and get the links"),
+            ("event here weekdays 7am Sunrise stretch", "4. plan it at the table (or a one-off: event here fri 4pm Tea party)"),
+            ("add Poppy, Sam to event 1", "5. bring your people: they hear about it from anywhere, with the links"),
+            ("events", "what's coming up, who's going, and the links (go event 1 walks there, meet hands over the links)"),
+            ("remove Poppy from event 1", "take someone off (anyone can drop out: not going 1)"),
+            ("make a noticeboard", "optional: a board on the same spot is a chat for the group, and its followers hear about everything planned there"),
         ],
         footer: Some("Times are your own, and everyone sees them in theirs. cancel event 1 stops one (or a whole repeating series)."),
     },

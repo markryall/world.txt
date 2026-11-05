@@ -478,6 +478,9 @@ going, the board's followers and its links carry over; `cancel event 1` stops
 the series.
 `event here sun 10am Pancakes with Poppy, Sam and Lu` signs them up as going
 too: they're told straight away, or find a note waiting when they next arrive.
+Later, `add Poppy, Sam to event 1` signs more people up (its host or anyone
+going can), and `remove Poppy from event 1` takes someone off (the host or a
+keeper; anyone can drop themselves with `not going 1`).
 A place event's links are only shown to people who are in on it (going,
 following its board, or standing nearby); everyone else sees that it has one.
 

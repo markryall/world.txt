@@ -21,7 +21,8 @@ points, coins or streaks: just more to potter about with.
   `weekends`, `daily`, `every mon wed`) stays at your 5pm and moves on to the
   next one by itself, keeping who's going and the links.
 - **Invites:** `event here sun 10am Pancakes with Poppy` signs Poppy up as
-  going, with a note waiting if they're away. A place event's links only show
+  going, with a note waiting if they're away. `add Sam to event 1` brings more
+  people in later, and `remove Sam from event 1` takes them off. A place event's links only show
   to people who are in on it.
 - **`help gatherings`** walks through making a spot for your group (a gathering
   table, a noticeboard beside it for the group, then events), and the island

@@ -186,6 +186,19 @@ pub fn next_at(days: &[Weekday], time: NaiveTime, tz: Tz, after: i64) -> Option<
     })
 }
 
+/// "Poppy, Sam and @Lu" → ["Poppy", "Sam", "Lu"].
+fn split_names(who: &str) -> Vec<String> {
+    who.split([',', '&']).flat_map(|p| p.split(" and ")).map(|n| n.trim().trim_start_matches('@').trim().to_string()).filter(|n| !n.is_empty()).collect()
+}
+
+/// "Poppy, Sam to event 2" → ("Poppy, Sam", "2"); the word is "to" or "from".
+pub fn names_and_event<'a>(rest: &'a str, word: &str) -> Option<(&'a str, &'a str)> {
+    let lower = rest.to_lowercase();
+    let marker = format!(" {word} event");
+    let at = lower.rfind(&marker)?;
+    Some((rest[..at].trim(), rest[at + marker.len()..].trim()))
+}
+
 /// How a repeating event's next time reads: "🔁 weekdays · next Fri 6 Nov, 9:20am".
 fn repeat_when(e: &EventRow, tz: Tz) -> Option<String> {
     let code = e.repeat.as_deref()?;
@@ -352,7 +365,15 @@ impl Game {
                         n => format!("The {n} people following the board here, whoever's going, and anyone nearby will get a reminder."),
                     }
                 }
-                _ => "Whoever's going and anyone nearby will get a reminder. (Tip: a noticeboard here makes a group that hears about everything planned here: help gatherings)".to_string(),
+                _ => {
+                    // Its number, for adding people to it.
+                    let n = self.world.db.upcoming_events(super::boards::now() - KEEP_AFTER)?.iter().position(|e| e.id == event).map_or(1, |i| i + 1);
+                    if invited.is_empty() {
+                        format!("Bring your people and they'll hear about it from anywhere: add Poppy, Sam to event {n}")
+                    } else {
+                        format!("Whoever's going and anyone nearby will get a reminder. (add more: add Poppy to event {n})")
+                    }
+                }
             }
         } else {
             "Everyone will get a reminder.".to_string()
@@ -389,24 +410,123 @@ impl Game {
                     self.say1(pid, line(p.tz));
                 }
             }
-            // The invited who are away: a note waiting for when they arrive.
-            let hostname = self.world.nick(&host);
-            for u in &invited {
-                if *u != host && !self.players.values().any(|p| p.user == *u) {
-                    let when = match &every {
-                        Some(every) => format!("🔁 {every} · next {}", when_zoned(at, self.zone_of(u))),
-                        None => when_zoned(at, self.zone_of(u)),
-                    };
-                    let note = format!("📅 invited you to {name} · {when} at {place}{call} (not going drops out)");
-                    self.world.db.send_mail(u, &host, &note, now)?;
+            let invited: Vec<String> = invited.into_iter().filter(|u| *u != host).collect();
+            self.send_invites(&host, &e, &invited)?;
+        }
+        Ok(())
+    }
+
+    /// Tell people they've been invited to an event: straight away if
+    /// they're here, or a note waiting for when they arrive.
+    fn send_invites(&mut self, from: &str, e: &EventRow, users: &[String]) -> anyhow::Result<()> {
+        let place = self.world.place_title(e.x, e.y);
+        let call = e.link.as_ref().map_or(String::new(), |l| format!(" · 🔗 {}", super::meetings::shown(l)));
+        let fromname = self.world.nick(from);
+        let when = |tz: Tz, zoned: bool| {
+            let at = if zoned { when_zoned(e.at, tz) } else { when_label(e.at, tz) };
+            match &e.repeat {
+                Some(code) => format!("🔁 {} · next {at}", days_label(code)),
+                None => at,
+            }
+        };
+        let now = super::boards::now();
+        for u in users {
+            match self.players.iter().find(|(_, p)| p.user == *u) {
+                Some((&pid, p)) => {
+                    let line = Line::new()
+                        .c(Col::Yellow, format!("📅 {fromname} has invited you to "))
+                        .b(Col::Yellow, &e.name)
+                        .c(Col::Yellow, format!(" · {} at {place}{call}", when(p.tz, false)))
+                        .c(Col::Dim, " (events lists it; not going drops out)");
+                    self.say1(pid, line);
+                }
+                None => {
+                    let note = format!("📅 invited you to {} · {} at {place}{call} (events lists it; not going drops out)", e.name, when(self.zone_of(u), true));
+                    self.world.db.send_mail(u, from, &note, now)?;
                 }
             }
-            for (&pid, p) in &self.players {
-                if pid != id && invited.contains(&p.user) {
-                    let when = when_for(p.tz);
-                    self.say1(pid, Line::new().c(Col::Yellow, format!("📅 {hostname} has invited you to ")).b(Col::Yellow, &name).c(Col::Yellow, format!(" · {when} at {place}{call}")).c(Col::Dim, " (not going drops out)"));
-                }
+        }
+        Ok(())
+    }
+
+    /// `add Poppy, Sam to event 2`: sign people up to a place event after
+    /// it's planned. Its host, a keeper, or anyone already going can.
+    pub(super) fn cmd_add_to_event(&mut self, id: u64, who: &str, which: &str) -> anyhow::Result<()> {
+        let Some(e) = self.pick_event(which)? else {
+            self.say1(id, Line::plain("Add them to which event? 'events' lists them, then e.g. 'add Poppy, Sam to event 2'."));
+            return Ok(());
+        };
+        if !e.local {
+            self.say1(id, Line::plain(format!("{} is for the whole island: everyone hears about it anyway.", e.name)));
+            return Ok(());
+        }
+        let me = self.user(id);
+        let going = self.world.db.going(e.id)?;
+        if e.host != me && !going.contains(&me) && !self.is_keeper(&me) {
+            self.say1(id, Line::plain(format!("Only {}'s host, or someone going, can add people to it.", e.name)));
+            return Ok(());
+        }
+        let mut added = Vec::new();
+        let mut already = Vec::new();
+        for n in split_names(who) {
+            let found = self.world.db.matching_users(&n)?;
+            let [them] = found.as_slice() else {
+                let why = if found.is_empty() { "there's nobody called" } else { "more than one person could be" };
+                self.say1(id, Line::plain(format!("Skipping {n}: {why} {n}. (Usernames from 'users' always work.)")));
+                continue;
+            };
+            if self.world.db.set_going(e.id, them, true)? {
+                added.push(them.clone());
+            } else {
+                already.push(self.world.nick(them));
             }
+        }
+        if !added.is_empty() {
+            let names: Vec<String> = added.iter().map(|u| self.world.nick(u)).collect();
+            let verb = if names.len() == 1 { "is" } else { "are" };
+            self.say1(id, Line::col(Col::Yellow, format!("📅 {} {verb} going to {} now, and will hear about it wherever they are.", super::super::world::join_and(&names), e.name)));
+            self.send_invites(&me, &e, &added)?;
+        }
+        if !already.is_empty() {
+            let verb = if already.len() == 1 { "was" } else { "were" };
+            self.say1(id, Line::col(Col::Dim, format!("   {} {verb} going already.", super::super::world::join_and(&already))));
+        }
+        Ok(())
+    }
+
+    /// `remove Poppy from event 2`: for its host or a keeper (anyone can
+    /// drop themselves with `not going`).
+    pub(super) fn cmd_remove_from_event(&mut self, id: u64, who: &str, which: &str) -> anyhow::Result<()> {
+        let Some(e) = self.pick_event(which)? else {
+            self.say1(id, Line::plain("Remove them from which event? 'events' lists them, then e.g. 'remove Poppy from event 2'."));
+            return Ok(());
+        };
+        let me = self.user(id);
+        if e.host != me && !self.is_keeper(&me) {
+            self.say1(id, Line::plain(format!("Only {}'s host or a keeper can take people off it. (not going takes yourself off)", e.name)));
+            return Ok(());
+        }
+        let mut gone = Vec::new();
+        for n in split_names(who) {
+            let Some(them) = self.world.db.resolve_user(&n) else {
+                self.say1(id, Line::plain(format!("There's nobody called {n}.")));
+                continue;
+            };
+            if them == e.host {
+                self.say1(id, Line::plain(format!("{} is hosting it, so they stay. (cancel event stops it)", self.world.nick(&them))));
+                continue;
+            }
+            if self.world.db.set_going(e.id, &them, false)? {
+                gone.push(self.world.nick(&them));
+                if let Some((&pid, _)) = self.players.iter().find(|(_, p)| p.user == them) {
+                    self.say1(pid, Line::col(Col::Dim, format!("📅 You're not on the list for {} any more.", e.name)));
+                }
+            } else {
+                self.say1(id, Line::col(Col::Dim, format!("{} wasn't going anyway.", self.world.nick(&them))));
+            }
+        }
+        if !gone.is_empty() {
+            self.say1(id, Line::col(Col::Yellow, format!("📅 {} won't hear about {} now (unless they follow a board there, or wander by).", super::super::world::join_and(&gone), e.name)));
         }
         Ok(())
     }
@@ -673,6 +793,15 @@ mod tests {
         assert_eq!(invited("Walk with Poppy & Bob", people), Some(Err(vec!["Bob".to_string()])));
         assert_eq!(invited("Chat with Twin", people), None, "ambiguous names aren't guessed");
         assert_eq!(invited("Tea with milk with Sam", people), Some(Ok(("Tea with milk".to_string(), vec!["plucky-wren-17".to_string()]))));
+    }
+
+    #[test]
+    fn reads_who_to_add_to_which_event() {
+        assert_eq!(names_and_event("Poppy, Sam to event 2", "to"), Some(("Poppy, Sam", "2")));
+        assert_eq!(names_and_event("Lu to event", "to"), Some(("Lu", "")));
+        assert_eq!(names_and_event("Poppy from Event 3", "from"), Some(("Poppy", "3")));
+        assert_eq!(names_and_event("Poppy to board", "to"), None);
+        assert_eq!(split_names("Poppy, Sam and @Lu & Jo"), vec!["Poppy", "Sam", "Lu", "Jo"]);
     }
 
     #[test]
