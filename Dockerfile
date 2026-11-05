@@ -1,5 +1,5 @@
-# world.txt in a small container, for hosting on Fly.io (see "Hosting on
-# Fly.io" in the README). The world itself lives on a volume at /data.
+# world.txt in a small container, for hosting on Fly.io (see
+# docs/hosting-fly.md). The world itself lives on a volume at /data.
 
 FROM rust:1.99-bookworm AS build
 WORKDIR /src

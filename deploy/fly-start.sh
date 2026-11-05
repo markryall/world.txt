@@ -1,6 +1,6 @@
 #!/bin/sh
-# Start the world on Fly.io. A world uploaded as /data/import.db (see the
-# README) takes over here, before the server opens anything, so it's never
+# Start the world on Fly.io. A world uploaded as /data/import.db (see
+# docs/hosting-fly.md) takes over here, before the server opens anything, so it's never
 # swapped under a running world.
 set -e
 if [ -f /data/import.db ]; then

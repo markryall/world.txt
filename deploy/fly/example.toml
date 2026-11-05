@@ -1,5 +1,5 @@
 # world.txt on Fly.io: one small machine that never sleeps, with the world on
-# a volume. See "Hosting on Fly.io" in the README.
+# a volume. See docs/hosting-fly.md.
 #
 # Copy this to deploy/fly/<world>.toml (e.g. home.toml; those stay out of git)
 # and fill in your app's name, a region near your people and your world's address.
