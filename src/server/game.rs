@@ -276,8 +276,28 @@ impl Game {
             map: self.world.minimap(p.x, p.y, &people, &self.find_positions()),
             here: self.others_here(id),
             humans: self.players.values().filter(|p| !p.bot).count() as u32,
+            people: self.people_for(id),
         };
         let _ = p.tx.send(msg);
+    }
+
+    /// Everyone else in the world, for the side panel: who's right here
+    /// first, then people, then residents, each by name.
+    fn people_for(&self, id: u64) -> Vec<crate::protocol::Person> {
+        let Some(me) = self.players.get(&id) else { return vec![] };
+        let mut people: Vec<crate::protocol::Person> = self
+            .players
+            .iter()
+            .filter(|(pid, _)| **pid != id)
+            .map(|(_, p)| crate::protocol::Person {
+                name: p.name.clone(),
+                here: (p.x, p.y) == (me.x, me.y),
+                bot: p.bot,
+                tz: (p.tz_known && !p.bot).then(|| p.tz.name().to_string()),
+            })
+            .collect();
+        people.sort_by_key(|p| (!p.here, p.bot, p.name.to_lowercase()));
+        people
     }
 
     fn status_all(&self) {

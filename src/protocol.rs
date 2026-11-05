@@ -61,6 +61,22 @@ impl Line {
     }
 }
 
+/// Someone else out in the world, for the side panel's list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Person {
+    pub name: String,
+    /// Standing right here with you.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub here: bool,
+    /// An island resident (AI), not a person.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub bot: bool,
+    /// Their timezone ("Europe/London"), if their device has said, so the
+    /// client can show what time it is for them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tz: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
     pub id: i64,
@@ -105,6 +121,9 @@ pub enum ToClient {
         /// People (not residents) currently in the world.
         #[serde(default)]
         humans: u32,
+        /// Everyone else in the world just now, those right here first.
+        #[serde(default)]
+        people: Vec<Person>,
     },
     /// The current first-steps nudge, or none to clear it.
     Hint {

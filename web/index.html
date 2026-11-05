@@ -46,6 +46,18 @@
   #join input { width: 100%; font: inherit; font-size: 18px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); text-align: center; outline: none; }
   #join button { margin-top: 12px; width: 100%; font: inherit; font-size: 17px; padding: 12px; border: 0; border-radius: 12px; background: var(--magenta); color: var(--bg); cursor: pointer; }
   #here a { color: var(--cyan); }
+  /* Who else is out in the world, at the foot of the side panel: it grows
+     upward and scrolls, so nothing above it ever moves. */
+  #here { display: none; }
+  #people { margin-top: auto; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px;
+    max-height: 30vh; overflow-y: auto; flex-shrink: 0; }
+  #people .who { color: var(--dim); margin-bottom: 4px; }
+  #people .p { display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+  #people a { color: var(--cyan); text-decoration: none; overflow: hidden; text-overflow: ellipsis; }
+  #people a:hover { text-decoration: underline; }
+  #people .bot a { color: var(--dim); }
+  #people .t { color: var(--dim); margin-left: auto; flex-shrink: 0; }
+  #people .here { color: var(--yellow); flex-shrink: 0; }
   #log a, #notes a { color: inherit; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
   #hint { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel);
     border-top: 1px solid var(--line); color: var(--yellow); font-weight: bold; cursor: pointer; }
@@ -101,6 +113,8 @@
     #pad button { height: 34px; }
     .info { flex: 1; min-width: 150px; }
     .quick { display: none; }
+    #people { display: none; }
+    #here { display: block; }
   }
 </style>
 </head>
@@ -123,10 +137,10 @@
       <button data-c="sw">↙</button><button data-c="s">↓</button><button data-c="se">↘</button>
     </div>
     <div class="quick">
-      <button data-prefill="chat ">💬 chat</button><button data-c="who">who</button><button data-c="help">help</button>
-      <button data-c="dig">dig</button><button data-c="plant flowers">🌼</button>
-      <button data-c="plant tree">🌳</button><button data-c="gather">🧺 gather</button><button data-c="satchel">satchel</button><button data-c="dance">💃</button>
+      <button data-c="help">help</button><button data-c="plant flowers" title="plant flowers">🌼</button>
+      <button data-c="plant tree" title="plant a tree">🌳</button><button data-c="dance" title="dance">💃</button>
     </div>
+    <div id="people"></div>
   </div>
 </div>
 <div id="hint" role="button" tabindex="0">
@@ -260,6 +274,8 @@ function status(m) {
     a.onclick = (e) => { e.preventDefault(); prefill('@' + name + ' '); };
     here.append(a);
   });
+  people = m.people || [];
+  showPeople();
   const map = $('#map');
   map.replaceChildren();
   m.map.forEach((line, i) => {
@@ -318,16 +334,51 @@ function lost() {
   retryTimer = setTimeout(connect, wait);
 }
 
+// Everyone else out in the world, with what time it is for them; tap a name
+// to talk to them.
+let people = [];
+function showPeople() {
+  const el = $('#people');
+  el.replaceChildren();
+  if (!people.length) {
+    el.append(Object.assign(document.createElement('div'), { className: 'who', textContent: 'Nobody else is out just now.' }));
+    return;
+  }
+  const n = people.filter((p) => !p.bot).length;
+  el.append(Object.assign(document.createElement('div'), { className: 'who', textContent: n === 1 ? '1 other person out in the world' : `${n} other people out in the world` }));
+  for (const p of people) {
+    const row = document.createElement('div');
+    row.className = 'p' + (p.bot ? ' bot' : '');
+    const a = document.createElement('a');
+    a.href = '#'; a.textContent = (p.bot ? '🐾 ' : '☺ ') + p.name; a.title = 'talk to ' + p.name;
+    a.onclick = (e) => { e.preventDefault(); prefill('@' + p.name + ' '); };
+    row.append(a);
+    if (p.here) row.append(Object.assign(document.createElement('span'), { className: 'here', textContent: 'here' }));
+    const t = document.createElement('span');
+    t.className = 't';
+    if (p.tz) {
+      try {
+        t.textContent = new Date().toLocaleTimeString([], { timeZone: p.tz, hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase().replace(' ', '');
+        t.title = `their time (${p.tz.split('/').pop().replace(/_/g, ' ')})`;
+      } catch { /* a zone this browser doesn't know */ }
+    } else if (p.bot) {
+      t.textContent = 'resident';
+    }
+    row.append(t);
+    el.append(row);
+  }
+}
+
 // The real date and time where you are, beside the island's own clock, so
 // event times (which are in your time) are easy to place.
 function showNow() {
   const d = new Date();
   const day = d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
-  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '');
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase().replace(' ', '');
   $('#now').textContent = `🕰 ${day}, ${time} · your time`;
 }
 showNow();
-setInterval(showNow, 15000);
+setInterval(() => { showNow(); showPeople(); }, 15000);
 
 // This browser's timezone ("Australia/Sydney"), so event times can be yours.
 function zone() {

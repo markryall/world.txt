@@ -609,7 +609,7 @@ mod tests {
     }
 
     fn status() -> ToClient {
-        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1 }
+        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1, people: vec![] }
     }
     fn words() -> ToClient {
         ToClient::Lines { lines: vec![] }

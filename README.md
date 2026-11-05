@@ -453,7 +453,9 @@ client) tell the world which timezone they're in, so 2pm means 2pm where you
 are, and everyone sees event times in theirs. Notes everyone reads alike (the
 Island Journal, a board) name the zone: "2:00pm AEST". The side panel shows your real
 date and time (🕰 … your time) under the island's own clock, and `events` starts
-with it too. `who` shows what time it is for everyone online
+with it too. In the browser, everyone else out in the world is listed at the foot of
+the side panel with their local time (tap a name to talk to them, and whoever's
+on your spot is marked "here"); `who` shows what time it is for everyone online
 ("3:12am Fri in London"), and `time Corey` tells you Corey's, from where they
 last were if they're away. It goes in the Island Journal, everyone hears a
 reminder ten minutes before and a shout when it starts, `events` lists what's
