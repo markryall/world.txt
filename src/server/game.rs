@@ -1284,16 +1284,16 @@ impl Game {
         }
         if meetings::is_meeting_spot(&name) {
             if self.world.things_at(x, y).any(|t| t.kind.as_deref() == Some(meetings::kind())) {
-                self.say1(id, Line::plain("There's already a meeting spot here. Give it its links: meet https://…"));
+                self.say1(id, Line::plain("There's already a gathering spot here. Give it its links: meet https://…"));
                 return Ok(());
             }
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(meetings::kind()))?;
             self.say1(id, Line::new().c(Col::Cyan, "🔗 You make ").b(Col::Cyan, &name).c(Col::Cyan, ". Give it a link or two for whatever happens here: meet https://…"));
             self.say1(id, Line::col(Col::Dim, "Then anyone here can type meet to get them. Events planned here use them too."));
             if self.world.things_at(x, y).any(|t| t.is_board()) {
-                self.say1(id, Line::col(Col::Dim, "The noticeboard here is its group: its followers hear about events planned here. (help meetings)"));
+                self.say1(id, Line::col(Col::Dim, "The noticeboard here is its group: its followers hear about events planned here. (help gatherings)"));
             } else {
-                self.say1(id, Line::col(Col::Dim, "Tip: put up a noticeboard here too, and its followers become this table's group: they'll hear about everything planned here. (help meetings)"));
+                self.say1(id, Line::col(Col::Dim, "Tip: put up a noticeboard here too, and its followers become this table's group: they'll hear about everything planned here. (help gatherings)"));
             }
             self.tell_here(x, y, id, Line::col(Col::Cyan, format!("🔗 {who} makes {name}.")));
             self.status_all();
@@ -1308,7 +1308,7 @@ impl Game {
             self.say1(id, Line::new().c(Col::Yellow, "📌 You put up ").b(Col::Yellow, &name).c(Col::Yellow, ". Anyone passing can read it and post notes."));
             self.say1(id, Line::col(Col::Dim, "Try: post hello everyone! · read · follow"));
             if self.world.things_at(x, y).any(|t| t.kind.as_deref() == Some(meetings::kind())) {
-                self.say1(id, Line::col(Col::Dim, "It's beside a meeting table, so its followers are that table's group. Bring them in: add Poppy, Sam to board"));
+                self.say1(id, Line::col(Col::Dim, "It's beside a gathering table, so its followers are that table's group. Bring them in: add Poppy, Sam to board"));
             }
             self.tell_here(x, y, id, Line::col(Col::Yellow, format!("📌 {who} puts up {name}.")));
             self.status_all();
@@ -2162,7 +2162,7 @@ const HELP: &[HelpTopic] = &[
             ("event here fri 4pm Tea party", "plan an event just for this place: only whoever's going, a board's followers here and people nearby hear about it"),
             ("event here fridays 5pm Frog choir", "a repeating one (also weekdays, daily, every mon wed)"),
             ("going 2 / not going 2", "say you'll come to a 📍 event, so you're reminded wherever you are"),
-            ("meet", "get the links for the gathering here (at a meeting table, or an event that has some)"),
+            ("meet", "get the links for the gathering here (at a gathering table, or an event that has some)"),
         ],
         footer: Some("There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
     },
@@ -2216,9 +2216,9 @@ const HELP: &[HelpTopic] = &[
         footer: None,
     },
     HelpTopic {
-        name: "gathering",
-        also: &["gather", "fishing", "fish", "satchel", "journal", "crafting", "craft"],
-        title: "🧺 gathering and crafting",
+        name: "foraging",
+        also: &["forage", "gather", "picking", "fishing", "fish", "satchel", "journal", "crafting", "craft"],
+        title: "🧺 foraging and crafting",
         keepers: false,
         items: &[
             ("gather  (or pick, catch)", "take what's here: look for pink • on the map"),
@@ -2262,7 +2262,7 @@ const HELP: &[HelpTopic] = &[
         keepers: false,
         items: &[
             ("make a frog that croaks when it rains", "also: at night, during the day, when it's sunny, when someone arrives"),
-            ("make a meeting table / meet https://…", "a spot that holds links for gatherings there (up to three); meet hands them over (meet off clears them)"),
+            ("make a gathering table / meet https://…", "a spot that holds links for gatherings there (up to three); meet hands them over (meet off clears them)"),
             ("push bench north", "move something"),
             ("unmake bench / undo", "take away something you made, or bring it back"),
         ],
@@ -2282,13 +2282,13 @@ const HELP: &[HelpTopic] = &[
         footer: None,
     },
     HelpTopic {
-        name: "meetings",
-        also: &["meeting", "meet", "events", "event", "group", "groups", "team", "get-togethers", "together"],
-        title: "🫖 get-togethers: a spot for your group",
+        name: "gatherings",
+        also: &["gathering", "meetings", "meeting", "meet", "events", "event", "group", "groups", "team", "get-togethers", "together"],
+        title: "🫖 gatherings: a spot for your group",
         keepers: false,
         items: &[
             ("name The Frog Pond Gazebo", "1. find a spot and name it, so it's easy to find on the map"),
-            ("make a meeting table", "2. somewhere to gather"),
+            ("make a gathering table", "2. somewhere to gather (a gazebo works too)"),
             ("meet https://… https://…", "3. leave links there for whatever you get up to (up to three)"),
             ("make a noticeboard", "4. on the same spot: its followers are your group"),
             ("add Poppy, Sam to board", "5. bring your group in (anyone can also walk up and follow)"),
@@ -2333,7 +2333,7 @@ const HELP: &[HelpTopic] = &[
             ("visitors / admit / turn away", "people sailing in from other worlds"),
             ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
             ("event sat 4pm Beach party", "plan an event for the whole island, right here (cancel event 1)"),
-            ("event fri 4pm Tea party https://…", "an event with links (at a meeting table, it uses the table's)"),
+            ("event fri 4pm Tea party https://…", "an event with links (at a gathering table, it uses the table's)"),
             ("station add Night Owl FM https://… [guide https://…]", "add a radio station anyone can tune to (station remove)"),
         ],
         footer: None,

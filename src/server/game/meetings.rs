@@ -14,7 +14,7 @@ pub fn kind() -> &'static str {
 
 pub fn is_meeting_spot(name: &str) -> bool {
     let n = name.to_lowercase();
-    ["meeting", "gazebo"].iter().any(|w| n.contains(w))
+    ["meeting", "gazebo", "gathering table", "gathering spot", "gathering place"].iter().any(|w| n.contains(w))
 }
 
 /// A call link worth keeping: https, one piece, not too long.
@@ -100,18 +100,18 @@ impl Game {
                 let msg = if spot.is_some() {
                     "There are no links here yet. Its maker (or a keeper) can add some: meet https://…"
                 } else {
-                    "There's nothing to join here. Gatherings with links happen at a meeting table: make a meeting table, then meet https://…"
+                    "There's nothing to join here. Gatherings happen at a gathering table: make a gathering table, then meet https://…"
                 };
                 self.say1(id, Line::plain(msg));
                 return Ok(());
             };
             self.say1(id, Line::new().c(Col::Cyan, "🔗 Here you go: ").b(Col::Cyan, shown(&link)).c(Col::Dim, " (the island will be right here when you're back)"));
             let user = self.user(id);
-            self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("🔗 {name} heads off to the meeting.")));
+            self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("🔗 {name} heads off to the gathering.")));
             return Ok(());
         }
         let Some((thing, spot_name, maker)) = spot else {
-            self.say1(id, Line::plain("Links live on meeting spots. Make one here first: make a meeting table"));
+            self.say1(id, Line::plain("Links live on gathering spots. Make one here first: make a gathering table"));
             return Ok(());
         };
         let user = self.user(id);
@@ -172,6 +172,8 @@ mod tests {
     fn knows_a_meeting_spot() {
         assert!(is_meeting_spot("a round meeting table"));
         assert!(is_meeting_spot("a little Gazebo"));
+        assert!(is_meeting_spot("a gathering table"));
+        assert!(!is_meeting_spot("a gathering basket"), "gathering finds is something else");
         assert!(!is_meeting_spot("a bench"));
     }
 }

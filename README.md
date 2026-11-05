@@ -478,17 +478,17 @@ too: they're told straight away, or find a note waiting when they next arrive.
 A place event's links are only shown to people who are in on it (going,
 following its board, or standing nearby); everyone else sees that it has one.
 
-### Meetings
+### Gatherings
 
 Somewhere to gather, with links for whatever's going on: a call, a list, a song.
-`help meetings` walks through the whole recipe, and the island nudges you along.
-`make a meeting table` (or a gazebo) makes a meeting spot, and its maker, the
+`help gatherings` walks through the whole recipe, and the island nudges you along.
+`make a gathering table` (or a gazebo) makes a gathering spot, and its maker, the
 home's owner or a keeper leaves its links there:
 `meet https://example.com/gathering https://example.com/snack-list` (up to
 three; `meet off` clears them). Anyone standing there sees them when they look,
 and `meet` hands them to you and tells everyone there you've headed off to the
-meeting. Events can carry links too, `event here fri 4pm Tea party https://…`,
-and one planned at a meeting table uses the table's. They show in `events`, the
+gathering. Events can carry links too, `event here fri 4pm Tea party https://…`,
+and one planned at a gathering table uses the table's. They show in `events`, the
 reminder and the "starting now" shout, and `meet` at an event's spot while it's
 on hands them over, each clickable on its own. In the browser, https links anywhere (lines and board
 notes) open in a new tab.
@@ -641,7 +641,7 @@ that's guidance, not a lock. So:
 - `src/server/nature.rs` and `src/server/game/gather.rs`: things to find, and gathering
 - `src/server/game/boards.rs`: noticeboards, their hooks and the Island Journal
 - `src/server/gardens.rs` and `src/server/game/growing.rs`: plantings that grow over real days
-- `src/server/game/meetings.rs`: meeting spots and their links
+- `src/server/game/meetings.rs`: gathering spots and their links
 - `src/server/game/lighthouse.rs`: the lighthouse everyone mends together
 - `src/agent.rs`: AI residents
 - `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside

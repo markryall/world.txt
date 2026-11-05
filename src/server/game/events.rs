@@ -352,7 +352,7 @@ impl Game {
                         n => format!("The {n} people following the board here, whoever's going, and anyone nearby will get a reminder."),
                     }
                 }
-                _ => "Whoever's going and anyone nearby will get a reminder. (Tip: a noticeboard here makes a group that hears about everything planned here: help meetings)".to_string(),
+                _ => "Whoever's going and anyone nearby will get a reminder. (Tip: a noticeboard here makes a group that hears about everything planned here: help gatherings)".to_string(),
             }
         } else {
             "Everyone will get a reminder.".to_string()

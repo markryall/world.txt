@@ -5,14 +5,14 @@
 Reasons to come back, and a world that works across timezones. Still no
 points, coins or streaks: just more to potter about with.
 
-### Meetings and events
-- **Meeting tables:** `make a meeting table` (or a gazebo) and leave links there
+### Gatherings and events
+- **Gathering tables:** `make a gathering table` (or a gazebo) and leave links there
   with `meet https://…`: a call, a list, a song, whatever the gathering needs
   (up to three). Anyone there sees them, and `meet` hands them over and tells
-  everyone nearby you've headed off to the meeting.
+  everyone nearby you've headed off to the gathering.
 - **Events can carry links** (`event fri 4pm Tea party https://…`), shown in
   `events`, the reminder and the "starting now" shout, each clickable. At a
-  meeting table, the table's are used.
+  gathering table, the table's are used.
 - **Place events:** `event here fri 4pm Tea party` is just for that spot. Only
   its host, people who've said `going 2`, followers of a noticeboard there and
   anyone nearby hear about it, so a little get-together doesn't ping the whole
@@ -23,7 +23,7 @@ points, coins or streaks: just more to potter about with.
 - **Invites:** `event here sun 10am Pancakes with Poppy` signs Poppy up as
   going, with a note waiting if they're away. A place event's links only show
   to people who are in on it.
-- **`help meetings`** walks through making a spot for your group (a meeting
+- **`help gatherings`** walks through making a spot for your group (a gathering
   table, a noticeboard beside it for the group, then events), and the island
   nudges you along as you go: making one suggests the other, and planning an
   event says who'll hear about it.
