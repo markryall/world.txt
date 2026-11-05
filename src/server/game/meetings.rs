@@ -28,19 +28,32 @@ pub fn clean_link(raw: &str) -> Option<String> {
 }
 
 /// Take a call link out of some words: "Standup https://meet…" → ("Standup", link).
+/// How many links one event or meeting spot keeps (a call, a board, notes).
+const MAX_LINKS: usize = 3;
+
+/// Take the links out of some words: "Standup https://meet… https://trello…"
+/// → ("Standup", "https://meet… https://trello…"). Several are kept
+/// together, a space apart.
 pub fn split_link(text: &str) -> (String, Option<String>) {
-    let mut link = None;
+    let mut links: Vec<String> = Vec::new();
     let words: Vec<&str> = text
         .split_whitespace()
         .filter(|w| {
-            if link.is_none() && w.starts_with("https://") {
-                link = clean_link(w);
-                return link.is_none();
+            if links.len() < MAX_LINKS && w.starts_with("https://") {
+                if let Some(l) = clean_link(w) {
+                    links.push(l);
+                    return false;
+                }
             }
             true
         })
         .collect();
-    (words.join(" "), link)
+    (words.join(" "), (!links.is_empty()).then(|| links.join(" ")))
+}
+
+/// Links kept together, for reading: "https://a · https://b".
+pub fn shown(links: &str) -> String {
+    links.split_whitespace().collect::<Vec<_>>().join(" · ")
 }
 
 impl Game {
@@ -71,7 +84,7 @@ impl Game {
         let Some(p) = self.players.get(&id) else { return vec![] };
         let Some((thing, name, _)) = self.meeting_spot_at(p.x, p.y) else { return vec![] };
         match self.meeting_links.get(&thing) {
-            Some(link) => vec![Line::new().c(Col::Cyan, format!("📞 {} has a call link: ", super::capitalise(&super::the(&name)))).c(Col::Cyan, link.clone()).c(Col::Dim, " (meet to go in)")],
+            Some(link) => vec![Line::new().c(Col::Cyan, format!("📞 {} has {}: ", super::capitalise(&super::the(&name)), if link.contains(' ') { "links" } else { "a call link" })).c(Col::Cyan, shown(link)).c(Col::Dim, " (meet to go in)")],
             None => vec![Line::col(Col::Dim, "📞 Nobody's set a call link here yet (meet https://…)")],
         }
     }
@@ -93,7 +106,7 @@ impl Game {
                 self.say1(id, Line::plain(msg));
                 return Ok(());
             };
-            self.say1(id, Line::new().c(Col::Cyan, "📞 In you go: ").b(Col::Cyan, link).c(Col::Dim, " (the island will be right here when you're back)"));
+            self.say1(id, Line::new().c(Col::Cyan, "📞 In you go: ").b(Col::Cyan, shown(&link)).c(Col::Dim, " (the island will be right here when you're back)"));
             let user = self.user(id);
             self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("📞 {name} heads into the call.")));
             return Ok(());
@@ -115,13 +128,13 @@ impl Game {
             self.say1(id, Line::col(Col::Cyan, format!("📞 {} has no call link now.", super::capitalise(&the_spot))));
             return Ok(());
         }
-        let Some(link) = clean_link(rest) else {
+        let (_, Some(link)) = split_link(rest) else {
             self.say1(id, Line::plain("That doesn't look like a call link. It needs to start https:// (a Meet, Zoom or Teams link, say)."));
             return Ok(());
         };
         self.world.db.set_meeting_link(thing, Some(&link), &user, super::boards::now())?;
         self.meeting_links.insert(thing, link.clone());
-        self.say1(id, Line::new().c(Col::Cyan, format!("📞 {} now holds the call link ", super::capitalise(&the_spot))).c(Col::Cyan, link).c(Col::Dim, ". Anyone here can type meet to go in."));
+        self.say1(id, Line::new().c(Col::Cyan, format!("📞 {} now holds ", super::capitalise(&the_spot))).c(Col::Cyan, shown(&link)).c(Col::Dim, ". Anyone here can type meet to go in."));
         self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("📞 {name} sets up a call at {the_spot}. (meet to go in)")));
         Ok(())
     }
@@ -138,6 +151,11 @@ mod tests {
         let (name, link) = split_link("Retro (https://zoom.us/j/123) with cake");
         assert_eq!(link, None, "a bracketed link isn't a clean word");
         assert!(name.contains("Retro"));
+        let (name, link) = split_link("Standup https://meet.google.com/abc https://trello.com/b/xyz/team");
+        assert_eq!((name.as_str(), link.as_deref()), ("Standup", Some("https://meet.google.com/abc https://trello.com/b/xyz/team")));
+        assert_eq!(shown(&link.unwrap()), "https://meet.google.com/abc · https://trello.com/b/xyz/team");
+        let (_, link) = split_link("x https://a.bc/1 https://a.bc/2 https://a.bc/3 https://a.bc/4");
+        assert_eq!(link.unwrap().split(' ').count(), 3, "three at most");
         let (name, link) = split_link("Beach party");
         assert_eq!((name.as_str(), link), ("Beach party", None));
     }

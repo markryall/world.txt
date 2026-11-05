@@ -80,7 +80,7 @@ fn time_word(w: &str) -> Option<NaiveTime> {
 
 fn with_call(line: Line, link: &Option<String>) -> Line {
     match link {
-        Some(l) => line.c(Col::Cyan, " 📞 ").c(Col::Cyan, l.clone()),
+        Some(l) => line.c(Col::Cyan, " 📞 ").c(Col::Cyan, super::meetings::shown(l)),
         None => line,
     }
 }
@@ -225,7 +225,7 @@ impl Game {
             self.world.db.set_going(event, u, true)?;
         }
         let when = when_label(at, tz);
-        let call = link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"));
+        let call = link.as_ref().map_or(String::new(), |l| format!(" · 📞 {}", super::meetings::shown(l)));
         let now = super::boards::now();
         let who = if local {
             self.world.db.set_going(event, &host, true)?;
@@ -304,7 +304,7 @@ impl Game {
             );
             if let Some(l) = &e.link {
                 if self.in_on(e, &self.insiders(e), &me, mx, my) {
-                    lines.push(Line::new().c(Col::Cyan, "     📞 ").c(Col::Cyan, l.clone()));
+                    lines.push(Line::new().c(Col::Cyan, "     📞 ").c(Col::Cyan, super::meetings::shown(l)));
                 } else {
                     lines.push(Line::col(Col::Dim, "     📞 has a call link, for whoever's going"));
                 }
@@ -349,7 +349,7 @@ impl Game {
                 "📅 You're going to {} ({} at {place}{}). You'll get a reminder wherever you are.",
                 e.name,
                 when_label(e.at, self.my_zone(id)),
-                e.link.as_ref().map_or(String::new(), |l| format!(" · 📞 {l}"))
+                e.link.as_ref().map_or(String::new(), |l| format!(" · 📞 {}", super::meetings::shown(l)))
             ),
             (true, false) => format!("📅 You're already going to {}.", e.name),
             (false, true) => format!("📅 You're not going to {} any more.", e.name),

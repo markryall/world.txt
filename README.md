@@ -482,7 +482,9 @@ and tells everyone there that you've gone into the call. Events can carry a link
 too, `event here fri 10am Standup https://zoom.us/j/123`, and one planned at a
 meeting table uses the table's. The link shows in `events`, the reminder and the
 "starting now" shout, and `meet` at an event's spot while it's on hands it over.
-Only https links are kept. In the browser, https links anywhere (lines and board
+Up to three https links are kept together (say, the Meet and the team's
+Trello board: `meet https://meet.google.com/… https://trello.com/b/…`), each
+shown and clickable on its own. In the browser, https links anywhere (lines and board
 notes) open in a new tab.
 
 ### Gathering

@@ -12,7 +12,8 @@ points, coins or streaks: just more to potter about with.
   the hallway outside the meeting.
 - **Events can carry a call link** (`event fri 10am Standup https://…`), shown
   in `events`, the reminder and the "starting now" shout. At a meeting table,
-  the table's link is used.
+  the table's link is used. Up to three links each (the call and the team's
+  Trello board, say), every one clickable.
 - **Place events:** `event here fri 10am Standup` is just for that spot. Only
   its host, people who've said `going 2`, followers of a noticeboard there and
   anyone nearby hear about it, so a team's standup doesn't ping the whole
