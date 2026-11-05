@@ -798,6 +798,7 @@ impl Game {
         if t == Terrain::Meadow {
             hints.extend(["Daisies everywhere. You could make a daisy chain and wear it.", "You catch a smell of wild mint. It'd make lovely tea, over a campfire."]);
         }
+        hints.extend(self.build_hints(id));
         // Everything else there is to do.
         if matches!(t, Terrain::Grass | Terrain::Dirt) {
             hints.push("The earth here is soft. Easy to dig, or to plant something in.");

@@ -178,6 +178,9 @@ impl Db {
                  thrown_at INTEGER NOT NULL, from_x INTEGER NOT NULL, from_y INTEGER NOT NULL,
                  lands_at INTEGER NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL,
                  found_by TEXT, found_at INTEGER);
+             CREATE TABLE IF NOT EXISTS buildings (
+                 thing INTEGER PRIMARY KEY, plan TEXT NOT NULL, by TEXT NOT NULL,
+                 started INTEGER NOT NULL, ready INTEGER NOT NULL, told INTEGER NOT NULL DEFAULT 0);
              CREATE TABLE IF NOT EXISTS snowmen (
                  x INTEGER NOT NULL, y INTEGER NOT NULL, builders TEXT NOT NULL, bits TEXT NOT NULL,
                  at INTEGER NOT NULL, PRIMARY KEY (x, y));
@@ -272,6 +275,7 @@ impl Db {
             ("trusted_worlds", "by"),
             ("bans", "name"),
             ("hooks", "by"),
+            ("buildings", "by"),
             ("meeting_links", "by"),
             ("plantings", "by"),
             ("project_gifts", "player"),
@@ -1196,6 +1200,28 @@ impl Db {
         let mut stmt = self.conn.prepare("SELECT id, board, name, up, label FROM hooks WHERE kind = 'status' AND up IS NOT NULL ORDER BY id")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get::<_, i64>(3)? != 0, r.get(4)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    // ---- buildings ---------------------------------------------------------
+
+    pub fn add_building(&self, thing: i64, plan: &str, by: &str, started: i64, ready: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO buildings (thing, plan, by, started, ready) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![thing, plan, by, started, ready],
+        )?;
+        Ok(())
+    }
+
+    /// Every building: (thing, plan, by, started, ready, told).
+    pub fn buildings(&self) -> anyhow::Result<Vec<(i64, String, String, i64, i64, bool)>> {
+        let mut stmt = self.conn.prepare("SELECT thing, plan, by, started, ready, told FROM buildings")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get::<_, i64>(5)? != 0)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn building_told(&self, thing: i64) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE buildings SET told = 1 WHERE thing = ?1", [thing])?;
+        Ok(())
     }
 
     /// Every progress bar that's showing: (hook, board, name, done, total, label).

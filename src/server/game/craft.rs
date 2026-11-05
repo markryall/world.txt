@@ -70,9 +70,14 @@ fn fits(need: Need, s: &Species) -> bool {
 /// Work out which satchel items a recipe would use: exact needs first, then
 /// "any" needs from the commonest finds, so rare things aren't used up by accident.
 pub fn plan(recipe: &Recipe, satchel: &[(String, i64)]) -> Option<Vec<(&'static str, i64)>> {
+    plan_needs(recipe.needs, satchel)
+}
+
+/// The same, for any list of needs (a building's, say).
+pub fn plan_needs(needs: &[(Need, i64)], satchel: &[(String, i64)]) -> Option<Vec<(&'static str, i64)>> {
     let mut left: Vec<(&'static Species, i64)> =
         satchel.iter().filter_map(|(id, n)| nature::by_id(id).map(|s| (s, *n))).collect();
-    let mut needs: Vec<(Need, i64)> = recipe.needs.to_vec();
+    let mut needs: Vec<(Need, i64)> = needs.to_vec();
     needs.sort_by_key(|(n, _)| matches!(n, Any(_)));
     let mut used: Vec<(&'static str, i64)> = Vec::new();
     for (need, mut n) in needs {

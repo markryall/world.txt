@@ -15,6 +15,14 @@ beside it. It works anywhere: talk, notes, events. No other markdown means
 anything. Hooks turn Slack-style links (`<https://…|build 42>`) into the same
 thing, and Slack's `<@someone|poppy>` into just the name.
 
+### Building things
+A satchel with enough in it can become somewhere to live: little houses
+named for what they're made of, four or five finds at most, that go up over a
+few real minutes while you watch the bar (or wander off). Some things only go
+next door to a building, so a house can grow into a rambling sort of place.
+Whoever built it can knock it down again. The scenery will say when you've
+enough for something.
+
 ### Progress bars
 `progress Deploy` at a noticeboard gives a secret address, like a hook, that
 something outside posts `37/100` (or `37%`, or `3 of 10 photos`) to. Everyone

@@ -18,6 +18,7 @@ mod music;
 mod play;
 mod progress;
 mod lights;
+mod builds;
 mod radio;
 pub(crate) use radio::clean_station_name;
 mod sailing;
@@ -145,6 +146,8 @@ struct Game {
     bars: std::collections::BTreeMap<i64, progress::Progress>,
     /// Up-or-down lights showing on boards, by hook.
     lights: std::collections::BTreeMap<i64, lights::Status>,
+    /// Buildings, by thing.
+    builds: std::collections::BTreeMap<i64, builds::Build>,
     /// Sandcastles, until the tide comes in.
     castles: HashMap<(i64, i64), play::Built>,
     /// Snowmen, until winter's over.
@@ -159,11 +162,12 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
     game.load_meetings();
     game.load_snowmen();
     game.load_progress();
     game.load_lights();
+    game.load_buildings();
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
@@ -304,7 +308,7 @@ impl Game {
             here: self.others_here(id),
             humans: self.players.values().filter(|p| !p.bot).count() as u32,
             people: self.people_for(id),
-            progress: self.bars_for(id),
+            progress: [self.build_bars_for(id), self.bars_for(id)].concat(),
             lights: self.lights_for(id),
         };
         let _ = p.tx.send(msg);
@@ -364,6 +368,7 @@ impl Game {
         let exits = lines.pop();
         lines.extend(self.board_lines_here(id));
         lines.extend(self.crab_lines_here(id));
+        lines.extend(self.building_lines_here(id));
         lines.extend(self.garden_lines_here(id));
         lines.extend(self.lighthouse_lines_here(id));
         lines.extend(self.meeting_lines_here(id));
@@ -721,11 +726,18 @@ impl Game {
             "raise" | "pile" => return self.cmd_raise(id),
             "path" | "pave" => return self.cmd_path(id),
             "name" | "call-this" => return self.cmd_name(id, rest),
-            "make" | "build" | "create" => return self.cmd_make(id, rest),
+            "build" | "construct" if rest.trim().is_empty() => return self.cmd_blueprints(id),
+            "blueprints" | "buildings" => return self.cmd_blueprints(id),
+            "make" | "build" | "create" | "construct" => {
+                if let Some(done) = self.cmd_build(id, &verb, rest) {
+                    return done;
+                }
+                return self.cmd_make(id, rest);
+            }
             "craft" => return self.cmd_craft(id, rest),
             "mend" | "repair" | "fix" => return self.cmd_mend(id),
             "recipes" => return self.cmd_recipes(id),
-            "unmake" | "destroy" | "remove" => return self.cmd_unmake(id, rest),
+            "unmake" | "destroy" | "remove" | "demolish" | "unbuild" | "knock" => return self.cmd_unmake(id, rest.trim_start().strip_prefix("down ").unwrap_or(rest)),
             "undo" => return self.cmd_undo(id),
             "mute" | "block" => return self.cmd_mute(id, rest, true),
             "unmute" | "unblock" => return self.cmd_mute(id, rest, false),
@@ -1827,9 +1839,14 @@ impl Game {
                 self.forget_kitchen(t.id);
                 self.stop_spin(t.id);
                 self.forget_radio(t.id);
-                self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
+                if t.kind.as_deref() == Some(builds::KIND) {
+                    self.say1(id, Line::col(Col::Dim, format!("You take down {}, bit by bit, and the bits go back to the island.", the(&t.name))));
+                    self.tell_here(x, y, id, Line::col(Col::Dim, format!("{who} takes down {}.", t.name)));
+                } else {
+                    self.say1(id, Line::col(Col::Dim, format!("{} fades gently away.", capitalise(&the(&t.name)))));
+                    self.tell_here(x, y, id, Line::col(Col::Dim, format!("{who} unmakes {}.", t.name)));
+                }
                 self.say1(id, Line::col(Col::Dim, "(changed your mind? type undo)"));
-                self.tell_here(x, y, id, Line::col(Col::Dim, format!("{who} unmakes {}.", t.name)));
                 self.status_all();
             }
             _ => self.say1(id, Line::plain("Unmake what? Name something that's here.")),
@@ -1888,6 +1905,7 @@ impl Game {
         self.growing_tick();
         self.lighthouse_tick();
         self.play_tick();
+        self.builds_tick();
 
         let season = Clock::season();
         if season != self.season {
@@ -2314,6 +2332,20 @@ const HELP: &[HelpTopic] = &[
             ("eat stew / serve crumble", "enjoy it, or share with everyone here"),
         ],
         footer: Some("Herbs and honey turn up as you wander. While it cooks, the smell drifts to everyone nearby."),
+    },
+    HelpTopic {
+        name: "buildings",
+        also: &["building", "blueprints", "houses", "house", "demolish"],
+        title: "🏗️ buildings",
+        keepers: false,
+        listed: false,
+        items: &[
+            ("build", "what you could build, and whether your satchel has enough"),
+            ("build a mushroom house", "put one up right here: it takes a few minutes, with a bar in your side panel"),
+            ("build a turret", "some things only go next door to a building, making it bigger"),
+            ("demolish mushroom house", "take down something you built (undo brings it back)"),
+        ],
+        footer: Some("Everything's built from what you gather: four or five things at most."),
     },
     HelpTopic {
         name: "animals",
