@@ -373,25 +373,29 @@ function lost() {
 function showBars(bars, lights) {
   const el = $('#bars');
   const span = (className, textContent) => Object.assign(document.createElement('span'), { className, textContent });
+  // Two with the same label (on different boards) say where they are.
+  const shared = (xs) => new Set(xs.map((x) => x.label).filter((label, i, all) => all.indexOf(label) !== i));
+  const sharedLights = shared(lights), sharedBars = shared(bars);
+  const named = (x, set) => (set.has(x.label) && x.place ? `${x.label} · ${x.place}` : x.label);
   const lightRows = lights.map((l) => {
     // A note's links show as their words, clickable; the hover has the words too.
     const words = (l.note || '').replace(/\[([^\[\]\n]{1,100})\]\((https:\/\/[^\s<>"')]+)\)/g, '$1');
-    const row = Object.assign(document.createElement('div'), { className: 'light' + (l.up ? '' : ' down'), title: `${l.label} is ${l.up ? 'up' : 'down'}${words ? ': ' + words : ''}` });
+    const row = Object.assign(document.createElement('div'), { className: 'light' + (l.up ? '' : ' down'), title: `${l.label}${l.place ? ' (at ' + l.place + ')' : ''} is ${l.up ? 'up' : 'down'}${words ? ': ' + words : ''}` });
     const amt = span('amt', l.up ? 'up' : 'down');
     if (!l.up && l.note) { amt.append(' · '); linkify(amt, l.note); }
-    row.append(span('dot', ''), span('lbl', l.label), amt);
+    row.append(span('dot', ''), span('lbl', named(l, sharedLights)), amt);
     return row;
   });
   el.replaceChildren(...lightRows, ...bars.map((b) => {
     const pct = Math.round(100 * Math.min(b.done, b.total) / Math.max(b.total, 1));
     const amount = b.total === 100 ? `${b.done}%` : `${b.done}/${b.total}`;
-    const row = Object.assign(document.createElement('div'), { className: 'bar' + (pct >= 100 ? ' full' : ''), title: `${b.label}: ${b.done} of ${b.total} (${pct}%)` });
+    const row = Object.assign(document.createElement('div'), { className: 'bar' + (pct >= 100 ? ' full' : ''), title: `${b.label}${b.place ? ' (at ' + b.place + ')' : ''}: ${b.done} of ${b.total} (${pct}%)` });
     const track = Object.assign(document.createElement('div'), { className: 'track' });
     const fill = Object.assign(document.createElement('div'), { className: 'fill' });
     fill.style.width = pct + '%';
     track.append(fill);
     row.append(track,
-      Object.assign(document.createElement('span'), { className: 'lbl', textContent: b.label }),
+      Object.assign(document.createElement('span'), { className: 'lbl', textContent: named(b, sharedBars) }),
       Object.assign(document.createElement('span'), { className: 'amt', textContent: amount }));
     return row;
   }));

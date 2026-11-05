@@ -83,6 +83,9 @@ pub struct Bar {
     pub label: String,
     pub done: u64,
     pub total: u64,
+    /// Where its board is, to tell apart two bars with the same label.
+    #[serde(default)]
+    pub place: String,
 }
 
 impl Bar {
@@ -104,6 +107,21 @@ pub struct Light {
     /// What it last said, e.g. "build 42 failed".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    /// Where its board is, to tell apart two lights with the same label.
+    #[serde(default)]
+    pub place: String,
+}
+
+/// Labels shared by more than one of these, which need their place beside them.
+pub fn shared_labels<'a>(labels: impl Iterator<Item = &'a str>) -> std::collections::HashSet<&'a str> {
+    let mut seen = std::collections::HashSet::new();
+    let mut twice = std::collections::HashSet::new();
+    for l in labels {
+        if !seen.insert(l) {
+            twice.insert(l);
+        }
+    }
+    twice
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -297,4 +315,13 @@ pub fn board_lines(msg: &ToClient) -> Option<Vec<Line>> {
     hints.push("post <message> to add one".to_string());
     out.push(Line::col(Col::Dim, format!("  ({})", hints.join(" · "))));
     Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn spots_shared_labels() {
+        let shared = super::shared_labels(["CI", "Deploy", "CI"].into_iter());
+        assert!(shared.contains("CI") && !shared.contains("Deploy"));
+    }
 }

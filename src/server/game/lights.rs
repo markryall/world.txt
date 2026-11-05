@@ -61,8 +61,8 @@ fn parse(text: &str) -> Option<Post> {
 }
 
 impl Status {
-    fn light(&self) -> Light {
-        Light { label: self.name.clone(), up: self.up, note: self.note.clone() }
+    fn light(&self, place: String) -> Light {
+        Light { label: self.name.clone(), up: self.up, note: self.note.clone(), place }
     }
 }
 
@@ -89,7 +89,7 @@ impl Game {
         }
         let Some(p) = self.players.get(&id) else { return vec![] };
         let followed: Vec<i64> = self.world.db.followed(&p.user).unwrap_or_default().into_iter().map(|(b, _)| b).collect();
-        self.lights.values().filter(|l| self.watches(p.x, p.y, &followed, l.board)).map(Status::light).collect()
+        self.lights.values().filter(|l| self.watches(p.x, p.y, &followed, l.board)).map(|l| l.light(self.board_place_name(l.board))).collect()
     }
 
     pub(super) fn lights_on(&self, board: i64) -> Vec<(i64, String)> {

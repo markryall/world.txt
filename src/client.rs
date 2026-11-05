@@ -177,13 +177,19 @@ fn draw(f: &mut Frame, st: &mut State) {
         )));
     }
     // Progress bars from boards you follow or are near: ▓▓▓▓░░░░ Deploy 37%
+    // Two with the same label (on different boards) say where they are.
+    let where_ = |label: &str, place: &str, shared: &std::collections::HashSet<&str>| {
+        if shared.contains(label) && !place.is_empty() { format!("{label} · {place}") } else { label.to_string() }
+    };
+    let shared_bars = crate::protocol::shared_labels(st.progress.iter().map(|b| b.label.as_str()));
+    let shared_lights = crate::protocol::shared_labels(st.lights.iter().map(|l| l.label.as_str()));
     for b in &st.progress {
         const WIDTH: u64 = 10;
         let filled = (b.percent() * WIDTH / 100) as usize;
         side_lines.push(RLine::from(vec![
             RSpan::styled("▓".repeat(filled), Style::default().fg(colour(Col::Green))),
             RSpan::styled("░".repeat(WIDTH as usize - filled), dim()),
-            RSpan::raw(format!(" {} ", b.label)),
+            RSpan::raw(format!(" {} ", where_(&b.label, &b.place, &shared_bars))),
             RSpan::styled(b.amount(), dim()),
         ]));
     }
@@ -192,7 +198,7 @@ fn draw(f: &mut Frame, st: &mut State) {
         let (col, word) = if l.up { (Col::Green, "up") } else { (Col::Red, "down") };
         let mut spans = vec![
             RSpan::styled("● ", Style::default().fg(colour(col))),
-            RSpan::raw(format!("{} ", l.label)),
+            RSpan::raw(format!("{} ", where_(&l.label, &l.place, &shared_lights))),
             RSpan::styled(word, Style::default().fg(colour(col))),
         ];
         if let Some(n) = l.note.as_ref().filter(|_| !l.up) {

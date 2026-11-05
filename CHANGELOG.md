@@ -28,7 +28,8 @@ posts `up` or `down` to, with a note if it likes (`down [build 42](https://…)
 failed`; Pingdom's alerts work as they are). Followers, and
 anyone nearby, see a green or red light in their side panel and get a message
 when it goes down or comes back up, never for staying up, and at most once a
-minute however much it flaps. While something's down, there may be someone
+minute however much it flaps. Two lights (or bars) with the same name on
+different boards say where each one is. While something's down, there may be someone
 on the noticeboard who'd appreciate a pat.
 
 ### A shorter help

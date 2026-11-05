@@ -34,8 +34,8 @@ pub struct Progress {
 }
 
 impl Progress {
-    fn bar(&self) -> Bar {
-        Bar { label: self.label.clone().unwrap_or_else(|| self.name.clone()), done: self.done, total: self.total }
+    fn bar(&self, place: String) -> Bar {
+        Bar { label: self.label.clone().unwrap_or_else(|| self.name.clone()), done: self.done, total: self.total, place }
     }
 }
 
@@ -94,8 +94,13 @@ impl Game {
                 followed.contains(&b.board)
                     || self.world.things.iter().any(|t| t.id == b.board && (t.x - p.x).abs() <= NEAR && (t.y - p.y).abs() <= NEAR)
             })
-            .map(Progress::bar)
+            .map(|b| b.bar(self.board_place_name(b.board)))
             .collect()
+    }
+
+    /// Where a board stands, for telling apart bars and lights with the same name.
+    pub(super) fn board_place_name(&self, board: i64) -> String {
+        self.world.things.iter().find(|t| t.id == board).map(|t| self.world.place_title(t.x, t.y)).unwrap_or_default()
     }
 
     /// A board's bars or lights have changed: freshen the side panels that show them.
@@ -224,7 +229,7 @@ mod tests {
 
     #[test]
     fn bars_say_how_far() {
-        let b = |done, total| Bar { label: "x".into(), done, total };
+        let b = |done, total| Bar { label: "x".into(), done, total, place: String::new() };
         assert_eq!(b(37, 100).amount(), "37%");
         assert_eq!(b(3, 10).amount(), "3/10");
         assert_eq!(b(3, 10).percent(), 30);
