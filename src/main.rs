@@ -2,6 +2,7 @@ mod agent;
 mod bridge;
 mod client;
 mod identity;
+mod links;
 mod protocol;
 mod server;
 mod service;

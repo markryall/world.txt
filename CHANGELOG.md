@@ -8,6 +8,13 @@ drops the odd hint, and the rest is for finding. A beach, a windy day, a
 puddle, a pond and a snowy week each have something going on. Anything that
 pipes up by itself stays quiet for someone who's stepped away.
 
+### Links with words
+`[the snack list](https://example.com/snacks)` shows as "the snack list" in the
+browser, clickable, with the address on hover; the terminal shows the address
+beside it. It works anywhere: talk, notes, events. No other markdown means
+anything. Hooks turn Slack-style links (`<https://…|build 42>`) into the same
+thing, and Slack's `<@someone|poppy>` into just the name.
+
 ### A shorter help
 `help` is down to the essentials (walking, talking, gathering, making, home
 and `mute`), plus the topics that need explaining: gatherings, noticeboards,

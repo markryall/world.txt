@@ -209,7 +209,7 @@ fn to_rline(l: &Line) -> RLine<'static> {
                 if s.b {
                     style = style.add_modifier(Modifier::BOLD);
                 }
-                RSpan::styled(s.t.clone(), style)
+                RSpan::styled(crate::links::plain(&s.t), style)
             })
             .collect::<Vec<_>>(),
     )

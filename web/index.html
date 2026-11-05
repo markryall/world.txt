@@ -244,15 +244,32 @@ function paintLine(line) {
 
 // Text, with any https links in it made clickable (a call, a build), opening
 // in a new tab so the island stays put.
+// Links are the only formatting: plain https ones, and markdown-style
+// [the notes](https://…), which show their words (hover for where they go).
+// Nothing else in markdown means anything here.
 function linkify(el, text) {
-  const parts = text.split(/(https:\/\/[^\s<>"']+)/);
-  parts.forEach((part, i) => {
-    if (i % 2 === 0) { if (part) el.append(part); return; }
-    const url = part.replace(/[.,!?;:)\]]+$/, '');
+  const link = (url, label) => {
     const a = document.createElement('a');
-    a.href = url; a.textContent = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    el.append(a, part.slice(url.length));
-  });
+    a.href = url; a.textContent = label; a.title = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    return a;
+  };
+  const re = /\[([^\[\]\n]{1,100})\]\((https:\/\/[^\s<>"')]+)\)|(https:\/\/[^\s<>"']+)/g;
+  let at = 0;
+  for (const m of text.matchAll(re)) {
+    if (m.index > at) el.append(text.slice(at, m.index));
+    if (m[1] !== undefined && m[1].trim()) {
+      el.append(link(m[2], m[1].trim()));
+      at = m.index + m[0].length;
+    } else if (m[3] !== undefined) {
+      const url = m[3].replace(/[.,!?;:)\]]+$/, '');
+      el.append(link(url, url));
+      at = m.index + url.length;
+    } else {
+      el.append(m[0]);
+      at = m.index + m[0].length;
+    }
+  }
+  if (at < text.length) el.append(text.slice(at));
 }
 
 // Ask for the plain-text look of symbols phones like to draw as wide emoji

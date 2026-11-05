@@ -67,6 +67,9 @@ chat that belongs to that spot:
   posting **follows** the board, so you hear about new notes wherever you are.
   `follow` / `unfollow` to change that, and `boards` lists the ones you follow
   (`unfollow 2` leaves one from anywhere).
+- Links can have words: `post [the snack list](https://example.com/snacks)`
+  shows "the snack list", clickable in the browser (the terminal shows the
+  address beside it). That's the only formatting there is.
 - A board's followers are its group, like a group chat: anyone who follows it
   (or made it, or a keeper) can `add Poppy, Sam to board`, and they're told, or
   find a note waiting. They hear its notes and the place events planned there.
@@ -74,7 +77,8 @@ chat that belongs to that spot:
   board, its maker or a keeper types `hook CI` and is shown a secret address,
   once. Anything POSTed there lands on the board as a note from `🔔 CI`, like
   any other post: plain text, or JSON with `text` (Slack style) or `content`
-  (Discord style), trimmed to 280 characters.
+  (Discord style), trimmed to 280 characters. Slack-style links
+  (`<https://…|build 42>`) come out as proper links.
   `curl -d 'the build passed 🎉' https://world.example.com/hook/<secret>`
   `hooks` lists a board's hooks and when they last posted, and `unhook CI`
   stops one. It answers 200 when posted, 404 for a stopped or unknown hook,

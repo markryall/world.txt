@@ -384,6 +384,7 @@ fn hook_text(body: &[u8]) -> Option<String> {
     } else {
         raw.to_string()
     };
+    let text = crate::links::from_slack(&text);
     // One tidy line: no control characters, runs of space squashed.
     let text: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
     let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
