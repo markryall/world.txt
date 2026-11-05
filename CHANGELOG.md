@@ -23,6 +23,10 @@ points, coins or streaks: just more to potter about with.
 - **Invites:** `event here sun 10am Pancakes with Poppy` signs Poppy up as
   going, with a note waiting if they're away. A place event's links only show
   to people who are in on it.
+- **`help meetings`** walks through making a spot for your group (a meeting
+  table, a noticeboard beside it for the group, then events), and the island
+  nudges you along as you go: making one suggests the other, and planning an
+  event says who'll hear about it.
 - **Everyone's own time:** browsers and the terminal client tell the world
   their timezone. 2pm means 2pm where you are, and everyone sees event times in
   theirs. A time that's already gone by says so. Your real date and time shows

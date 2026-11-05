@@ -1290,6 +1290,11 @@ impl Game {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(meetings::kind()))?;
             self.say1(id, Line::new().c(Col::Cyan, "🔗 You make ").b(Col::Cyan, &name).c(Col::Cyan, ". Give it a link or two for whatever happens here: meet https://…"));
             self.say1(id, Line::col(Col::Dim, "Then anyone here can type meet to get them. Events planned here use them too."));
+            if self.world.things_at(x, y).any(|t| t.is_board()) {
+                self.say1(id, Line::col(Col::Dim, "The noticeboard here is its group: its followers hear about events planned here. (help meetings)"));
+            } else {
+                self.say1(id, Line::col(Col::Dim, "Tip: put up a noticeboard here too, and its followers become this table's group: they'll hear about everything planned here. (help meetings)"));
+            }
             self.tell_here(x, y, id, Line::col(Col::Cyan, format!("🔗 {who} makes {name}.")));
             self.status_all();
             return Ok(());
@@ -1302,6 +1307,9 @@ impl Game {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(boards::board_kind()))?;
             self.say1(id, Line::new().c(Col::Yellow, "📌 You put up ").b(Col::Yellow, &name).c(Col::Yellow, ". Anyone passing can read it and post notes."));
             self.say1(id, Line::col(Col::Dim, "Try: post hello everyone! · read · follow"));
+            if self.world.things_at(x, y).any(|t| t.kind.as_deref() == Some(meetings::kind())) {
+                self.say1(id, Line::col(Col::Dim, "It's beside a meeting table, so its followers are that table's group. Bring them in: add Poppy, Sam to board"));
+            }
             self.tell_here(x, y, id, Line::col(Col::Yellow, format!("📌 {who} puts up {name}.")));
             self.status_all();
             return Ok(());
@@ -2272,6 +2280,24 @@ const HELP: &[HelpTopic] = &[
             ("describe A cosy den, fairy lights…", "in your own words, what people see here when they look (describe alone clears it)"),
         ],
         footer: None,
+    },
+    HelpTopic {
+        name: "meetings",
+        also: &["meeting", "meet", "events", "event", "group", "groups", "team", "get-togethers", "together"],
+        title: "🫖 get-togethers: a spot for your group",
+        keepers: false,
+        items: &[
+            ("name The Frog Pond Gazebo", "1. find a spot and name it, so it's easy to find on the map"),
+            ("make a meeting table", "2. somewhere to gather"),
+            ("meet https://… https://…", "3. leave links there for whatever you get up to (up to three)"),
+            ("make a noticeboard", "4. on the same spot: its followers are your group"),
+            ("add Poppy, Sam to board", "5. bring your group in (anyone can also walk up and follow)"),
+            ("event here fri 4pm Tea party", "plan one at the table: the group hears about it from anywhere, with the links"),
+            ("event here weekdays 7am Sunrise stretch", "or a repeating one (also daily, weekends, every mon wed, fridays)"),
+            ("event here sun 10am Pancakes with Jo", "invite someone who isn't in the group"),
+            ("events / go event / meet", "what's coming up, walk there, and get the links"),
+        ],
+        footer: Some("Times are your own, and everyone sees them in theirs. cancel event 1 stops one (or a whole repeating series)."),
     },
     HelpTopic {
         name: "boards",

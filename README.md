@@ -481,6 +481,7 @@ following its board, or standing nearby); everyone else sees that it has one.
 ### Meetings
 
 Somewhere to gather, with links for whatever's going on: a call, a list, a song.
+`help meetings` walks through the whole recipe, and the island nudges you along.
 `make a meeting table` (or a gazebo) makes a meeting spot, and its maker, the
 home's owner or a keeper leaves its links there:
 `meet https://example.com/gathering https://example.com/snack-list` (up to
