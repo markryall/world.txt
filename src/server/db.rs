@@ -44,6 +44,22 @@ pub struct EventRow {
     pub tz: Option<String>,
 }
 
+/// Something outside that can post to a board: notes, or a progress bar.
+#[derive(Debug, Clone)]
+pub struct Hook {
+    pub id: i64,
+    pub board: i64,
+    pub name: String,
+    /// "notes" or "progress".
+    pub kind: String,
+    pub by: String,
+    pub last_at: Option<i64>,
+}
+
+fn hook_row(r: &rusqlite::Row) -> rusqlite::Result<Hook> {
+    Ok(Hook { id: r.get(0)?, board: r.get(1)?, name: r.get(2)?, kind: r.get(3)?, by: r.get(4)?, last_at: r.get(5)? })
+}
+
 /// A message in a bottle, washed up somewhere.
 pub struct Bottle {
     pub id: i64,
@@ -196,6 +212,11 @@ impl Db {
         let _ = conn.execute("ALTER TABLE events ADD COLUMN tz TEXT", []);
         // What someone's wearing, just for show.
         let _ = conn.execute("ALTER TABLE players ADD COLUMN wearing TEXT", []);
+        // Hooks that fill a progress bar rather than post notes, and where it's up to.
+        let _ = conn.execute("ALTER TABLE hooks ADD COLUMN kind TEXT NOT NULL DEFAULT 'notes'", []);
+        let _ = conn.execute("ALTER TABLE hooks ADD COLUMN done INTEGER", []);
+        let _ = conn.execute("ALTER TABLE hooks ADD COLUMN total INTEGER", []);
+        let _ = conn.execute("ALTER TABLE hooks ADD COLUMN label TEXT", []);
         Ok(Db { conn })
     }
 
@@ -1109,35 +1130,64 @@ impl Db {
 
     // ---- hooks: outside tools posting to boards ------------------------------
 
-    pub fn add_hook(&self, board: i64, name: &str, secret_hash: &str, by: &str, at: i64) -> anyhow::Result<()> {
+    pub fn add_hook(&self, board: i64, name: &str, kind: &str, secret_hash: &str, by: &str, at: i64) -> anyhow::Result<()> {
         self.conn.execute(
-            "INSERT INTO hooks (board, name, secret_hash, by, at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![board, name, secret_hash, by, at],
+            "INSERT INTO hooks (board, name, kind, secret_hash, by, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![board, name, kind, secret_hash, by, at],
         )?;
         Ok(())
     }
 
-    /// A board's hooks: (name, made by, made at, last posted).
-    pub fn hooks(&self, board: i64) -> anyhow::Result<Vec<(String, String, i64, Option<i64>)>> {
-        let mut stmt = self.conn.prepare("SELECT name, by, at, last_at FROM hooks WHERE board = ?1 ORDER BY id")?;
-        let rows = stmt.query_map([board], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+    /// A board's hooks.
+    pub fn hooks(&self, board: i64) -> anyhow::Result<Vec<Hook>> {
+        let mut stmt = self.conn.prepare("SELECT id, board, name, kind, by, last_at FROM hooks WHERE board = ?1 ORDER BY id")?;
+        let rows = stmt.query_map([board], hook_row)?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
-    pub fn remove_hook(&self, board: i64, name: &str) -> anyhow::Result<bool> {
-        Ok(self.conn.execute("DELETE FROM hooks WHERE board = ?1 AND name = ?2 COLLATE NOCASE", params![board, name])? > 0)
+    /// Removes a board's hook by name: its id, if there was one.
+    pub fn remove_hook(&self, board: i64, name: &str) -> anyhow::Result<Option<i64>> {
+        let id = self
+            .conn
+            .query_row("SELECT id FROM hooks WHERE board = ?1 AND name = ?2 COLLATE NOCASE", params![board, name], |r| r.get(0))
+            .ok();
+        if let Some(id) = id {
+            self.conn.execute("DELETE FROM hooks WHERE id = ?1", [id])?;
+        }
+        Ok(id)
     }
 
-    /// The hook a secret belongs to: (id, board, name).
-    pub fn hook_by_secret(&self, secret_hash: &str) -> Option<(i64, i64, String)> {
+    /// The hook a secret belongs to.
+    pub fn hook_by_secret(&self, secret_hash: &str) -> Option<Hook> {
         self.conn
-            .query_row("SELECT id, board, name FROM hooks WHERE secret_hash = ?1", [secret_hash], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .query_row("SELECT id, board, name, kind, by, last_at FROM hooks WHERE secret_hash = ?1", [secret_hash], hook_row)
             .ok()
     }
 
     pub fn touch_hook(&self, id: i64, at: i64) -> anyhow::Result<()> {
         self.conn.execute("UPDATE hooks SET last_at = ?2 WHERE id = ?1", params![id, at])?;
         Ok(())
+    }
+
+    /// Where a progress hook is up to (or nothing, cleared).
+    pub fn set_progress(&self, id: i64, bar: Option<(u64, u64, Option<&str>)>) -> anyhow::Result<()> {
+        let (done, total, label) = match bar {
+            Some((d, t, l)) => (Some(d as i64), Some(t as i64), l),
+            None => (None, None, None),
+        };
+        self.conn.execute("UPDATE hooks SET done = ?2, total = ?3, label = ?4 WHERE id = ?1", params![id, done, total, label])?;
+        Ok(())
+    }
+
+    /// Every progress bar that's showing: (hook, board, name, done, total, label).
+    pub fn progress_bars(&self) -> anyhow::Result<Vec<(i64, i64, String, u64, u64, Option<String>)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, board, name, done, total, label FROM hooks WHERE kind = 'progress' AND done IS NOT NULL AND total IS NOT NULL ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get::<_, i64>(3)?.max(0) as u64, r.get::<_, i64>(4)?.max(1) as u64, r.get(5)?))
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     // ---- meeting spots -------------------------------------------------------

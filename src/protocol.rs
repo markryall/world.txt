@@ -77,6 +77,25 @@ pub struct Person {
     pub tz: Option<String>,
 }
 
+/// A progress bar an outside tool keeps filling, for the side panel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Bar {
+    pub label: String,
+    pub done: u64,
+    pub total: u64,
+}
+
+impl Bar {
+    /// How far along, 0 to 100.
+    pub fn percent(&self) -> u64 {
+        (self.done.min(self.total) * 100) / self.total.max(1)
+    }
+    /// What goes beside it: "37%", or "3/10" when it's counting things.
+    pub fn amount(&self) -> String {
+        if self.total == 100 { format!("{}%", self.done) } else { format!("{}/{}", self.done, self.total) }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Note {
     pub id: i64,
@@ -124,6 +143,9 @@ pub enum ToClient {
         /// Everyone else in the world just now, those right here first.
         #[serde(default)]
         people: Vec<Person>,
+        /// Progress bars on noticeboards you follow or are near.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        progress: Vec<Bar>,
     },
     /// The current first-steps nudge, or none to clear it.
     Hint {

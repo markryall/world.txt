@@ -58,6 +58,15 @@
   #people .bot a { color: var(--dim); }
   #people .t { color: var(--dim); margin-left: auto; flex-shrink: 0; }
   #people .here { color: var(--yellow); flex-shrink: 0; }
+  /* Progress bars from boards you follow or are near: the bar, then its label on the right. */
+  #bars { display: flex; flex-direction: column; gap: 6px; font-size: 13px; flex-shrink: 0; }
+  #bars:empty { display: none; }
+  #bars .bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  #bars .track { flex: 1; min-width: 60px; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  #bars .fill { height: 100%; background: var(--green, #7ed87e); border-radius: 4px; transition: width .4s ease; }
+  #bars .full .fill { background: var(--yellow); }
+  #bars .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+  #bars .amt { color: var(--dim); flex-shrink: 0; }
   #log a, #notes a { color: inherit; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
   #hint { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel);
     border-top: 1px solid var(--line); color: var(--yellow); font-weight: bold; cursor: pointer; }
@@ -115,6 +124,7 @@
     .quick { display: none; }
     #people { display: none; }
     #here { display: block; }
+    #bars { width: 100%; }
   }
 </style>
 </head>
@@ -140,6 +150,7 @@
       <button data-c="help">help</button><button data-c="plant flowers" title="plant flowers">🌼</button>
       <button data-c="plant tree" title="plant a tree">🌳</button><button data-c="dance" title="dance">💃</button>
     </div>
+    <div id="bars"></div>
     <div id="people"></div>
   </div>
 </div>
@@ -293,6 +304,7 @@ function status(m) {
   });
   people = m.people || [];
   showPeople();
+  showBars(m.progress || []);
   const map = $('#map');
   map.replaceChildren();
   m.map.forEach((line, i) => {
@@ -349,6 +361,24 @@ function lost() {
   retries++;
   clearTimeout(retryTimer);
   retryTimer = setTimeout(connect, wait);
+}
+
+// Progress bars outside tools keep filling on noticeboards you follow or are near.
+function showBars(bars) {
+  const el = $('#bars');
+  el.replaceChildren(...bars.map((b) => {
+    const pct = Math.round(100 * Math.min(b.done, b.total) / Math.max(b.total, 1));
+    const amount = b.total === 100 ? `${b.done}%` : `${b.done}/${b.total}`;
+    const row = Object.assign(document.createElement('div'), { className: 'bar' + (pct >= 100 ? ' full' : ''), title: `${b.label}: ${b.done} of ${b.total} (${pct}%)` });
+    const track = Object.assign(document.createElement('div'), { className: 'track' });
+    const fill = Object.assign(document.createElement('div'), { className: 'fill' });
+    fill.style.width = pct + '%';
+    track.append(fill);
+    row.append(track,
+      Object.assign(document.createElement('span'), { className: 'lbl', textContent: b.label }),
+      Object.assign(document.createElement('span'), { className: 'amt', textContent: amount }));
+    return row;
+  }));
 }
 
 // Everyone else out in the world, with what time it is for them; tap a name

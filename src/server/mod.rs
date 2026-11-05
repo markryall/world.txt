@@ -119,6 +119,10 @@ pub enum HookReply {
     Unknown,
     /// The same hook posted again too soon.
     TooFast,
+    /// Moved a progress bar along (or cleared it).
+    Progressed,
+    /// A progress hook got something that isn't progress.
+    NotProgress,
 }
 
 pub async fn run(
@@ -408,6 +412,8 @@ async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>,
                         events.send(Event::Hook { secret, text: t, reply })?;
                         match answer.await {
                             Ok(HookReply::Posted) => text("200 OK", "posted 📌"),
+                            Ok(HookReply::Progressed) => text("200 OK", "noted 📊"),
+                            Ok(HookReply::NotProgress) => text("400 Bad Request", "send how far along it is: 37/100, 37%, '3 of 10 photos', or clear"),
                             Ok(HookReply::TooFast) => text("429 Too Many Requests", "one at a time, babe: wait a couple of seconds"),
                             Ok(HookReply::Unknown) | Err(_) => text("404 Not Found", "no hook here (it may have been stopped)"),
                         }
@@ -610,7 +616,7 @@ mod tests {
     }
 
     fn status() -> ToClient {
-        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1, people: vec![] }
+        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1, people: vec![], progress: vec![] }
     }
     fn words() -> ToClient {
         ToClient::Lines { lines: vec![] }

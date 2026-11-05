@@ -284,7 +284,7 @@ impl Game {
 
     /// The board here that `id` may put hooks on: its maker, or a keeper.
     /// Not the Island Journal, which is the island's own.
-    fn hookable_board(&self, id: u64) -> Option<i64> {
+    pub(super) fn hookable_board(&self, id: u64) -> Option<i64> {
         let (x, y, _) = self.here(id)?;
         let user = self.user(id);
         let Some((board, journal)) = self.board_here(x, y) else {
@@ -304,30 +304,42 @@ impl Game {
     }
 
     /// `hook CI`: a secret address outside tools can post notes to.
-    pub(super) fn cmd_hook(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
+    /// `progress Deploy`: one they post "37/100" to, for a progress bar.
+    pub(super) fn cmd_hook(&mut self, id: u64, name: &str, progress: bool) -> anyhow::Result<()> {
         let Some(board) = self.hookable_board(id) else { return Ok(()) };
         let name = clean_hook_name(name);
         if name.is_empty() {
-            self.say1(id, Line::plain("Name it after whatever will post, e.g. 'hook CI' or 'hook Deploys'."));
+            let eg = if progress { "'progress Deploy' or 'progress Backup'" } else { "'hook CI' or 'hook Deploys'" };
+            self.say1(id, Line::plain(format!("Name it after whatever will post, e.g. {eg}.")));
             return Ok(());
         }
-        if self.world.db.hooks(board)?.iter().any(|h| h.0.eq_ignore_ascii_case(&name)) {
-            self.say1(id, Line::plain(format!("This board already has a hook called {name}. For a fresh address: unhook {name}, then hook {name}.")));
+        if self.world.db.hooks(board)?.iter().any(|h| h.name.eq_ignore_ascii_case(&name)) {
+            self.say1(id, Line::plain(format!("This board already has a hook called {name}. For a fresh address: unhook {name}, then try again.")));
             return Ok(());
         }
         let secret = crate::server::accounts::new_secret()?;
-        self.world.db.add_hook(board, &name, &crate::server::names::hash(&secret), &self.user(id), now())?;
+        let kind = if progress { "progress" } else { "notes" };
+        self.world.db.add_hook(board, &name, kind, &crate::server::names::hash(&secret), &self.user(id), now())?;
         let address = hook_url(self.url.as_deref(), &secret);
-        self.send(
-            id,
+        let lines = if progress {
+            vec![
+                Line::new().b(Col::Yellow, format!("📊 {name} can show its progress here now. Its secret address:")),
+                Line::new().t("   ").b(Col::Yellow, address.clone()),
+                Line::col(Col::Dim, "   POST how far along it is: 37/100, 37%, or '3 of 10 photos' (the words become its label). For example:"),
+                Line::col(Col::Dim, format!("   curl -d 37/100 {address}")),
+                Line::col(Col::Dim, "   Everyone who follows this board, or is nearby, sees the bar in their side panel. Post 'clear' (or clear here) when it's done."),
+                Line::col(Col::Dim, "   It's only shown this once, and anyone with it can post here: keep it like a password. (unhook to stop it)"),
+            ]
+        } else {
             vec![
                 Line::new().b(Col::Yellow, format!("🔔 {name} can post here now. Its secret address:")),
                 Line::new().t("   ").b(Col::Yellow, address.clone()),
                 Line::col(Col::Dim, r#"   POST plain text, or JSON with "text" (Slack style) or "content" (Discord style). For example:"#),
                 Line::col(Col::Dim, format!("   curl -d 'the build passed 🎉' {address}")),
                 Line::col(Col::Dim, "   It's only shown this once, and anyone with it can post here: keep it like a password. (unhook to stop it)"),
-            ],
-        );
+            ]
+        };
+        self.send(id, lines);
         Ok(())
     }
 
@@ -336,7 +348,8 @@ impl Game {
         let name = clean_hook_name(name);
         if name.is_empty() {
             self.say1(id, Line::plain("Stop which one? 'hooks' lists them."));
-        } else if self.world.db.remove_hook(board, &name)? {
+        } else if let Some(hook) = self.world.db.remove_hook(board, &name)? {
+            self.drop_bar(hook);
             self.say1(id, Line::col(Col::Yellow, format!("🔕 {name} can't post here any more.")));
         } else {
             self.say1(id, Line::plain(format!("This board has no hook called {name}. ('hooks' lists them)")));
@@ -353,11 +366,12 @@ impl Game {
         let hooks = self.world.db.hooks(board)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "🔔 Hooks on this board")];
         if hooks.is_empty() {
-            lines.push(Line::col(Col::Dim, "  None yet. Its maker or a keeper can add one: hook CI"));
+            lines.push(Line::col(Col::Dim, "  None yet. Its maker or a keeper can add one: hook CI (notes) or progress Deploy (a progress bar)"));
         }
-        for (name, by, _, last) in hooks {
-            let last = last.map_or("hasn't posted yet".to_string(), |t| format!("last posted {}", when(t)));
-            lines.push(Line::new().t("  ").b(Col::Yellow, name).c(Col::Dim, format!("  made by {} · {last}", self.world.nick(&by))));
+        for h in hooks {
+            let last = h.last_at.map_or("hasn't posted yet".to_string(), |t| format!("last posted {}", when(t)));
+            let icon = if h.kind == "progress" { "📊 " } else { "🔔 " };
+            lines.push(Line::new().t("  ").t(icon).b(Col::Yellow, h.name).c(Col::Dim, format!("  made by {} · {last}", self.world.nick(&h.by))));
         }
         self.send(id, lines);
         Ok(())
@@ -366,11 +380,17 @@ impl Game {
     /// An outside tool posting through its hook's secret address.
     pub(super) fn hook_post(&mut self, secret: &str, text: &str) -> crate::server::HookReply {
         use crate::server::HookReply;
-        let Some((hook, board, name)) = self.world.db.hook_by_secret(&crate::server::names::hash(secret)) else {
+        let Some(h) = self.world.db.hook_by_secret(&crate::server::names::hash(secret)) else {
             return HookReply::Unknown;
         };
+        let (hook, board, name) = (h.id, h.board, h.name);
         // A board that's been unmade keeps its hooks, quietly, in case of undo.
         let Some((x, y)) = self.board_place(board) else { return HookReply::Unknown };
+        // Progress only moves a bar along, and side panels go out at most
+        // twice a second anyway, so it can post as often as it likes.
+        if h.kind == "progress" {
+            return self.progress_post(hook, board, name, text);
+        }
         let soon = self.hook_last.get(&hook).is_some_and(|t| t.elapsed() < HOOK_GAP);
         if soon {
             return HookReply::TooFast;

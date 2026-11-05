@@ -16,6 +16,7 @@ mod lighthouse;
 mod meetings;
 mod music;
 mod play;
+mod progress;
 mod radio;
 pub(crate) use radio::clean_station_name;
 mod sailing;
@@ -139,6 +140,8 @@ struct Game {
     zones: HashMap<u64, chrono_tz::Tz>,
     /// When each hook last posted, so one can't flood its board.
     hook_last: HashMap<i64, std::time::Instant>,
+    /// Progress bars showing on boards, by hook.
+    bars: std::collections::BTreeMap<i64, progress::Progress>,
     /// Sandcastles, until the tide comes in.
     castles: HashMap<(i64, i64), play::Built>,
     /// Snowmen, until winter's over.
@@ -153,9 +156,10 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
     game.load_meetings();
     game.load_snowmen();
+    game.load_progress();
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
@@ -294,6 +298,7 @@ impl Game {
             here: self.others_here(id),
             humans: self.players.values().filter(|p| !p.bot).count() as u32,
             people: self.people_for(id),
+            progress: self.bars_for(id),
         };
         let _ = p.tx.send(msg);
     }
@@ -654,7 +659,9 @@ impl Game {
             "unfollow" | "leave" => return self.cmd_follow(id, false, rest),
             "boards" => return self.cmd_boards(id),
             "archive" => return self.cmd_archive(id),
-            "hook" => return self.cmd_hook(id, rest),
+            "hook" => return self.cmd_hook(id, rest, false),
+            "progress" => return self.cmd_hook(id, rest, true),
+            "clear" => return self.cmd_clear_bar(id, rest),
             "unhook" => return self.cmd_unhook(id, rest),
             "hooks" => return self.cmd_hooks(id),
             "gather" | "pick" | "catch" | "collect" | "forage" | "g" => return self.cmd_gather(id, rest),
@@ -2369,6 +2376,7 @@ const HELP: &[HelpTopic] = &[
             ("add Poppy, Sam to board", "they follow this board now, like adding them to a group chat (anyone who follows it can)"),
             ("archive / read week 2026-11-02", "past pages of the Island Journal"),
             ("hook CI / hooks / unhook CI", "a secret address outside tools (builds, deploys…) can post notes to (the board's maker or a keeper)"),
+            ("progress Deploy / clear Deploy", "a secret address a tool posts 37/100 to: a progress bar in the side panel of everyone following or nearby"),
         ],
         footer: None,
     },

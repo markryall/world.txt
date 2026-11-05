@@ -20,6 +20,7 @@ struct State {
     clock: String,
     map: Vec<Line>,
     here: Vec<String>,
+    progress: Vec<crate::protocol::Bar>,
     hint: Option<String>,
     input: String,
     history: Vec<String>,
@@ -57,7 +58,8 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                                 let excess = st.log.len().saturating_sub(2000);
                                 st.log.drain(..excess);
                             }
-                            Ok(ToClient::Status { place, weather, clock, map, here, .. }) => {
+                            Ok(ToClient::Status { place, weather, clock, map, here, progress, .. }) => {
+                                st.progress = progress;
                                 st.place = place;
                                 st.weather = weather;
                                 st.clock = clock;
@@ -171,6 +173,20 @@ fn draw(f: &mut Frame, st: &mut State) {
             format!("☺ {}", st.here.join(", ")),
             Style::default().fg(colour(Col::Cyan)),
         )));
+    }
+    // Progress bars from boards you follow or are near: ▓▓▓▓░░░░ Deploy 37%
+    for b in &st.progress {
+        const WIDTH: u64 = 10;
+        let filled = (b.percent() * WIDTH / 100) as usize;
+        side_lines.push(RLine::from(vec![
+            RSpan::styled("▓".repeat(filled), Style::default().fg(colour(Col::Green))),
+            RSpan::styled("░".repeat(WIDTH as usize - filled), dim()),
+            RSpan::raw(format!(" {} ", b.label)),
+            RSpan::styled(b.amount(), dim()),
+        ]));
+    }
+    if !st.progress.is_empty() {
+        side_lines.push(RLine::default());
     }
     if let Some(h) = &st.hint {
         side_lines.push(RLine::from(RSpan::styled(

@@ -84,6 +84,16 @@ chat that belongs to that spot:
   stops one. It answers 200 when posted, 404 for a stopped or unknown hook,
   429 if one hook posts more than once every two seconds, and 413 past 16KB.
   Not on the Island Journal.
+- **Progress bars:** `progress Deploy` at a board gives a hook of another kind.
+  Instead of notes, it's sent how far along something is: `37/100`, `37%`, or
+  `3 of 10 photos` (any words after the numbers become its label; otherwise
+  it's called Deploy). Everyone who follows the board, or is within a few
+  steps of it, sees the bar fill in their side panel, with its label on the
+  right. Nothing is said in anyone's log, and it can post as often as it
+  likes. When it's finished, `clear Deploy` at the board (or the tool posting
+  `clear`) takes the bar away until it next says something, and `unhook
+  Deploy` stops it for good.
+  `curl -d '3 of 10 photos' https://world.example.com/hook/<secret>`
 
 The **Island Journal** is a special board at the spawn point. The first find of
 every species each week goes in it automatically, with a shout-out to the whole

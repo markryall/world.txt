@@ -15,6 +15,13 @@ beside it. It works anywhere: talk, notes, events. No other markdown means
 anything. Hooks turn Slack-style links (`<https://…|build 42>`) into the same
 thing, and Slack's `<@someone|poppy>` into just the name.
 
+### Progress bars
+`progress Deploy` at a noticeboard gives a secret address, like a hook, that
+something outside posts `37/100` (or `37%`, or `3 of 10 photos`) to. Everyone
+following the board, or standing near it, sees the bar fill in their side
+panel, label on the right, without a word in their log. `clear Deploy` (or
+posting `clear`) takes it away when it's done.
+
 ### A shorter help
 `help` is down to the essentials (walking, talking, gathering, making, home
 and `mute`), plus the topics that need explaining: gatherings, noticeboards,
