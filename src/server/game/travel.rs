@@ -44,21 +44,12 @@ impl Game {
             self.say1(id, Line::plain("You're already with yourself. 💅"));
             return Ok(());
         }
-        let (me, them) = (&self.players[&id], &self.players[&tid]);
-        let theirs = crate::server::islands::island_at(them.x, them.y);
-        if crate::server::islands::island_at(me.x, me.y).id != theirs.id {
-            self.say1(id, Line::plain(format!("{target} is over on {}. Row there from a dock first (sail {}) ⛵", theirs.name, theirs.name.split(' ').next().unwrap_or(""))));
-            return Ok(());
-        }
-        if let Some(p) = self.players.get_mut(&id) {
-            p.travel = Some(target_user);
-        }
-        self.say1(id, Line::col(Col::Cyan, format!("🚶 You set off to find {target}. (type stop to stop)")));
         if self.players[&tid].hears(&self.user(id)) {
             self.say1(tid, Line::col(Col::Cyan, format!("🚶 {name} is coming to find you!")));
         }
-        self.step_travellers();
-        Ok(())
+        // Over the water too, if need be: to the dock, across, then find them.
+        let (tx, ty) = (self.players[&tid].x, self.players[&tid].y);
+        self.set_off(id, tx, ty, &target, Some(target_user))
     }
 
     /// `places`: every named spot and home, on every island, numbered.
@@ -94,7 +85,7 @@ impl Game {
             return Ok(());
         }
         let places = self.world.places();
-        let Some((tx, ty, name, island)) = pick_place(&places, want) else {
+        let Some((tx, ty, name, _)) = pick_place(&places, want) else {
             self.say1(id, Line::plain(format!("There's nowhere called {want}. 'places' lists everywhere with a name.")));
             return Ok(());
         };
@@ -102,12 +93,30 @@ impl Game {
             self.say1(id, Line::plain(format!("You're already at {name}. 💅")));
             return Ok(());
         }
+        self.set_off(id, tx, ty, &name, None)
+    }
+
+    /// Head for (tx, ty): walking, or down to the dock and rowing across if
+    /// it's on another island, then walking on. `join`: then go and find
+    /// that person (by username) once across.
+    pub(super) fn set_off(&mut self, id: u64, tx: i64, ty: i64, name: &str, join: Option<String>) -> anyhow::Result<()> {
+        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
         let here = crate::server::islands::island_at(x, y);
+        let island = crate::server::islands::island_at(tx, ty);
         if here.id == island.id {
             if let Some(p) = self.players.get_mut(&id) {
-                p.travel = None;
                 p.heading = None;
-                p.walk_to = Some((tx, ty, name.clone()));
+                p.join_after = None;
+                match join {
+                    Some(u) => {
+                        p.walk_to = None;
+                        p.travel = Some(u);
+                    }
+                    None => {
+                        p.travel = None;
+                        p.walk_to = Some((tx, ty, name.to_string()));
+                    }
+                }
             }
             self.say1(id, Line::col(Col::Cyan, format!("🚶 You set off for {name}. (stop to stop)")));
         } else {
@@ -119,7 +128,8 @@ impl Game {
             let dock = self.world.place_title(dx, dy);
             if let Some(p) = self.players.get_mut(&id) {
                 p.travel = None;
-                p.heading = Some((tx, ty, name.clone()));
+                p.heading = Some((tx, ty, name.to_string()));
+                p.join_after = join;
                 p.walk_to = ((dx, dy) != (x, y)).then(|| (dx, dy, dock.clone()));
             }
             self.say1(id, Line::col(Col::Cyan, format!("🚶 You set off for {name}, over on {}: down to {dock} first, then a row across. (stop to stop)", island.name)));
@@ -142,6 +152,7 @@ impl Game {
     pub(super) fn stop_travelling(&mut self, id: u64, say: bool) {
         if let Some(p) = self.players.get_mut(&id) {
             p.heading = None;
+            p.join_after = None;
         }
         let place = self.players.get_mut(&id).and_then(|p| p.walk_to.take());
         let was = self.players.get_mut(&id).and_then(|p| p.travel.take()).map(|_| ()).or(place.map(|_| ()));
@@ -176,7 +187,7 @@ impl Game {
                     self.carry_on(id);
                     continue;
                 }
-                self.say1(id, Line::col(Col::Cyan, format!("🎉 You've arrived at {place}!")));
+                self.say1(id, Line::col(Col::Cyan, arrived(&place)));
                 self.look(id);
             }
         }
@@ -191,6 +202,12 @@ impl Game {
             };
             let (me, them) = ((self.players[&id].x, self.players[&id].y), (self.players[&tid].x, self.players[&tid].y));
             if me != them {
+                let island = |p: (i64, i64)| crate::server::islands::island_at(p.0, p.1).id;
+                if island(me) != island(them) {
+                    // They've sailed off: follow them over the water.
+                    let _ = self.set_off(id, them.0, them.1, &target, Some(target_user.clone()));
+                    continue;
+                }
                 let Some((dx, dy)) = self.first_step(me, them) else {
                     self.say1(id, Line::plain(format!("You can't find a way to {target} over land.")));
                     self.stop_travelling(id, true);
@@ -212,6 +229,11 @@ impl Game {
             }
         }
     }
+}
+
+/// Getting there: home is home.
+pub fn arrived(place: &str) -> String {
+    if place == "home" { "🏡 You're home.".to_string() } else { format!("🎉 You've arrived at {place}!") }
 }
 
 /// The place someone means: its number from `places`, or its name (whole,

@@ -113,13 +113,20 @@ impl Game {
             self.status_near(id, &[left, to]);
             // On the way somewhere further: walk on from the dock.
             if let Some((hx, hy, place)) = self.players.get_mut(&id).and_then(|p| p.heading.take()) {
-                if (hx, hy) != to {
+                if let Some(u) = self.players.get_mut(&id).and_then(|p| p.join_after.take()) {
+                    // Off to find someone: wherever they are now.
+                    if let Some(p) = self.players.get_mut(&id) {
+                        p.travel = Some(u);
+                    }
+                    self.say1(id, Line::col(Col::Cyan, format!("🚶 On you go to find {place}. (stop to stop)")));
+                } else if (hx, hy) != to {
                     if let Some(p) = self.players.get_mut(&id) {
                         p.walk_to = Some((hx, hy, place.clone()));
                     }
-                    self.say1(id, Line::col(Col::Cyan, format!("🚶 On you go to {place}. (stop to stop)")));
+                    let on = if place == "home" { "🚶 On you go home. (stop to stop)".to_string() } else { format!("🚶 On you go to {place}. (stop to stop)") };
+                    self.say1(id, Line::col(Col::Cyan, on));
                 } else {
-                    self.say1(id, Line::col(Col::Cyan, format!("🎉 You've arrived at {place}!")));
+                    self.say1(id, Line::col(Col::Cyan, super::travel::arrived(&place)));
                 }
             }
         }

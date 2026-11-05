@@ -69,6 +69,8 @@ struct Player {
     /// Where they're headed in the end, when it's over the water: walk to the
     /// dock, row across, then walk on.
     heading: Option<(i64, i64, String)>,
+    /// Who they're off to find once they've rowed across (`join`), by username.
+    join_after: Option<String>,
     /// Out on the water in a rowing boat.
     voyage: Option<sailing::Voyage>,
     /// Their timezone, so times read as theirs.
@@ -432,7 +434,7 @@ impl Game {
             None => (self.zone_of(&user), self.world.db.zone(&user).is_some()),
         };
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false) });
 
         self.send(
             id,
@@ -632,6 +634,7 @@ impl Game {
             "read" => return self.cmd_read(id, rest),
             "post" | "note" => return self.cmd_post(id, rest),
             "follow" => return self.cmd_follow(id, true, rest),
+            "leave" if rest.trim_start().starts_with("event") => return self.cmd_leave_event(id, rest.trim_start().trim_start_matches("event")),
             "unfollow" | "leave" => return self.cmd_follow(id, false, rest),
             "boards" => return self.cmd_boards(id),
             "archive" => return self.cmd_archive(id),
@@ -2178,7 +2181,8 @@ const HELP: &[HelpTopic] = &[
             ("event here fri 4pm Tea party", "plan an event just for this place: only whoever's going, a board's followers here and people nearby hear about it"),
             ("event here fridays 5pm Frog choir", "a repeating one (also weekdays, daily, every mon wed)"),
             ("add Poppy, Sam to event 2", "sign people up to a 📍 event (its host, or anyone going); remove Poppy from event 2 for the host"),
-            ("going 2 / not going 2", "say you'll come to a 📍 event, so you're reminded wherever you are"),
+            ("going 2 / not going 2", "say you'll come to a 📍 event, so you're reminded wherever you are (for a repeating one, not going skips just the next)"),
+            ("leave event 2", "drop out of a repeating event for good"),
             ("meet", "get the links for the gathering here (at a gathering table, or an event that has some)"),
         ],
         footer: Some("There are four islands: sail between them from the docks. A whole day passes in 24 minutes."),
@@ -2292,7 +2296,7 @@ const HELP: &[HelpTopic] = &[
         keepers: false,
         items: &[
             ("claim", "make the patch around you your home (one each)"),
-            ("home", "go straight home from anywhere"),
+            ("home  (or go home)", "walk home from anywhere, rowing across if need be"),
             ("share Lu / unshare Lu / guests", "who else may build at your home"),
             ("describe A cosy den, fairy lights…", "in your own words, what people see here when they look (describe alone clears it)"),
         ],
@@ -2310,7 +2314,8 @@ const HELP: &[HelpTopic] = &[
             ("event here weekdays 7am Sunrise stretch", "4. plan it at the table (or a one-off: event here fri 4pm Tea party)"),
             ("add Poppy, Sam to event 1", "5. bring your people: they hear about it from anywhere, with the links"),
             ("events", "what's coming up, who's going, and the links (go event 1 walks there, meet hands over the links)"),
-            ("remove Poppy from event 1", "take someone off (anyone can drop out: not going 1)"),
+            ("not going 1 / leave event 1", "skip just the next one of a repeating event, or drop out for good"),
+            ("remove Poppy from event 1", "take someone off (the host or a keeper)"),
             ("make a noticeboard", "optional: a board on the same spot is a chat for the group, and its followers hear about everything planned there"),
         ],
         footer: Some("Times are your own, and everyone sees them in theirs. cancel event 1 stops one (or a whole repeating series)."),

@@ -78,19 +78,12 @@ impl Game {
             self.say1(id, Line::plain("You're already home. 🏡"));
             return Ok(());
         }
+        // Walked, not whisked: there's the scenery on the way.
         self.tell_here(x, y, id, Line::col(Col::Cyan, format!("{name} heads off home.")));
         if let Some(p) = self.players.get_mut(&id) {
-            p.x = hx;
-            p.y = hy;
             p.fishing = None;
-            p.sky = self.world.weather.sky_at(hx, hy);
         }
-        self.say1(id, Line::col(Col::Magenta, "🏡 You wander home along the paths you know by heart."));
-        self.tell_here(hx, hy, id, Line::col(Col::Cyan, format!("{name} comes home.")));
-        self.look(id);
-        self.save_progress(id);
-        self.status_near(id, &[(x, y), (hx, hy)]);
-        Ok(())
+        self.set_off(id, hx, hy, "home", None)
     }
 
     pub(super) fn cmd_invite(&mut self, id: u64, who: &str, on: bool) -> anyhow::Result<()> {

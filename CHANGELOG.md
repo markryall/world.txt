@@ -19,7 +19,8 @@ points, coins or streaks: just more to potter about with.
   island. Anyone can plan one; whole-island events are still for keepers.
 - **Repeating events:** `event here fridays 5pm Frog choir` (or `weekdays`,
   `weekends`, `daily`, `every mon wed`) stays at your 5pm and moves on to the
-  next one by itself, keeping who's going and the links.
+  next one by itself, keeping who's going and the links. `not going 1` skips
+  just the next one, and `leave event 1` drops out for good.
 - **Invites:** `event here sun 10am Pancakes with Poppy` signs Poppy up as
   going, with a note waiting if they're away. `add Sam to event 1` brings more
   people in later, and `remove Sam from event 1` takes them off. A place event's links only show
@@ -38,6 +39,9 @@ points, coins or streaks: just more to potter about with.
 - **`places`** lists every named spot and home on every island, and **`go to
   The Greenhouse`** (or `go 3`, or part of a name) walks you there, rowing
   across from the dock if it's on another island.
+
+- **No more whisking:** `home` and `join Poppy` walk you there too, rowing
+  across from the dock if it's on another island, so you see the way.
 
 ### Noticeboards
 - **Hooks:** `hook CI` at a board gives a secret address that outside tools

@@ -256,7 +256,14 @@ impl Game {
     /// anyone nearby.
     fn audience(&self, e: &EventRow) -> Vec<u64> {
         let insiders = self.insiders(e);
-        self.players.iter().filter(|(_, p)| self.in_on(e, &insiders, &p.user, p.x, p.y)).map(|(&id, _)| id).collect()
+        // Skipping this one: only if they happen to be standing nearby.
+        let skipping = self.world.db.skipping(e.id, e.at).unwrap_or_default();
+        self.players
+            .iter()
+            .filter(|(_, p)| self.in_on(e, &insiders, &p.user, p.x, p.y))
+            .filter(|(_, p)| !skipping.contains(&p.user) || self.in_on(e, &[], "", p.x, p.y))
+            .map(|(&id, _)| id)
+            .collect()
     }
 
     /// For a place event: who's going, and who follows a board on its spot.
@@ -565,9 +572,16 @@ impl Game {
             }
             if e.local {
                 let going = self.world.db.going(e.id)?;
-                let names: Vec<String> = going.iter().map(|u| if *u == me { "you".to_string() } else { self.world.nick(u) }).collect();
+                let skipping = self.world.db.skipping(e.id, e.at)?;
+                let nick = |u: &String| if *u == me { "you".to_string() } else { self.world.nick(u) };
+                let names: Vec<String> = going.iter().filter(|u| !skipping.contains(u)).map(nick).collect();
                 let verb = if names.len() == 1 && names[0] != "you" { "is" } else { "are" };
-                let text = if names.is_empty() { "nobody's said they're going yet".to_string() } else { format!("{} {verb} going", super::super::world::join_and(&names)) };
+                let mut text = if names.is_empty() { "nobody's said they're going yet".to_string() } else { format!("{} {verb} going", super::super::world::join_and(&names)) };
+                let skips: Vec<String> = going.iter().filter(|u| skipping.contains(u)).map(nick).collect();
+                if !skips.is_empty() {
+                    let verb = if skips.len() == 1 && skips[0] != "you" { "is" } else { "are" };
+                    text.push_str(&format!(" ({} {verb} skipping the next one)", super::super::world::join_and(&skips)));
+                }
                 lines.push(Line::col(Col::Dim, format!("     {text}")));
             }
         }
@@ -596,8 +610,22 @@ impl Game {
             self.say1(id, Line::plain(format!("{} is for the whole island: everyone hears about it anyway.", e.name)));
             return Ok(());
         }
-        let changed = self.world.db.set_going(e.id, &me, going)?;
         let place = self.world.place_title(e.x, e.y);
+        // A repeating event: not going means just the next one.
+        if e.repeat.is_some() {
+            let on = self.world.db.going(e.id)?.contains(&me);
+            let next = when_label(e.at, self.my_zone(id));
+            if !going && on {
+                self.world.db.set_skip(e.id, &me, e.at, true)?;
+                self.say1(id, Line::col(Col::Yellow, format!("📅 You'll skip the next {} ({next}). You're still on for the ones after. (going {which} if you change your mind; leave event {which} to drop out for good)", e.name, which = which.trim())));
+                return Ok(());
+            }
+            if going && self.world.db.set_skip(e.id, &me, e.at, false)? {
+                self.say1(id, Line::col(Col::Yellow, format!("📅 You're back on for the next {} ({next}).", e.name)));
+                return Ok(());
+            }
+        }
+        let changed = self.world.db.set_going(e.id, &me, going)?;
         let msg = match (going, changed) {
             (true, true) => format!(
                 "📅 You're going to {} ({} at {place}{}). You'll get a reminder wherever you are.",
@@ -616,6 +644,27 @@ impl Game {
                 self.say1(host, Line::col(Col::Yellow, format!("📅 {name} is going to {}.", e.name)));
             }
         }
+        Ok(())
+    }
+
+    /// `leave event 2`: drop out of a repeating event for good.
+    pub(super) fn cmd_leave_event(&mut self, id: u64, which: &str) -> anyhow::Result<()> {
+        let Some(e) = self.pick_event(which)? else {
+            self.say1(id, Line::plain("Leave which? 'events' lists them, then e.g. 'leave event 2'."));
+            return Ok(());
+        };
+        let me = self.user(id);
+        if e.host == me {
+            self.say1(id, Line::plain(format!("You're hosting {}: cancel event {} stops it for everyone.", e.name, which.trim())));
+            return Ok(());
+        }
+        let msg = if self.world.db.set_going(e.id, &me, false)? {
+            let every = if e.repeat.is_some() { " (every one of them)" } else { "" };
+            format!("📅 You're not going to {}{every} any more.", e.name)
+        } else {
+            format!("📅 You weren't going to {} anyway.", e.name)
+        };
+        self.say1(id, Line::col(Col::Yellow, msg));
         Ok(())
     }
 

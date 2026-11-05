@@ -144,6 +144,9 @@ impl Db {
                  PRIMARY KEY (x, y));
              CREATE TABLE IF NOT EXISTS event_going (
                  event INTEGER NOT NULL, player TEXT NOT NULL, PRIMARY KEY (event, player));
+             CREATE TABLE IF NOT EXISTS event_skips (
+                 event INTEGER NOT NULL, player TEXT NOT NULL, at INTEGER NOT NULL,
+                 PRIMARY KEY (event, player, at));
              CREATE TABLE IF NOT EXISTS project_gifts (
                  project TEXT NOT NULL, stage INTEGER NOT NULL, player TEXT NOT NULL,
                  n INTEGER NOT NULL, at INTEGER NOT NULL);",
@@ -242,6 +245,7 @@ impl Db {
             ("mutes", "player"),
             ("mutes", "muted"),
             ("event_going", "player"),
+            ("event_skips", "player"),
         ] {
             tx.execute(&format!("UPDATE OR IGNORE {table} SET {col} = ?2 WHERE {col} = ?1"), [old, new])?;
             tx.execute(&format!("DELETE FROM {table} WHERE {col} = ?1"), [old])?;
@@ -833,6 +837,23 @@ impl Db {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// Skip (or un-skip) one time of a repeating event. True if that changed anything.
+    pub fn set_skip(&self, event: i64, player: &str, at: i64, skip: bool) -> anyhow::Result<bool> {
+        let n = if skip {
+            self.conn.execute("INSERT OR IGNORE INTO event_skips (event, player, at) VALUES (?1, ?2, ?3)", params![event, player, at])?
+        } else {
+            self.conn.execute("DELETE FROM event_skips WHERE event = ?1 AND player = ?2 AND at = ?3", params![event, player, at])?
+        };
+        Ok(n > 0)
+    }
+
+    /// Who's skipping this time of an event.
+    pub fn skipping(&self, event: i64, at: i64) -> anyhow::Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT player FROM event_skips WHERE event = ?1 AND at = ?2")?;
+        let rows = stmt.query_map(params![event, at], |r| r.get(0))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     /// Make an event repeat on these days, at its time of day in `tz`.
     pub fn set_repeat(&self, id: i64, days: &str, tz: &str) -> anyhow::Result<()> {
         self.conn.execute("UPDATE events SET repeat = ?2, tz = ?3 WHERE id = ?1", params![id, days, tz])?;
@@ -863,6 +884,8 @@ impl Db {
         // Repeating events aren't forgotten: they move on to their next time.
         self.conn.execute("DELETE FROM events WHERE at < ?1 AND repeat IS NULL", [before])?;
         self.conn.execute("DELETE FROM event_going WHERE event NOT IN (SELECT id FROM events)", [])?;
+        // Skips for times gone by aren't needed any more.
+        self.conn.execute("DELETE FROM event_skips WHERE at < ?1 OR event NOT IN (SELECT id FROM events)", [before])?;
         Ok(())
     }
 
@@ -1134,6 +1157,23 @@ mod tests {
         assert!(db.upcoming_events(0).unwrap()[0].local);
         db.remove_event(e).unwrap();
         assert!(db.going(e).unwrap().is_empty());
+    }
+
+    #[test]
+    fn skipping_is_one_time_only() {
+        let db = Db::open(":memory:").unwrap();
+        let e = db.add_event(1_000, "Standup", 1, 2, "host", None, true).unwrap();
+        db.set_repeat(e, "mon,tue,wed,thu,fri", "UTC").unwrap();
+        db.set_going(e, "sam", true).unwrap();
+        assert!(db.set_skip(e, "sam", 1_000, true).unwrap());
+        assert_eq!(db.skipping(e, 1_000).unwrap(), vec!["sam"]);
+        // The next time along, Sam's back on.
+        db.reschedule_event(e, 87_400).unwrap();
+        assert!(db.skipping(e, 87_400).unwrap().is_empty());
+        assert_eq!(db.going(e).unwrap(), vec!["sam"], "still going to the rest");
+        db.forget_events_before(50_000).unwrap();
+        assert!(db.skipping(e, 1_000).unwrap().is_empty(), "old skips are tidied away");
+        assert_eq!(db.upcoming_events(0).unwrap().len(), 1, "the repeating event itself stays");
     }
 
     #[test]

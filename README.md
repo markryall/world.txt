@@ -332,7 +332,8 @@ Progress is saved by name, so returning visitors never see it again
 - `@Poppy hi` talks to someone anywhere (if they're away it's kept as mail and
   shown when they next arrive), `reply` answers them, `chat` (or `@all`) reaches
   everyone, `find Poppy` tells you which way to walk, and `join Poppy` walks you
-  there automatically (around the water, following if they move; `stop` to stop).
+  there automatically (around the water, rowing across if they're on another
+  island, following if they move; `stop` to stop).
   `places` lists every named spot and home on every island, and `go to The
   Greenhouse` (or `go 3`, or part of the name; "to" is optional) walks you
   there, down to the dock and rowing across first if it's on another island.
@@ -367,7 +368,8 @@ Clouds drift across the island on the wind, and a whole day passes in 24 minutes
 `claim` makes the 3x3 patch around you your home (one each, not too close to
 anyone else's or to where newcomers arrive). It shows as `⌂` on the map and is
 called "Poppy's Home" (with "Poppy's Garden" around it) unless you `name` it.
-`home` takes you straight back from anywhere. Anyone can visit, but only you,
+`home` (or `go home`) walks you back from anywhere, rowing across if it's on
+another island. Anyone can visit, but only you,
 the friends you `share` it with, and keepers can make, place, dig, plant or name
 things there (`unshare`, `guests`). Claiming somewhere else moves your home.
 
@@ -475,7 +477,8 @@ Events can repeat: `event here fridays 5pm Frog choir` (also `weekdays`,
 time, even across daylight saving, moves on to the next one an hour after each
 starts, and `events` shows it as "🔁 every fri · next Fri 6 Nov, 5:00pm". Who's
 going, the board's followers and its links carry over; `cancel event 1` stops
-the series.
+the series. On a repeating event, `not going 1` skips just the next one
+(`going 1` un-skips it), and `leave event 1` drops out for good.
 `event here sun 10am Pancakes with Poppy, Sam and Lu` signs them up as going
 too: they're told straight away, or find a note waiting when they next arrive.
 Later, `add Poppy, Sam to event 1` signs more people up (its host or anyone
