@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-11-06)
 
 ### Things to stumble on
 A handful of new bits of nonsense, left out of `help` on purpose: the scenery
