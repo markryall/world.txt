@@ -799,6 +799,9 @@ impl Game {
             hints.extend(["Daisies everywhere. You could make a daisy chain and wear it.", "You catch a smell of wild mint. It'd make lovely tea, over a campfire."]);
         }
         hints.extend(self.build_hints(id));
+        if self.players.iter().any(|(pid, p)| *pid != id && (p.x, p.y) == (x, y) && !p.bot) {
+            hints.push("Two's company. You could settle just about anything with a game of rock, paper, scissors.");
+        }
         // Everything else there is to do.
         if matches!(t, Terrain::Grass | Terrain::Dirt) {
             hints.push("The earth here is soft. Easy to dig, or to plant something in.");

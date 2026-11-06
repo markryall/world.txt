@@ -18,6 +18,12 @@ Progress is saved by name, so returning visitors never see it again
   Greenhouse` (or `go 3`, or part of the name; "to" is optional) walks you
   there, down to the dock and rowing across first if it's on another island.
   In the browser, tap a name to message them.
+- `ask How many ducks are on the pond?` drops a question into a hat for
+  everyone standing with you. Each answers in secret (`answer 7`), and once
+  everyone has, all the answers come out together, so nobody's swayed by
+  anyone else's. Numbers come out smallest first. Anyone who arrives partway
+  can join in by answering, someone who wanders off is out of it, and
+  `reveal` shows what's in so far if someone's stepped away.
 - `dig`, `fill`, `plant birch|bluebells|grass` (see Gardens), `raise`, `path`, `name The Willow Bank`
 - `make a frog that croaks when it rains`, `push frog north`, `unmake frog`
 - `make a music box`, then `teach C E G E C` (only its maker can) and `play`; it also

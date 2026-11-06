@@ -7,6 +7,7 @@ mod companions;
 mod cook;
 mod craft;
 mod events;
+mod games;
 mod gather;
 mod gramophone;
 mod growing;
@@ -154,6 +155,8 @@ struct Game {
     snowmen: HashMap<(i64, i64), play::Built>,
     /// Snow angels, until fresh snow fills them in.
     angels: HashMap<(i64, i64), play::Angels>,
+    /// Little games going on, by spot.
+    rounds: HashMap<(i64, i64), games::Round>,
     /// When the tide next comes in.
     next_tide: std::time::Instant,
     /// For work done elsewhere (looking up what's on) to report back.
@@ -162,7 +165,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
     game.load_meetings();
     game.load_snowmen();
     game.load_progress();
@@ -373,6 +376,7 @@ impl Game {
         lines.extend(self.lighthouse_lines_here(id));
         lines.extend(self.meeting_lines_here(id));
         lines.extend(self.play_lines_here(id));
+        lines.extend(self.games_lines_here(id));
         lines.extend(self.animal_lines(id));
         lines.extend(self.find_lines(p.x, p.y));
         lines.extend(exits);
@@ -517,6 +521,7 @@ impl Game {
             return; // a visitor who gave up waiting
         }
         self.juke_leave(id);
+        self.games_walks(id);
         self.stop_spins_by(id);
         let Some(p) = self.players.remove(&id) else { return };
         if p.bot {
@@ -570,6 +575,9 @@ impl Game {
             return self.walk(id, dx, dy);
         }
         if let Some(done) = self.crab_command(id, &verb, rest) {
+            return done;
+        }
+        if let Some(done) = self.games_command(id, &verb, rest) {
             return done;
         }
         if let Some(done) = self.play_command(id, &verb, rest) {
@@ -781,6 +789,7 @@ impl Game {
         let dir = DIRS.iter().find(|d| d.2 == dx && d.3 == dy).map_or("away", |d| d.1);
         let back = DIRS.iter().find(|d| d.2 == -dx && d.3 == -dy).map_or("somewhere", |d| d.1);
         self.kite_walks(id);
+        self.games_walks(id);
         let with = self.with_companion(id);
         self.tell_here(ox, oy, id, Line::col(Col::Cyan, format!("{name} wanders off to the {dir}{with}.")));
         if let Some(p) = self.players.get_mut(&id) {
@@ -2267,6 +2276,7 @@ const HELP: &[HelpTopic] = &[
             ("nickname Pip", "change what you're called (your username stays)"),
             ("link me", "a magic link to sign in on another device of yours"),
             ("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
+            ("ask How many ducks are on the pond?", "everyone here answers in secret (answer 7), and the answers all come out together"),
         ],
         footer: None,
     },

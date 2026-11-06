@@ -8,6 +8,12 @@ drops the odd hint, and the rest is for finding. A beach, a windy day, a
 puddle, a pond and a snowy week each have something going on. Anything that
 pipes up by itself stays quiet for someone who's stepped away.
 
+### A question in a hat
+`ask Tea or coffee?` puts a question to everyone standing with you. Each
+answers in secret (`answer tea`), and the answers all come out of the hat
+together once everyone has. Numbers come out in order, and it says when
+everyone agrees. There may be another game or two to find when you've company.
+
 ### Links with words
 `[the snack list](https://example.com/snacks)` shows as "the snack list" in the
 browser, clickable, with the address on hover; the terminal shows the address

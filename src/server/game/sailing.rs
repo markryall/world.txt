@@ -100,6 +100,7 @@ impl Game {
             }
             let name = self.players[&id].name.clone();
             let left = (self.players[&id].x, self.players[&id].y);
+            self.games_walks(id);
             if let Some(p) = self.players.get_mut(&id) {
                 p.voyage = None;
                 p.x = to.0;
