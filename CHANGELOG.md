@@ -14,6 +14,22 @@ answers in secret (`answer tea`), and the answers all come out of the hat
 together once everyone has. Numbers come out in order, and it says when
 everyone agrees. There may be another game or two to find when you've company.
 
+### Keeping things safe
+- **Muting someone silences their music too:** `mute Sam` now stops you
+  hearing Sam's gramophone and jukebox songs, as well as Sam's words.
+- **A gentle pace:** a rush of twenty commands is fine, then four a second;
+  past that the island asks you to slow down a little rather than kicking.
+- **Visitors' passports** are only checked against home worlds out on the
+  internet, never somewhere only the server can reach, and a visitor whose
+  passport can't be checked is just told so.
+- **Smaller messages:** connections that send far more than a browser ever
+  would are let go, and the jukebox takes twenty songs from you at a time.
+- **Residents** never pass on links, can't reach the whole world with
+  `@everyone`, and keep what people tell them privately to themselves.
+- **Under the hood:** the world runs as an ordinary user in its container
+  rather than root, and finished connections are let go properly instead of
+  lingering until the next restart.
+
 ### Links with words
 `[the snack list](https://example.com/snacks)` shows as "the snack list" in the
 browser, clickable, with the address on hover; the terminal shows the address
