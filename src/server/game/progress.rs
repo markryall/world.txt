@@ -1,8 +1,8 @@
-//! Progress bars on noticeboards. A board's maker can `progress Deploy` for
+//! Progress bars on noticeboards. A board's maker can `progress Pizza` for
 //! a secret address that an outside tool posts "37/100" to, and everyone
 //! who follows the board, or is standing near it, sees the bar fill in
 //! their side panel. Nothing is said in anyone's log: it just quietly moves
-//! along. `clear Deploy` (or the tool posting "clear") takes it away until
+//! along. `clear Pizza` (or the tool posting "clear") takes it away until
 //! the next number comes.
 
 use super::Game;
@@ -165,7 +165,7 @@ impl Game {
         }
     }
 
-    /// `clear Deploy`: take a finished bar (or a status light) away,
+    /// `clear Pizza`: take a finished bar (or a status light) away,
     /// keeping its hook for next time.
     pub(super) fn cmd_clear_bar(&mut self, id: u64, name: &str) -> anyhow::Result<()> {
         let Some(board) = self.hookable_board(id) else { return Ok(()) };
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(parse("37/100"), at(37, 100, None));
         assert_eq!(parse(" 3 / 10 copying photos "), at(3, 10, Some("copying photos")));
         assert_eq!(parse("37%"), at(37, 100, None));
-        assert_eq!(parse("45% deploying"), at(45, 100, Some("deploying")));
+        assert_eq!(parse("45% in the oven"), at(45, 100, Some("in the oven")));
         assert_eq!(parse("3 of 10 photos"), at(3, 10, Some("photos")));
         assert_eq!(parse("12/10"), at(10, 10, None), "never past full");
         assert_eq!(parse("Clear"), Some(Post::Clear));

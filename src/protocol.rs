@@ -104,7 +104,7 @@ impl Bar {
 pub struct Light {
     pub label: String,
     pub up: bool,
-    /// What it last said, e.g. "build 42 failed".
+    /// What it last said, e.g. "flat as a millpond".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
     /// Where its board is, to tell apart two lights with the same label.
@@ -321,7 +321,7 @@ pub fn board_lines(msg: &ToClient) -> Option<Vec<Line>> {
 mod tests {
     #[test]
     fn spots_shared_labels() {
-        let shared = super::shared_labels(["CI", "Deploy", "CI"].into_iter());
-        assert!(shared.contains("CI") && !shared.contains("Deploy"));
+        let shared = super::shared_labels(["Surf", "Pizza", "Surf"].into_iter());
+        assert!(shared.contains("Surf") && !shared.contains("Pizza"));
     }
 }

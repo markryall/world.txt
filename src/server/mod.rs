@@ -667,8 +667,8 @@ mod tests {
 
     #[test]
     fn hooks_take_plain_text_or_slack_or_discord_json() {
-        assert_eq!(hook_text(b"deploy finished \xF0\x9F\x9A\x80").as_deref(), Some("deploy finished 🚀"));
-        assert_eq!(hook_text(br#"{"text":"build 42 passed"}"#).as_deref(), Some("build 42 passed"));
+        assert_eq!(hook_text(b"pizza is here \xF0\x9F\x8D\x95").as_deref(), Some("pizza is here 🍕"));
+        assert_eq!(hook_text(br#"{"text":"the kettle has boiled"}"#).as_deref(), Some("the kettle has boiled"));
         assert_eq!(hook_text(br#"{"content":"hi from discord","username":"x"}"#).as_deref(), Some("hi from discord"));
         assert_eq!(hook_text(b"two\nlines\r\n  and   spaces").as_deref(), Some("two lines and spaces"));
         assert_eq!(hook_text(br#"{"check_name":"site","current_state":"DOWN","description":"timeout"}"#).as_deref(), Some("DOWN timeout"));

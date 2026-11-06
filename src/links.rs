@@ -141,12 +141,12 @@ mod tests {
     fn terminal_shows_where_it_goes() {
         assert_eq!(plain("See [the notes](https://example.com/n) now"), "See the notes (https://example.com/n) now");
         assert_eq!(plain("https://example.com"), "https://example.com");
-        assert_eq!(labels("[build 42](https://ci.example.com/42) failed"), "build 42 failed");
+        assert_eq!(labels("[the cat cam](https://cats.example.com/cam) is on"), "the cat cam is on");
     }
 
     #[test]
     fn slack_links_become_markdown() {
-        assert_eq!(from_slack("Build <https://ci.example.com/42|#42> passed"), "Build [#42](https://ci.example.com/42) passed");
+        assert_eq!(from_slack("Pizza <https://pizza.example.com/7|#7> is here"), "Pizza [#7](https://pizza.example.com/7) is here");
         assert_eq!(from_slack("See <https://example.com>"), "See https://example.com");
         assert_eq!(from_slack("Old <http://example.com|site>"), "Old site (http://example.com)");
         assert_eq!(from_slack("Hi <@U123|poppy> in <#C9|general>"), "Hi poppy in general");

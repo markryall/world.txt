@@ -1,5 +1,5 @@
-//! Status lights on noticeboards. `status CI` at a board gives a secret
-//! address that an outside tool (a build, an uptime check) posts "up" or
+//! Status lights on noticeboards. `status Surf` at a board gives a secret
+//! address that an outside tool (a surf report, a cat flap) posts "up" or
 //! "down" to. Everyone who follows the board, or is near it, sees a little
 //! light in their side panel, and hears about it when it changes: when it
 //! goes down, and when it comes back up. Staying up says nothing.
@@ -16,8 +16,8 @@ use crate::protocol::{Col, Light, Line};
 use crate::server::HookReply;
 use std::time::{Duration, Instant};
 
-/// The longest note a light keeps ("build 42 failed"), the same as a board
-/// note, so there's room for a link: `down [build 42](https://…) failed`.
+/// The longest note a light keeps ("flat as a millpond"), the same as a board
+/// note, so there's room for a link: `down [the beach cam](https://…) says flat`.
 const MAX_NOTE: usize = 280;
 /// Saved and sent out at most this often.
 const SETTLE: Duration = Duration::from_secs(1);
@@ -44,7 +44,7 @@ enum Post {
     Clear,
 }
 
-/// "up", "down build 42 failed", "passed", "FAILED: tests", "DOWN timeout", "clear".
+/// "up", "down flat as a millpond", "passed", "FAILED: the soufflé", "DOWN timeout", "clear".
 fn parse(text: &str) -> Option<Post> {
     let t = text.trim();
     let split = t.find(|c: char| !c.is_alphanumeric()).unwrap_or(t.len());
@@ -261,13 +261,13 @@ mod tests {
     #[test]
     fn reads_up_and_down() {
         assert_eq!(parse("up"), is(true, None));
-        assert_eq!(parse("Down build 42 failed"), is(false, Some("build 42 failed")));
-        assert_eq!(parse("FAILED: 3 tests"), is(false, Some("3 tests")));
+        assert_eq!(parse("Down flat as a millpond"), is(false, Some("flat as a millpond")));
+        assert_eq!(parse("FAILED: the soufflé"), is(false, Some("the soufflé")));
         assert_eq!(parse("passed"), is(true, None));
         assert_eq!(parse("DOWN timeout"), is(false, Some("timeout")));
         assert_eq!(
-            parse("down [build 42](https://ci.example.com/builds/42/jobs/7/logs) failed"),
-            is(false, Some("[build 42](https://ci.example.com/builds/42/jobs/7/logs) failed"))
+            parse("down [the beach cam](https://surf.example.com/cam) says flat"),
+            is(false, Some("[the beach cam](https://surf.example.com/cam) says flat"))
         );
         assert_eq!(parse("clear"), Some(Post::Clear));
         assert_eq!(parse("upside"), None);

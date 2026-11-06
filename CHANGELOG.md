@@ -12,7 +12,7 @@ pipes up by itself stays quiet for someone who's stepped away.
 `[the snack list](https://example.com/snacks)` shows as "the snack list" in the
 browser, clickable, with the address on hover; the terminal shows the address
 beside it. It works anywhere: talk, notes, events. No other markdown means
-anything. Hooks turn Slack-style links (`<https://…|build 42>`) into the same
+anything. Hooks turn Slack-style links (`<https://…|the cat cam>`) into the same
 thing, and Slack's `<@someone|poppy>` into just the name.
 
 ### Building things
@@ -24,16 +24,16 @@ Whoever built it can knock it down again. The scenery will say when you've
 enough for something.
 
 ### Progress bars
-`progress Deploy` at a noticeboard gives a secret address, like a hook, that
+`progress Pizza` at a noticeboard gives a secret address, like a hook, that
 something outside posts `37/100` (or `37%`, or `3 of 10 photos`) to. Everyone
 following the board, or standing near it, sees the bar fill in their side
-panel, label on the right, without a word in their log. `clear Deploy` (or
+panel, label on the right, without a word in their log. `clear Pizza` (or
 posting `clear`) takes it away when it's done.
 
 ### Status lights
-`status CI` at a noticeboard gives an address that a build or an uptime check
-posts `up` or `down` to, with a note if it likes (`down [build 42](https://…)
-failed`; Pingdom's alerts and Semaphore's webhook notifications work as
+`status Surf` at a noticeboard gives an address that a surf report or a cat flap
+posts `up` or `down` to, with a note if it likes (`down [the beach cam](https://…)
+says flat`; Pingdom's alerts and Semaphore's webhook notifications work as
 they are). Followers, and
 anyone nearby, see a green or red light in their side panel and get a message
 when it goes down or comes back up, never for staying up, and at most once a
@@ -104,8 +104,8 @@ points, coins or streaks: just more to potter about with.
   across from the dock if it's on another island, so you see the way.
 
 ### Noticeboards
-- **Hooks:** `hook CI` at a board gives a secret address that outside tools
-  (builds, deploys, a calendar) can POST notes to: plain text, or Slack- or
+- **Hooks:** `hook Doorbell` at a board gives a secret address that outside tools
+  (a doorbell, a smart kettle, a calendar) can POST notes to: plain text, or Slack- or
   Discord-style JSON. `hooks` lists them and `unhook` stops one.
 - **Boards as groups:** anyone who follows a board can `add Poppy, Sam to
   board`, like adding someone to a group chat. `boards` numbers them, and

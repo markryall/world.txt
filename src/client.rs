@@ -176,7 +176,7 @@ fn draw(f: &mut Frame, st: &mut State) {
             Style::default().fg(colour(Col::Cyan)),
         )));
     }
-    // Progress bars from boards you follow or are near: ▓▓▓▓░░░░ Deploy 37%
+    // Progress bars from boards you follow or are near: ▓▓▓▓░░░░ Pizza 37%
     // Two with the same label (on different boards) say where they are.
     let where_ = |label: &str, place: &str, shared: &std::collections::HashSet<&str>| {
         if shared.contains(label) && !place.is_empty() { format!("{label} · {place}") } else { label.to_string() }
@@ -193,7 +193,7 @@ fn draw(f: &mut Frame, st: &mut State) {
             RSpan::styled(b.amount(), dim()),
         ]));
     }
-    // Up-or-down lights: ● CI down · build 42 failed
+    // Up-or-down lights: ● Surf down · flat as a millpond
     for l in &st.lights {
         let (col, word) = if l.up { (Col::Green, "up") } else { (Col::Red, "down") };
         let mut spans = vec![

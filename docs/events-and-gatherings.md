@@ -73,40 +73,40 @@ chat that belongs to that spot:
 - A board's followers are its group, like a group chat: anyone who follows it
   (or made it, or a keeper) can `add Poppy, Sam to board`, and they're told, or
   find a note waiting. They hear its notes and the place events planned there.
-- **Hooks** let outside tools post too (builds, deploys, a calendar). At a
-  board, its maker or a keeper types `hook CI` and is shown a secret address,
-  once. Anything POSTed there lands on the board as a note from `🔔 CI`, like
+- **Hooks** let outside tools post too (a doorbell, a smart kettle, a calendar). At a
+  board, its maker or a keeper types `hook Doorbell` and is shown a secret address,
+  once. Anything POSTed there lands on the board as a note from `🔔 Doorbell`, like
   any other post: plain text, or JSON with `text` (Slack style) or `content`
   (Discord style), trimmed to 280 characters. Slack-style links
-  (`<https://…|build 42>`) come out as proper links.
-  `curl -d 'the build passed 🎉' https://world.example.com/hook/<secret>`
-  `hooks` lists a board's hooks and when they last posted, and `unhook CI`
+  (`<https://…|the cat cam>`) come out as proper links.
+  `curl -d 'ding dong 🚪' https://world.example.com/hook/<secret>`
+  `hooks` lists a board's hooks and when they last posted, and `unhook Doorbell`
   stops one. It answers 200 when posted, 404 for a stopped or unknown hook,
   429 if one hook posts more than once every two seconds, and 413 past 16KB.
   Not on the Island Journal.
-- **Progress bars:** `progress Deploy` at a board gives a hook of another kind.
+- **Progress bars:** `progress Pizza` at a board gives a hook of another kind.
   Instead of notes, it's sent how far along something is: `37/100`, `37%`, or
   `3 of 10 photos` (any words after the numbers become its label; otherwise
-  it's called Deploy). Everyone who follows the board, or is within a few
+  it's called Pizza). Everyone who follows the board, or is within a few
   steps of it, sees the bar fill in their side panel, with its label on the
   right. Nothing is said in anyone's log. It can post as often as it likes:
-  the bar moves on at most once a second, always to the latest number. When it's finished, `clear Deploy` at the board (or the tool posting
+  the bar moves on at most once a second, always to the latest number. When it's finished, `clear Pizza` at the board (or the tool posting
   `clear`) takes the bar away until it next says something, and `unhook
-  Deploy` stops it for good.
+  Pizza` stops it for good.
   `curl -d '3 of 10 photos' https://world.example.com/hook/<secret>`
-- **Status lights:** `status CI` at a board gives a hook that's sent `up` or
+- **Status lights:** `status Surf` at a board gives a hook that's sent `up` or
   `down` (`ok`, `passed`, `failed`, `broken` and friends work too), with any
-  words after it kept as a note: `down build 42 failed`, or with a link,
-  `down [build 42](https://ci.example.com/builds/42) failed` (the side panel
-  shows "build 42", clickable in the browser). Pingdom-style JSON
+  words after it kept as a note: `down flat as a millpond`, or with a link,
+  `down [the beach cam](https://surf.example.com/cam) says flat` (the side panel
+  shows "the beach cam", clickable in the browser). Pingdom-style JSON
   (`current_state`) and Semaphore's notification webhook work as they are.
   Everyone who follows the board, or is
   near it, sees a green or red light in their side panel, and gets a message
   when it goes down or comes back up. Staying up says nothing, and the first
   word from something that's fine is quiet. A flapping check can't chatter:
   a light speaks at most once a minute, and only to say where it ended up.
-  `clear CI` hides it until it next says something.
-  `curl -d 'down build 42 failed' https://world.example.com/hook/<secret>`
+  `clear Surf` hides it until it next says something.
+  `curl -d 'down flat as a millpond' https://world.example.com/hook/<secret>`
 
 The **Island Journal** is a special board at the spawn point. The first find of
 every species each week goes in it automatically, with a shout-out to the whole

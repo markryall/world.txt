@@ -303,16 +303,16 @@ impl Game {
         Some(board)
     }
 
-    /// `hook CI`: a secret address outside tools can post notes to.
-    /// `progress Deploy`: one they post "37/100" to, for a progress bar.
+    /// `hook Doorbell`: a secret address outside tools can post notes to.
+    /// `progress Pizza`: one they post "37/100" to, for a progress bar.
     pub(super) fn cmd_hook(&mut self, id: u64, name: &str, kind: &str) -> anyhow::Result<()> {
         let Some(board) = self.hookable_board(id) else { return Ok(()) };
         let name = clean_hook_name(name);
         if name.is_empty() {
             let eg = match kind {
-                "progress" => "'progress Deploy' or 'progress Backup'",
-                "status" => "'status CI' or 'status Website'",
-                _ => "'hook CI' or 'hook Deploys'",
+                "progress" => "'progress Pizza' or 'progress Laundry'",
+                "status" => "'status Surf' or 'status Bakery'",
+                _ => "'hook Doorbell' or 'hook Kettle'",
             };
             self.say1(id, Line::plain(format!("Name it after whatever will post, e.g. {eg}.")));
             return Ok(());
@@ -329,7 +329,7 @@ impl Game {
                 Line::new().b(Col::Yellow, format!("🚦 {name} can say whether it's up or down here now. Its secret address:")),
                 Line::new().t("   ").b(Col::Yellow, address.clone()),
                 Line::col(Col::Dim, "   POST up or down (ok, passed, failed… work too), with any words after it. Pingdom-style JSON works. For example:"),
-                Line::col(Col::Dim, format!("   curl -d 'down build 42 failed' {address}")),
+                Line::col(Col::Dim, format!("   curl -d 'down flat as a millpond' {address}")),
                 Line::col(Col::Dim, "   Everyone who follows this board, or is nearby, sees its light, and hears when it goes down or comes back up (at most once a minute)."),
                 Line::col(Col::Dim, "   It's only shown this once, and anyone with it can post here: keep it like a password. (clear hides the light; unhook stops it)"),
             ]
@@ -347,7 +347,7 @@ impl Game {
                 Line::new().b(Col::Yellow, format!("🔔 {name} can post here now. Its secret address:")),
                 Line::new().t("   ").b(Col::Yellow, address.clone()),
                 Line::col(Col::Dim, r#"   POST plain text, or JSON with "text" (Slack style) or "content" (Discord style). For example:"#),
-                Line::col(Col::Dim, format!("   curl -d 'the build passed 🎉' {address}")),
+                Line::col(Col::Dim, format!("   curl -d 'ding dong 🚪' {address}")),
                 Line::col(Col::Dim, "   It's only shown this once, and anyone with it can post here: keep it like a password. (unhook to stop it)"),
             ]
         };
@@ -379,7 +379,7 @@ impl Game {
         let hooks = self.world.db.hooks(board)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "🔔 Hooks on this board")];
         if hooks.is_empty() {
-            lines.push(Line::col(Col::Dim, "  None yet. Its maker or a keeper can add one: hook CI (notes), progress Deploy (a progress bar) or status CI (up or down)"));
+            lines.push(Line::col(Col::Dim, "  None yet. Its maker or a keeper can add one: hook Doorbell (notes), progress Pizza (a progress bar) or status Surf (up or down)"));
         }
         for h in hooks {
             let last = h.last_at.map_or("hasn't posted yet".to_string(), |t| format!("last posted {}", when(t)));
@@ -667,7 +667,7 @@ mod tests {
 
     #[test]
     fn hook_names_are_tidy() {
-        assert_eq!(clean_hook_name("  CI   builds <b> "), "CI builds b");
+        assert_eq!(clean_hook_name("  Cat   flap <b> "), "Cat flap b");
         assert_eq!(clean_hook_name("a-very-long-name-for-a-hook-indeed"), "a-very-long-name-for-a-h");
         assert_eq!(hook_url(Some("https://w.example/"), "abc"), "https://w.example/hook/abc");
     }
