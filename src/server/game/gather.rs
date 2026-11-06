@@ -320,7 +320,7 @@ impl Game {
     }
 
     /// Find something in the satchel by name.
-    fn carried(&self, player: &str, what: &str) -> anyhow::Result<Option<&'static Species>> {
+    pub(super) fn carried(&self, player: &str, what: &str) -> anyhow::Result<Option<&'static Species>> {
         Ok(self
             .world
             .db

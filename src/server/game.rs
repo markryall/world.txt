@@ -20,6 +20,7 @@ mod play;
 mod progress;
 mod lights;
 mod builds;
+mod cases;
 mod radio;
 pub(crate) use radio::clean_station_name;
 mod sailing;
@@ -376,6 +377,7 @@ impl Game {
         lines.extend(self.lighthouse_lines_here(id));
         lines.extend(self.meeting_lines_here(id));
         lines.extend(self.play_lines_here(id));
+        lines.extend(self.cases_lines_here(id));
         lines.extend(self.games_lines_here(id));
         lines.extend(self.animal_lines(id));
         lines.extend(self.find_lines(p.x, p.y));
@@ -574,6 +576,9 @@ impl Game {
             return self.walk(id, dx, dy);
         }
         if let Some(done) = self.crab_command(id, &verb, rest) {
+            return done;
+        }
+        if let Some(done) = self.cases_command(id, &verb, rest) {
             return done;
         }
         if let Some(done) = self.games_command(id, &verb, rest) {
@@ -1348,6 +1353,13 @@ impl Game {
             self.status_all();
             return Ok(());
         }
+        if cases::is_case(&name) {
+            self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(cases::KIND))?;
+            self.say1(id, Line::new().c(Col::Yellow, "🫙 You make ").b(Col::Yellow, &name).c(Col::Yellow, ". Show off your finds in it: put firefly in jar, put shell in case…"));
+            self.tell_here(x, y, id, Line::col(Col::Yellow, format!("🫙 {who} makes {name}.")));
+            self.status_all();
+            return Ok(());
+        }
         if music::is_music_box(&name) {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(music::music_kind()))?;
             self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach C E G E C"));
@@ -1839,6 +1851,9 @@ impl Game {
             }
             Some(i) if !what.is_empty() && !self.may_change(&self.user(id), i) => {
                 self.say1(id, self.not_yours(i));
+            }
+            Some(i) if self.case_has_things(i) => {
+                self.say1(id, Line::plain(format!("There are still finds in {}. Take them out first (take … from …).", the(&self.world.things[i].name))));
             }
             Some(i) if !what.is_empty() => {
                 let t = self.world.remove_thing(i, &self.user(id))?;
@@ -2389,6 +2404,7 @@ const HELP: &[HelpTopic] = &[
             ("home  (or go home)", "walk home from anywhere, rowing across if need be"),
             ("share Lu / unshare Lu / guests", "who else may build at your home"),
             ("describe A cosy den, fairy lights…", "in your own words, what people see here when they look (describe alone clears it)"),
+            ("make a jar / put firefly in jar", "show off your finds at home (a display case, a shelf, a fish tank, a bug hotel…); take firefly from jar brings one back"),
             ("paint the cottage pink / paint home lilac", "any colour you like, for things you've made or your whole home (it shows on the map); paint … plain scrubs it off"),
         ],
         footer: None,

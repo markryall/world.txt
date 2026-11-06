@@ -8,6 +8,12 @@ your whole home, in any colour you can name (rainbow included). People read
 your word for it, things show in their colour wherever they're described, and
 your home's `⌂` turns your colour on the map.
 
+### Display cases
+`make a jar`, then `put firefly in jar`: a home for your favourite finds,
+where friends can see them. Butterflies open and close their wings, beetles
+trundle about, a fish tank's fish turn slow circles, and a jar of fireflies
+glows at night. Butterflies and bugs finally have somewhere to go.
+
 ## 0.4.0 (2026-11-06)
 
 ### Things to stumble on

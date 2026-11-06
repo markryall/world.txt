@@ -237,6 +237,13 @@ impl Db {
         // Paint: a colour word for a thing, or for a whole home.
         let _ = conn.execute("ALTER TABLE things ADD COLUMN paint TEXT", []);
         let _ = conn.execute("ALTER TABLE homes ADD COLUMN paint TEXT", []);
+        // What's on show in each display case.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS displays (
+                 thing INTEGER NOT NULL, species TEXT NOT NULL, count INTEGER NOT NULL,
+                 PRIMARY KEY (thing, species))",
+            [],
+        )?;
         // Repeating events: which days ("mon,tue,wed,thu,fri"), in whose timezone.
         let _ = conn.execute("ALTER TABLE events ADD COLUMN repeat TEXT", []);
         let _ = conn.execute("ALTER TABLE events ADD COLUMN tz TEXT", []);
@@ -573,6 +580,22 @@ impl Db {
 
     pub fn paint_thing(&self, id: i64, paint: Option<&str>) -> anyhow::Result<()> {
         self.conn.execute("UPDATE things SET paint = ?2 WHERE id = ?1", params![id, paint])?;
+        Ok(())
+    }
+
+    /// What's in a display case, in the order it went in.
+    pub fn display(&self, thing: i64) -> anyhow::Result<Vec<(String, i64)>> {
+        let mut stmt = self.conn.prepare("SELECT species, count FROM displays WHERE thing = ?1 AND count > 0 ORDER BY rowid")?;
+        let rows = stmt.query_map([thing], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn display_add(&self, thing: i64, species: &str, n: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO displays (thing, species, count) VALUES (?1, ?2, ?3)
+             ON CONFLICT(thing, species) DO UPDATE SET count = count + excluded.count",
+            params![thing, species, n],
+        )?;
         Ok(())
     }
 

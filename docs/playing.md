@@ -71,6 +71,14 @@ what people read, drawn in the nearest of the island's colours, and a painted
 home's `⌂` shows in its colour on the map. At your home you can paint what
 your guests made too. `paint the bench plain` scrubs it off.
 
+Finds can be kept on show. `make a jar` (or a display case, a shelf, a
+terrarium, a bug hotel, or a fish tank for fish), then `put firefly in jar` or
+`put shell on shelf`. Anyone who looks there sees what's inside: butterflies
+open and close their wings, beetles trundle about, fish turn circles, and
+anything that glows (fireflies, glow-worms, glowcaps) lights up the dark. A case
+holds twelve finds. `take firefly from jar` puts one back in your satchel. At
+your home, you and your guests can fill each other's cases.
+
 ## Gardens
 
 What you plant grows slowly, over real time. A tree starts as a sapling, is a
