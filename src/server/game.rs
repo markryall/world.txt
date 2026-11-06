@@ -25,6 +25,7 @@ mod cases;
 mod radio;
 pub(crate) use radio::clean_station_name;
 mod sailing;
+mod together;
 mod travel;
 mod visitors;
 
@@ -583,6 +584,9 @@ impl Game {
             return done;
         }
         if let Some(done) = self.cases_command(id, &verb, rest) {
+            return done;
+        }
+        if let Some(done) = self.together_command(id, &verb, rest) {
             return done;
         }
         if let Some(done) = self.hills_command(id, &verb, rest) {

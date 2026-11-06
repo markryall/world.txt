@@ -807,6 +807,14 @@ impl Game {
         hints.extend(self.build_hints(id));
         if self.players.iter().any(|(pid, p)| *pid != id && (p.x, p.y) == (x, y) && !p.bot) {
             hints.push("Two's company. You could settle just about anything with a game of rock, paper, scissors.");
+            let night = matches!(crate::server::weather::Clock::phase(), crate::server::weather::Phase::Night);
+            if sky.wet() {
+                hints.push("The rain's coming down. An umbrella's just big enough for two.");
+            } else if night && sky == Sky::Clear {
+                hints.push("The stars are out, bright and thick. Lie back together and you might spot a constellation.");
+            } else if !night && dry && matches!(t, Terrain::Meadow | Terrain::Grass) {
+                hints.push("What a spot for a picnic. Good grass, good company.");
+            }
         }
         // Everything else there is to do.
         if matches!(t, Terrain::Grass | Terrain::Dirt) {

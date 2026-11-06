@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Little things for two
+A few small things that work on your own and are nicer with someone else
+there. The scenery will mention them when you've company.
+
 ### The hills
 The high ground has a few things to find now. Climb up and see what the
 scenery suggests.
