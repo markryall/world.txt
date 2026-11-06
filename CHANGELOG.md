@@ -8,6 +8,12 @@ your whole home, in any colour you can name (rainbow included). People read
 your word for it, things show in their colour wherever they're described, and
 your home's `⌂` turns your colour on the map.
 
+### Furniture from finds
+`recipes` has a new section, for your home: feather cushions, toadstool
+stools, leaf rugs, door wreaths, vases of flowers, shell mirrors that sparkle in
+the sun, pinecone lamps that glow at night, driftwood tables, pebble doorstops,
+and a butterfly bush for butterflies to drift in and out of.
+
 ### Display cases
 `make a jar`, then `put firefly in jar`: a home for your favourite finds,
 where friends can see them. Butterflies open and close their wings, beetles

@@ -71,6 +71,12 @@ what people read, drawn in the nearest of the island's colours, and a painted
 home's `⌂` shows in its colour on the map. At your home you can paint what
 your guests made too. `paint the bench plain` scrubs it off.
 
+Homes can be furnished from finds, too: `recipes` lists things for a home
+(a feather cushion, a toadstool stool, a leaf rug, a door wreath, a vase of
+flowers, a shell mirror, a pinecone lamp, a driftwood table, a pebble doorstop,
+a butterfly bush). `craft feather cushion`, then `place feather cushion` where
+you want it, and paint it if you like.
+
 Finds can be kept on show. `make a jar` (or a display case, a shelf, a
 terrarium, a bug hotel, or a fish tank for fish), then `put firefly in jar` or
 `put shell on shelf`. Anyone who looks there sees what's inside: butterflies

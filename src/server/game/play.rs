@@ -810,6 +810,7 @@ impl Game {
         }
         if self.world.home_at(x, y).is_some_and(|h| h.owner == user) {
             hints.push("A pot of paint sits by your door. Anything here could be any colour you like.");
+            hints.push("Your home could do with somewhere to sit. A feather cushion, maybe, or a toadstool stool. (recipes)");
             hints.push("An empty shelf by the door is just waiting for a few of your finds. A jar of fireflies would glow lovely at night.");
         }
         if dry && matches!(t, Terrain::Grass | Terrain::Meadow) && !self.world.homes.iter().any(|h| h.owner == user) {

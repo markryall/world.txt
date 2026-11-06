@@ -38,6 +38,25 @@ pub const RECIPES: &[Recipe] = &[
     },
 ];
 
+/// Things for a home, made from finds: place one and it's part of the room.
+pub const FURNITURE: &[Recipe] = &[
+    Recipe { makes: "feather_cushion", needs: &[(Any(Kind::Feather), 3)] },
+    Recipe { makes: "toadstool_stool", needs: &[(Exactly("fly_agaric"), 1), (Any(Kind::Leaf), 1)] },
+    Recipe { makes: "leaf_rug", needs: &[(Any(Kind::Leaf), 5)] },
+    Recipe { makes: "door_wreath", needs: &[(Any(Kind::Flower), 2), (Any(Kind::Leaf), 2)] },
+    Recipe { makes: "vase_of_flowers", needs: &[(Exactly("sea_glass"), 1), (Any(Kind::Flower), 3)] },
+    Recipe { makes: "shell_mirror", needs: &[(Exactly("sea_glass"), 2), (Any(Kind::Shell), 2)] },
+    Recipe { makes: "pinecone_lamp", needs: &[(Exactly("pinecone"), 2), (Exactly("firefly"), 1)] },
+    Recipe { makes: "driftwood_table", needs: &[(Exactly("driftwood"), 2), (Any(Kind::Stone), 1)] },
+    Recipe { makes: "pebble_doorstop", needs: &[(Exactly("pebble"), 2), (Any(Kind::Feather), 1)] },
+    Recipe { makes: "butterfly_bush", needs: &[(Any(Kind::Butterfly), 2), (Any(Kind::Flower), 2)] },
+];
+
+/// Every recipe, crafts first, then things for a home.
+fn all_recipes() -> impl Iterator<Item = &'static Recipe> {
+    RECIPES.iter().chain(FURNITURE)
+}
+
 pub(super) fn need_label(need: Need, n: i64) -> String {
     let (one, many) = match need {
         Any(k) => match k {
@@ -50,6 +69,8 @@ pub(super) fn need_label(need: Need, n: i64) -> String {
             Kind::Berry => ("berry", "berries"),
             Kind::Fish => ("fish", "fish"),
             Kind::Herb => ("herb", "herbs"),
+            Kind::Butterfly => ("butterfly", "butterflies"),
+            Kind::Bug => ("bug", "bugs"),
             _ => ("thing", "things"),
         },
         Exactly(id) => {
@@ -110,7 +131,10 @@ impl Game {
         let user = self.user(id);
         let satchel = self.world.db.satchel(&user)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "✂️ Things you can craft")];
-        for r in RECIPES {
+        for (i, r) in all_recipes().enumerate() {
+            if i == RECIPES.len() {
+                lines.push(Line::new().b(Col::Magenta, "🪑 For your home"));
+            }
             let Some(s) = nature::by_id(r.makes) else { continue };
             let needs: Vec<String> = r.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
             let ready = plan(r, &satchel).is_some();
@@ -134,8 +158,7 @@ impl Game {
         if w.is_empty() {
             return self.cmd_recipes(id);
         }
-        let Some((recipe, s)) = RECIPES
-            .iter()
+        let Some((recipe, s)) = all_recipes()
             .filter_map(|r| nature::by_id(r.makes).map(|s| (r, s)))
             .find(|(_, s)| s.name.contains(&w) || s.id == w.replace(' ', "_"))
         else {
@@ -168,7 +191,7 @@ mod tests {
 
     #[test]
     fn every_recipe_makes_a_real_craft() {
-        for r in RECIPES {
+        for r in all_recipes() {
             let s = nature::by_id(r.makes).unwrap_or_else(|| panic!("{} is missing", r.makes));
             assert_eq!(s.kind, Kind::Craft);
             for (need, _) in r.needs {

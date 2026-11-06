@@ -251,6 +251,17 @@ pub const SPECIES: &[Species] = &[
     Species { id: "berry_crumble", name: "slice of berry crumble", kind: Food, rarity: Uncommon, when: Any, ground: &[], here: "smells of warm berries and honey" },
     Species { id: "honey_cake", name: "slice of honey cake", kind: Food, rarity: Uncommon, when: Any, ground: &[], here: "smells sweet and golden" },
     Species { id: "garland", name: "rainbow garland", kind: Craft, rarity: Uncommon, when: Any, ground: &[], here: "flutters in every colour" },
+    // things for a home: `here` is how they sit in the room once placed
+    Species { id: "feather_cushion", name: "feather cushion", kind: Craft, rarity: Common, when: Any, ground: &[], here: "sits plump and inviting, just asking to be sat on" },
+    Species { id: "toadstool_stool", name: "toadstool stool", kind: Craft, rarity: Common, when: Any, ground: &[], here: "is exactly the right height for sitting and thinking" },
+    Species { id: "leaf_rug", name: "leaf rug", kind: Craft, rarity: Common, when: Any, ground: &[], here: "rustles softly underfoot" },
+    Species { id: "door_wreath", name: "door wreath", kind: Craft, rarity: Common, when: Any, ground: &[], here: "hangs by the door, saying welcome without a word" },
+    Species { id: "vase_of_flowers", name: "vase of flowers", kind: Craft, rarity: Common, when: Any, ground: &[], here: "brightens the whole place up" },
+    Species { id: "shell_mirror", name: "shell mirror", kind: Craft, rarity: Uncommon, when: DryDay, ground: &[], here: "catches the sun and scatters it about in little green sparkles" },
+    Species { id: "pinecone_lamp", name: "pinecone lamp", kind: Craft, rarity: Uncommon, when: Night, ground: &[], here: "glows warm and amber, a firefly dozing inside" },
+    Species { id: "driftwood_table", name: "driftwood table", kind: Craft, rarity: Uncommon, when: Any, ground: &[], here: "stands a little wonky, bleached smooth by the sea" },
+    Species { id: "pebble_doorstop", name: "pebble doorstop", kind: Craft, rarity: Common, when: Any, ground: &[], here: "holds the door open for whoever's passing" },
+    Species { id: "butterfly_bush", name: "butterfly bush", kind: Craft, rarity: Uncommon, when: DryDay, ground: &[], here: "has butterflies drifting in and out of its flowers" },
 ];
 
 pub fn by_id(id: &str) -> Option<&'static Species> {
