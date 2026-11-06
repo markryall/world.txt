@@ -12,4 +12,8 @@ if [ -f /data/import.db ]; then
     mv /data/import.db "$WORLD_DB"
     echo "📦 moved in the uploaded world (the one it replaced is in /data/replaced)"
 fi
-exec world.txt serve --addr 0.0.0.0:8080
+# Everything in /data belongs to the world's own user (an upload, or a
+# command run over ssh as root, can leave things that don't), and the world
+# runs as that user rather than as root.
+chown -R world:world /data
+exec setpriv --reuid=world --regid=world --init-groups -- world.txt serve --addr 0.0.0.0:8080

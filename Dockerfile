@@ -15,6 +15,9 @@ FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 sqlite3 tzdata \
     && rm -rf /var/lib/apt/lists/*
+# The world runs as this ordinary user, not root (fly-start.sh hands over to
+# it), so a bug in the server can only reach the world's own files.
+RUN useradd --system --uid 10001 --home-dir /data --no-create-home --shell /usr/sbin/nologin world
 COPY --from=build /src/target/release/world-txt /usr/local/bin/world.txt
 COPY deploy/fly-start.sh /usr/local/bin/fly-start.sh
 ENV WORLD_DB=/data/world.db
