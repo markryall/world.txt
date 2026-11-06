@@ -38,12 +38,11 @@ pub fn split_link(text: &str) -> (String, Option<String>) {
     let words: Vec<&str> = text
         .split_whitespace()
         .filter(|w| {
-            if links.len() < MAX_LINKS && w.starts_with("https://") {
-                if let Some(l) = clean_link(w) {
+            if links.len() < MAX_LINKS && w.starts_with("https://")
+                && let Some(l) = clean_link(w) {
                     links.push(l);
                     return false;
                 }
-            }
             true
         })
         .collect();

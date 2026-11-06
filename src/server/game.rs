@@ -437,8 +437,8 @@ impl Game {
             let _ = p.tx.send(ToClient::Bye { reason: "👋 You've wandered in from another window or device, so this one has gone quiet.".to_string() });
             self.leave(old);
         }
-        if !self.is_keeper(&user) {
-            if let Some(until) = self.world.db.banned_until(&user, key_hash.as_deref(), now) {
+        if !self.is_keeper(&user)
+            && let Some(until) = self.world.db.banned_until(&user, key_hash.as_deref(), now) {
                 if until - now > 365 * 86_400 {
                     bye("🚫 The island keepers have closed the island to you.");
                 } else {
@@ -447,7 +447,6 @@ impl Game {
                 }
                 return;
             }
-        }
         let saved = self.world.db.player(&user);
         // Invited accounts start off the map, until their first arrival.
         let first_time = !bot && saved.is_none_or(|s| s.0 < 0);
@@ -943,11 +942,10 @@ impl Game {
     /// nothing is lost even if the world stops before they leave.
     fn save_progress(&self, id: u64) {
         let Some(p) = self.players.get(&id) else { return };
-        if !p.bot {
-            if let Err(e) = self.world.db.save_player(&p.user, p.x, p.y, p.tutorial) {
+        if !p.bot
+            && let Err(e) = self.world.db.save_player(&p.user, p.x, p.y, p.tutorial) {
                 eprintln!("saving {}: {e}", p.user);
             }
-        }
     }
 
     fn progress(&mut self, id: u64, act: Act) {
@@ -1619,13 +1617,12 @@ impl Game {
             return Ok(());
         }
         self.world.db.add_ban(&tuser, thash.as_deref(), boards::now() + minutes * 60)?;
-        if let Some(pid) = target {
-            if let Some(p) = self.players.get(&pid) {
+        if let Some(pid) = target
+            && let Some(p) = self.players.get(&pid) {
                 let _ = p.tx.send(ToClient::Bye {
                     reason: format!("🌙 A keeper has asked you to take a break. You can come back in about {minutes} minutes."),
                 });
             }
-        }
         let gone = if target.is_some() { "has been sent off" } else { "isn't here, but" };
         self.say1(id, Line::col(Col::Yellow, format!("👢 {tname} {gone} for {minutes} minutes (name and device). 'unkick {tuser}' to let them back early.")));
         println!("👢 {who} kicked {tname} for {minutes} minutes");
@@ -1885,12 +1882,11 @@ impl Game {
             return Ok(());
         }
         let name = self.world.things[i].name.clone();
-        if gramophone::makes_sound(self.world.things[i].kind.as_deref()) {
-            if let Some(other) = self.sound_too_close(x + dx, y + dy, Some(self.world.things[i].id)) {
+        if gramophone::makes_sound(self.world.things[i].kind.as_deref())
+            && let Some(other) = self.sound_too_close(x + dx, y + dy, Some(self.world.things[i].id)) {
                 self.say1(id, Line::plain(format!("That would put it too close to {}: two songs at once would be a muddle.", the(&other))));
                 return Ok(());
             }
-        }
         self.world.move_thing(i, x + dx, y + dy)?;
         self.say1(id, Line::plain(format!("You push {} off to the {long}.", the(&name))));
         self.tell_here(x, y, id, Line::plain(format!("{who} pushes {} off to the {long}.", the(&name))));
@@ -2022,10 +2018,8 @@ impl Game {
 fn said_something(input: &str, verb: &str) -> bool {
     let text = if verb == "say" {
         input.split_once(char::is_whitespace).map_or("", |(_, r)| r)
-    } else if let Some(r) = input.strip_prefix(SAY_QUOTES) {
-        r
     } else {
-        ""
+        input.strip_prefix(SAY_QUOTES).unwrap_or_default()
     };
     !text.trim().is_empty()
 }
@@ -2486,11 +2480,10 @@ fn help(topic: &str, keeper: bool) -> Vec<Line> {
         }
         return lines;
     }
-    if !topic.is_empty() {
-        if let Some(t) = topics().find(|t| t.name == topic || t.also.contains(&topic.as_str())) {
+    if !topic.is_empty()
+        && let Some(t) = topics().find(|t| t.name == topic || t.also.contains(&topic.as_str())) {
             return help_topic(t);
         }
-    }
     let mut lines = Vec::new();
     if topic.is_empty() {
         lines.push(Line::new().b(Col::Magenta, "✨ Things you can do ✨"));

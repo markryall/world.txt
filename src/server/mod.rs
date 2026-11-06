@@ -53,7 +53,9 @@ impl ClientTx {
         ClientTx { tx, audio_queued: Arc::default(), queued: Arc::default(), swamped: Arc::default() }
     }
 
-    pub fn send(&self, msg: ToClient) -> Result<(), mpsc::error::SendError<ToClient>> {
+    /// Queue a message. The error (the connection's gone) carries the message
+    /// back, boxed, since some messages are big.
+    pub fn send(&self, msg: ToClient) -> Result<(), Box<mpsc::error::SendError<ToClient>>> {
         use std::sync::atomic::Ordering::Relaxed;
         if self.swamped.load(Relaxed) {
             return Ok(());
@@ -74,7 +76,7 @@ impl ClientTx {
             _ => {}
         }
         self.queued.fetch_add(1, Relaxed);
-        self.tx.send(msg)
+        self.tx.send(msg).map_err(Box::new)
     }
 
     /// The writer took a message off the queue.

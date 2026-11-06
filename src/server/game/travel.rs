@@ -238,7 +238,7 @@ pub fn arrived(place: &str) -> String {
 
 /// The place someone means: its number from `places`, or its name (whole,
 /// then the start of it, then any part), with or without "the".
-fn pick_place<'a>(places: &'a [(i64, i64, String, &'static crate::server::islands::Island)], want: &str) -> Option<(i64, i64, String, &'static crate::server::islands::Island)> {
+fn pick_place(places: &[(i64, i64, String, &'static crate::server::islands::Island)], want: &str) -> Option<(i64, i64, String, &'static crate::server::islands::Island)> {
     if let Ok(n) = want.parse::<usize>() {
         return places.get(n.checked_sub(1)?).cloned();
     }

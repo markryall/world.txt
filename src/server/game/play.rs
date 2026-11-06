@@ -243,11 +243,10 @@ impl Game {
         let (x, y) = (me.x, me.y);
         let mut lines = Vec::new();
         for p in self.players.values() {
-            if p.user != me.user && (p.x, p.y) == (x, y) {
-                if let Some(w) = &p.fun.wearing {
+            if p.user != me.user && (p.x, p.y) == (x, y)
+                && let Some(w) = &p.fun.wearing {
                     lines.push(Line::col(Col::Magenta, format!("✨ {} is wearing {w}.", p.name)));
                 }
-            }
         }
         if let Some(c) = self.castles.get(&(x, y)) {
             lines.push(Line::col(Col::Yellow, format!("🏰 A sandcastle stands here, built by {}: {}.", self.names(&c.builders), and_list(&c.bits))));

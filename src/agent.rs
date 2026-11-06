@@ -123,12 +123,11 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                         for line in lines {
                             let text: String = line.0.iter().map(|s| s.t.as_str()).collect();
                             if text.trim().is_empty() { continue }
-                            if let Some(why) = trigger(&text, &me) {
-                                if wake_at.is_none() {
+                            if let Some(why) = trigger(&text, &me)
+                                && wake_at.is_none() {
                                     wake_at = Some(Instant::now() + DEBOUNCE);
                                     wake_reason = why.to_string();
                                 }
-                            }
                             seen.push_back(text);
                             while seen.len() > CONTEXT_LINES { seen.pop_front(); }
                         }
@@ -176,8 +175,8 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
             continue;
         }
         let now = Instant::now();
-        if let Some(t) = last_call {
-            if now < t + MIN_GAP {
+        if let Some(t) = last_call
+            && now < t + MIN_GAP {
                 // Too soon: think a little later instead, keeping the reason.
                 if wake_at.is_none() {
                     wake_at = Some(t + MIN_GAP);
@@ -185,7 +184,6 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                 }
                 continue;
             }
-        }
         while recent_calls.front().is_some_and(|t| now.duration_since(*t) > Duration::from_secs(3600)) {
             recent_calls.pop_front();
         }

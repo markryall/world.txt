@@ -138,11 +138,10 @@ impl Game {
             n => format!("📀 {n} songs added. One plays each time your turn comes round."),
         };
         self.say1(id, Line::col(Col::Pink, msg));
-        if added > 0 {
-            if let Some((x, y)) = self.world.things.iter().find(|t| t.id == thing).map(|t| (t.x, t.y)) {
+        if added > 0
+            && let Some((x, y)) = self.world.things.iter().find(|t| t.id == thing).map(|t| (t.x, t.y)) {
                 self.tell_here(x, y, id, Line::col(Col::Pink, format!("📀 {who} adds some songs to the jukebox.")));
             }
-        }
         if self.jukes.get(&thing).is_some_and(|j| j.now.is_none()) {
             self.juke_next(thing);
         }

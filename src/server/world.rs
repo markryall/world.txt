@@ -722,7 +722,7 @@ fn atmosphere(
         s.push_str(wet);
     } else if breezy {
         s.push(' ');
-        s.push_str(rng::pick(
+        s.push_str(rng::pick::<&str>(
             &["A breeze tugs at your clothes.", "The wind is up, and lively.", "Gusts of wind come and go."],
             seed ^ 0xb,
             x,

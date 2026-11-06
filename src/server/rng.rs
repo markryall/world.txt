@@ -17,7 +17,7 @@ pub fn unit2(seed: u64, x: i64, y: i64) -> f64 {
 }
 
 /// Pick something stable for a place, so descriptions don't flicker.
-pub fn pick<'a, T>(items: &'a [T], seed: u64, x: i64, y: i64) -> &'a T {
+pub fn pick<T>(items: &[T], seed: u64, x: i64, y: i64) -> &T {
     &items[(hash2(seed, x, y) % items.len() as u64) as usize]
 }
 

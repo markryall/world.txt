@@ -1,0 +1,3 @@
+# A few functions take eight plain values (where, when, what weather...).
+# Bundling them into one-off structs just to please the lint reads worse.
+too-many-arguments-threshold = 8

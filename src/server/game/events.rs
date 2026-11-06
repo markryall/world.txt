@@ -219,10 +219,13 @@ pub fn place_event(text: &str) -> (bool, &str) {
     (false, t)
 }
 
+/// An event's name without its guests, and their usernames.
+pub type Invited = (String, Vec<String>);
+
 /// "Standup with Poppy, Sam and Lu" → ("Standup", their usernames), when
 /// every name is someone; "Tea with cake" (nobody's called cake) stays as it
 /// is (None); some names but not others: Err(the unknown ones).
-pub fn invited(name: &str, lookup: impl Fn(&str) -> Vec<String>) -> Option<Result<(String, Vec<String>), Vec<String>>> {
+pub fn invited(name: &str, lookup: impl Fn(&str) -> Vec<String>) -> Option<Result<Invited, Vec<String>>> {
     let lower = name.to_lowercase();
     let at = lower.rfind(" with ")?;
     let (what, who) = (name[..at].trim(), &name[at + " with ".len()..]);
@@ -291,11 +294,10 @@ impl Game {
     /// Tell everyone who's in on an event, each in their own time.
     fn tell_audience(&self, e: &EventRow, except: Option<u64>, line: impl Fn(Tz) -> Line) {
         for id in self.audience(e) {
-            if Some(id) != except {
-                if let Some(p) = self.players.get(&id) {
+            if Some(id) != except
+                && let Some(p) = self.players.get(&id) {
                     self.say1(id, line(p.tz));
                 }
-            }
         }
     }
 
@@ -638,12 +640,11 @@ impl Game {
             (false, false) => format!("📅 You weren't going to {} anyway.", e.name),
         };
         self.say1(id, Line::col(Col::Yellow, msg));
-        if going && changed && e.host != me {
-            if let Some((&host, _)) = self.players.iter().find(|(_, p)| p.user == e.host) {
+        if going && changed && e.host != me
+            && let Some((&host, _)) = self.players.iter().find(|(_, p)| p.user == e.host) {
                 let name = self.world.nick(&me);
                 self.say1(host, Line::col(Col::Yellow, format!("📅 {name} is going to {}.", e.name)));
             }
-        }
         Ok(())
     }
 
@@ -858,6 +859,6 @@ mod tests {
         assert_eq!(place_event("here fri 10am Standup"), (true, "fri 10am Standup"));
         assert_eq!(place_event("Here 4pm Tea"), (true, "4pm Tea"));
         assert_eq!(place_event("sat 4pm Beach party"), (false, "sat 4pm Beach party"));
-        assert_eq!(place_event("hereford 4pm cattle show").0, false);
+        assert!(!place_event("hereford 4pm cattle show").0);
     }
 }

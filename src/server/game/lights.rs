@@ -122,7 +122,7 @@ impl Game {
     /// second), and say so if it's gone up or down (at most once a minute).
     fn flush_light(&mut self, hook: i64) {
         let Some(l) = self.lights.get_mut(&hook) else { return };
-        if l.pending && !l.saved.is_some_and(|t| t.elapsed() < SETTLE) {
+        if l.pending && l.saved.is_none_or(|t| t.elapsed() >= SETTLE) {
             l.pending = false;
             l.saved = Some(Instant::now());
             let (board, up, note) = (l.board, l.up, l.note.clone());

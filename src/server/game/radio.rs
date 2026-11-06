@@ -287,11 +287,10 @@ impl Game {
         let labels: HashMap<i64, String> = radios.iter().map(|(id, (_, _, url))| (*id, self.station_label(url))).collect();
         for (pid, p) in self.players.iter_mut().filter(|(_, p)| !p.bot) {
             let mut hearing: HashMap<i64, (f32, String)> = HashMap::new();
-            if let Some((id, (x, y, url))) = heard[pid].and_then(|id| radios.get(&id).map(|r| (id, r))) {
-                if let Some(gain) = gain_at((p.x - x).abs().max((p.y - y).abs())) {
+            if let Some((id, (x, y, url))) = heard[pid].and_then(|id| radios.get(&id).map(|r| (id, r)))
+                && let Some(gain) = gain_at((p.x - x).abs().max((p.y - y).abs())) {
                     hearing.insert(id, (gain, url.clone()));
                 }
-            }
             for (id, (gain, url)) in &hearing {
                 if p.radios.get(id) != Some(&(*gain, url.clone())) {
                     if p.radios.get(id).is_none_or(|(_, u)| u != url) {

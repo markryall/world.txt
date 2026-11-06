@@ -2,6 +2,28 @@
 
 use rusqlite::{Connection, params};
 
+/// An invite, for keepers: the username, their nickname, when it expires, and
+/// when it was used (if it has been).
+pub type InviteRow = (String, String, i64, Option<i64>);
+
+/// An account, for keepers: the username, nickname, whether they're a keeper,
+/// how many devices they have, and when one was last seen.
+pub type AccountRow = (String, String, bool, i64, Option<i64>);
+
+/// A home: its owner, where it is, and who else may build there.
+pub type HomeRow = (String, i64, i64, Vec<String>);
+
+/// A status light: its hook, its board, its name, whether it's up, and its note.
+pub type LightRow = (i64, i64, String, bool, Option<String>);
+
+/// A building: its thing, its plan, who built it, when it was started and
+/// will be ready, and whether they've been told it's done.
+pub type BuildingRow = (i64, String, String, i64, i64, bool);
+
+/// A progress bar: its hook, its board, its name, how far along out of how
+/// much, and its label.
+pub type BarRow = (i64, i64, String, u64, u64, Option<String>);
+
 pub struct Db {
     conn: Connection,
 }
@@ -381,7 +403,7 @@ impl Db {
 
     /// Recent invites, newest first: (username, nickname, expires, used_at).
     /// `used_at` is None while unused; old ones from before it was kept show 0.
-    pub fn invites(&self, limit: usize) -> anyhow::Result<Vec<(String, String, i64, Option<i64>)>> {
+    pub fn invites(&self, limit: usize) -> anyhow::Result<Vec<InviteRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT i.user, COALESCE(p.nickname, i.user), i.expires,
                     CASE WHEN i.used = 0 THEN NULL ELSE COALESCE(i.used_at, 0) END
@@ -432,7 +454,7 @@ impl Db {
     }
 
     /// Everyone, for keepers: (username, nickname, keeper, devices, last seen).
-    pub fn accounts(&self) -> anyhow::Result<Vec<(String, String, bool, i64, Option<i64>)>> {
+    pub fn accounts(&self) -> anyhow::Result<Vec<AccountRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT p.name, COALESCE(p.nickname, p.name), p.keeper,
                     (SELECT COUNT(*) FROM devices d WHERE d.user = p.name),
@@ -752,7 +774,6 @@ impl Db {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
-    /// Where a returning player was, and how far through first steps.
     // ---- companions ---------------------------------------------------------
 
     pub fn companion(&self, owner: &str) -> Option<(String, Option<String>)> {
@@ -966,7 +987,7 @@ impl Db {
     // ---- homes ---------------------------------------------------------------
 
     /// Every home: (owner, x, y, guests).
-    pub fn homes(&self) -> anyhow::Result<Vec<(String, i64, i64, Vec<String>)>> {
+    pub fn homes(&self) -> anyhow::Result<Vec<HomeRow>> {
         let mut stmt = self.conn.prepare("SELECT owner, x, y FROM homes")?;
         let rows: Vec<(String, i64, i64)> =
             stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_, _>>()?;
@@ -1044,6 +1065,7 @@ impl Db {
         Ok(n > 0)
     }
 
+    /// Where a returning player was, and how far through first steps.
     pub fn player(&self, name: &str) -> Option<(i64, i64, u8)> {
         self.conn
             .query_row("SELECT x, y, tutorial FROM players WHERE name = ?1", [name], |r| {
@@ -1196,7 +1218,7 @@ impl Db {
     }
 
     /// Every status light that's showing: (hook, board, name, up, note).
-    pub fn status_lights(&self) -> anyhow::Result<Vec<(i64, i64, String, bool, Option<String>)>> {
+    pub fn status_lights(&self) -> anyhow::Result<Vec<LightRow>> {
         let mut stmt = self.conn.prepare("SELECT id, board, name, up, label FROM hooks WHERE kind = 'status' AND up IS NOT NULL ORDER BY id")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get::<_, i64>(3)? != 0, r.get(4)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -1213,7 +1235,7 @@ impl Db {
     }
 
     /// Every building: (thing, plan, by, started, ready, told).
-    pub fn buildings(&self) -> anyhow::Result<Vec<(i64, String, String, i64, i64, bool)>> {
+    pub fn buildings(&self) -> anyhow::Result<Vec<BuildingRow>> {
         let mut stmt = self.conn.prepare("SELECT thing, plan, by, started, ready, told FROM buildings")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get::<_, i64>(5)? != 0)))?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -1225,7 +1247,7 @@ impl Db {
     }
 
     /// Every progress bar that's showing: (hook, board, name, done, total, label).
-    pub fn progress_bars(&self) -> anyhow::Result<Vec<(i64, i64, String, u64, u64, Option<String>)>> {
+    pub fn progress_bars(&self) -> anyhow::Result<Vec<BarRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, board, name, done, total, label FROM hooks WHERE kind = 'progress' AND done IS NOT NULL AND total IS NOT NULL ORDER BY id",
         )?;

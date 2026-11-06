@@ -143,11 +143,10 @@ fn on_path(name: &str) -> Option<PathBuf> {
 /// This program, as the agent should start it.
 fn this_program() -> anyhow::Result<PathBuf> {
     let arg0 = std::env::args().next().unwrap_or_default();
-    if !arg0.contains('/') {
-        if let Some(p) = on_path(&arg0) {
+    if !arg0.contains('/')
+        && let Some(p) = on_path(&arg0) {
             return Ok(p);
         }
-    }
     Ok(std::env::current_exe()?)
 }
 

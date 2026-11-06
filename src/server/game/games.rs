@@ -227,7 +227,7 @@ impl Game {
 
     fn reveal(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((x, y, _)) = self.here(id) else { return Ok(()) };
-        if !self.rounds.get(&(x, y)).is_some_and(|g| g.players.iter().filter(|p| p.2.is_some()).count() >= 2) {
+        if self.rounds.get(&(x, y)).is_none_or(|g| g.players.iter().filter(|p| p.2.is_some()).count() < 2) {
             self.say1(id, Line::plain("Not yet: at least two people need to have chosen first."));
             return Ok(());
         }
@@ -261,7 +261,7 @@ impl Game {
                 let answers = in_order(chosen);
                 let same = answers.windows(2).all(|w| w[0].1.eq_ignore_ascii_case(&w[1].1));
                 for (who, a) in &answers {
-                    lines.push(Line::new().t("   ").c(Col::Magenta, format!("{a}")).c(Col::Dim, format!("  {who}")));
+                    lines.push(Line::new().t("   ").c(Col::Magenta, a.clone()).c(Col::Dim, format!("  {who}")));
                 }
                 if same && answers.len() > 1 {
                     lines.push(Line::col(Col::Magenta, "   Everyone agrees! ✨"));

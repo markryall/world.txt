@@ -578,11 +578,10 @@ impl Game {
         if !followed.is_empty() {
             lines.push(Line::col(Col::Dim, "  unfollow 2 leaves one from anywhere"));
         }
-        if let Some(j) = self.journal_board {
-            if let Some((jx, jy)) = self.board_place(j) {
+        if let Some(j) = self.journal_board
+            && let Some((jx, jy)) = self.board_place(j) {
                 lines.push(Line::col(Col::Dim, format!("  The Island Journal stands at {}.", self.world.place_title(jx, jy))));
             }
-        }
         self.send(id, lines);
         Ok(())
     }
