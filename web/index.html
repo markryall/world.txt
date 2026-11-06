@@ -884,10 +884,11 @@ function jukeAdd(thing) {
 }
 
 function jukeQueue(files) {
-  const songs = [...files].map((f) => {
+  // The jukebox keeps 20 each, so there's no sending a whole music library.
+  const songs = [...files].slice(0, 20).map((f) => {
     const key = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
     juke.files.set(key, f);
-    return { key, title: f.name.replace(/\.[^.]+$/, '') };
+    return { key, title: f.name.replace(/\.[^.]+$/, '').slice(0, 200) };
   });
   if (!songs.length || !ws || ws.readyState !== 1) return;
   ws.send(JSON.stringify({ type: 'queue', thing: juke.thing, songs }));

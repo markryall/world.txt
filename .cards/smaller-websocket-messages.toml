@@ -1,7 +1,7 @@
 name = "Smaller websocket messages"
-status = "todo"
+status = "done"
 description = "tokio_tungstenite's defaults allow messages of about 64MB, and anyone can send them before saying hello. Set a WebSocketConfig with sensible max_message_size/max_frame_size: commands need a few KB; check what songs (Queue) and gramophone Audio frames really need."
 created_at = "2026-11-06T07:24:17.763450Z"
-updated_at = "2026-11-06T07:24:17.763450Z"
+updated_at = "2026-11-06T08:12:11.431033Z"
 tags = ["security"]
 priority = "high"

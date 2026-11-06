@@ -204,7 +204,8 @@ async fn connection(
     if !is_websocket(&stream).await? {
         return serve_page(stream, &info, &events).await;
     }
-    let ws = tokio_tungstenite::accept_async(stream).await?;
+    let config = tokio_tungstenite::tungstenite::protocol::WebSocketConfig::default().max_message_size(Some(MAX_MESSAGE)).max_frame_size(Some(MAX_MESSAGE));
+    let ws = tokio_tungstenite::accept_async_with_config(stream, Some(config)).await?;
     let (mut sink, mut source) = ws.split();
     let (raw_tx, mut rx) = mpsc::unbounded_channel::<ToClient>();
     let tx = ClientTx::new(raw_tx);
@@ -236,6 +237,11 @@ async fn connection(
             Ok(Message::Close(_)) | Err(_) => break,
             Ok(_) => continue,
         };
+        // Saying hello takes a few hundred bytes: anything much bigger from
+        // someone who hasn't yet is up to no good.
+        if !joined && text.len() > MAX_HELLO {
+            break;
+        }
         let Ok(parsed) = serde_json::from_str::<ToServer>(text.as_str()) else {
             continue;
         };
@@ -280,7 +286,13 @@ async fn connection(
         let _ = events.send(Event::Leave { id });
     }
     drop(tx);
-    let _ = writer.await;
+    // The writer holds a sender of its own (to count what's queued), so its
+    // queue never runs dry by itself: give it a moment to send any last
+    // goodbye, then let it go, and the connection with it.
+    let mut writer = writer;
+    if tokio::time::timeout(std::time::Duration::from_secs(2), &mut writer).await.is_err() {
+        writer.abort();
+    }
     Ok(())
 }
 
@@ -317,6 +329,11 @@ fn page(info: &Option<federation::WorldInfo>) -> String {
 }
 
 /// The most a request may send: its headers, and a hook's post.
+/// The biggest message a browser sends: half a second or so of a
+/// gramophone's music (at most 60 frames of 4KB), or a jukebox's song list.
+const MAX_MESSAGE: usize = 512 * 1024;
+/// The biggest message before saying hello (a passport is the longest).
+const MAX_HELLO: usize = 8 * 1024;
 const MAX_HEAD: usize = 8 * 1024;
 const MAX_BODY: usize = 16 * 1024;
 
