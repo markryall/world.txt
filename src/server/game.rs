@@ -158,6 +158,8 @@ struct Game {
     angels: HashMap<(i64, i64), play::Angels>,
     /// Little games going on, by spot.
     rounds: HashMap<(i64, i64), games::Round>,
+    /// When a home's owner was last told someone was visiting, by (owner, visitor).
+    doorbells: HashMap<(String, String), std::time::Instant>,
     /// When the tide next comes in.
     next_tide: std::time::Instant,
     /// For work done elsewhere (looking up what's on) to report back.
@@ -166,7 +168,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), doorbells: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
     game.load_meetings();
     game.load_snowmen();
     game.load_progress();
@@ -377,6 +379,7 @@ impl Game {
         lines.extend(self.lighthouse_lines_here(id));
         lines.extend(self.meeting_lines_here(id));
         lines.extend(self.play_lines_here(id));
+        lines.extend(self.home_life_lines(id));
         lines.extend(self.cases_lines_here(id));
         lines.extend(self.games_lines_here(id));
         lines.extend(self.animal_lines(id));
@@ -804,6 +807,7 @@ impl Game {
             p.fishing = None; // walking off reels the line in
         }
         self.tell_here(nx, ny, id, Line::col(Col::Cyan, format!("{name} arrives from the {back}{with}.")));
+        self.visit_home(id, (ox, oy), (nx, ny));
         if quiet {
             // just the step, below
         } else {

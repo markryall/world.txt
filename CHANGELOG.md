@@ -14,6 +14,11 @@ stools, leaf rugs, door wreaths, vases of flowers, shell mirrors that sparkle in
 the sun, pinecone lamps that glow at night, driftwood tables, pebble doorstops,
 and a butterfly bush for butterflies to drift in and out of.
 
+### Homes that look lived in
+A house glows at the windows at night while you're in the world, and its
+chimney smokes while you've something cooking. If someone drops by your home
+while you're off wandering, a little doorbell tells you who.
+
 ### Display cases
 `make a jar`, then `put firefly in jar`: a home for your favourite finds,
 where friends can see them. Butterflies open and close their wings, beetles

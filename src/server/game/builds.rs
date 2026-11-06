@@ -208,6 +208,13 @@ const STEPS: [(i64, i64, &str); 8] =
     [(0, -1, "north"), (1, -1, "north-east"), (1, 0, "east"), (1, 1, "south-east"), (0, 1, "south"), (-1, 1, "south-west"), (-1, 0, "west"), (-1, -1, "north-west")];
 
 impl Game {
+    /// A building that's finished going up.
+    pub(super) fn built(&self, thing: i64) -> bool {
+        self.builds.get(&thing).is_some_and(|b| now() >= b.ready)
+    }
+}
+
+impl Game {
     pub(super) fn load_buildings(&mut self) {
         match self.world.db.buildings() {
             Ok(rows) => {

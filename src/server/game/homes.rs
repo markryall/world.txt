@@ -4,6 +4,11 @@
 use super::Game;
 use crate::protocol::{Col, Line};
 use crate::server::paint;
+use crate::server::weather::{Clock, Phase};
+use std::time::Duration;
+
+/// An owner hears about the same visitor at most this often.
+const DOORBELL_EVERY: Duration = Duration::from_secs(30 * 60);
 use crate::server::world::{HOME_RADIUS, Home};
 
 /// Commands that change a place, which a home's owner gets a say over.
@@ -200,5 +205,56 @@ impl Game {
         }
         self.status_all();
         Ok(())
+    }
+
+    /// For `look`: a home that's lived in. Windows glow at night while its
+    /// owner's in the world, and a chimney smokes while something cooks.
+    pub(super) fn home_life_lines(&self, id: u64) -> Vec<Line> {
+        let Some(p) = self.players.get(&id) else { return vec![] };
+        let Some(h) = self.world.home_at(p.x, p.y) else { return vec![] };
+        let buildings: Vec<String> = self
+            .world
+            .things_at(p.x, p.y)
+            .filter(|t| t.kind.as_deref() == Some(super::builds::KIND) && self.built(t.id))
+            .map(|t| super::the(&t.name))
+            .collect();
+        let Some(building) = buildings.first() else { return vec![] };
+        let mut lines = Vec::new();
+        let owner_about = self.players.values().any(|o| o.user == h.owner);
+        if owner_about && matches!(Clock::phase(), Phase::Dusk | Phase::Night) {
+            lines.push(Line::col(Col::Yellow, format!("🪟 Warm light glows in the windows of {building}.")));
+        }
+        let cooking = self.cooking.keys().any(|k| {
+            self.world.things.iter().find(|t| t.id == *k).is_some_and(|t| self.world.home_at(t.x, t.y).is_some_and(|kh| kh.owner == h.owner))
+        });
+        if cooking {
+            lines.push(Line::col(Col::Dim, format!("🌫 A curl of smoke rises from the chimney of {building}, smelling of something good.")));
+        }
+        lines
+    }
+
+    /// Someone's wandered into a home: if its owner is out and about
+    /// elsewhere, they hear about it (now and then, not every step).
+    pub(super) fn visit_home(&mut self, id: u64, from: (i64, i64), to: (i64, i64)) {
+        let Some(h) = self.world.home_at(to.0, to.1) else { return };
+        if self.world.home_at(from.0, from.1).is_some_and(|f| f.owner == h.owner) {
+            return;
+        }
+        let Some(p) = self.players.get(&id) else { return };
+        if p.bot || h.welcomes(&p.user) {
+            return;
+        }
+        let (visitor, user, owner) = (p.name.clone(), p.user.clone(), h.owner.clone());
+        let Some((&oid, o)) = self.players.iter().find(|(_, o)| o.user == owner) else { return };
+        // At home, they'll see them arrive anyway.
+        if self.world.home_at(o.x, o.y).is_some_and(|oh| oh.owner == owner) || !o.hears(&user) {
+            return;
+        }
+        let key = (owner, user);
+        if self.doorbells.get(&key).is_some_and(|t| t.elapsed() < DOORBELL_EVERY) {
+            return;
+        }
+        self.doorbells.insert(key, std::time::Instant::now());
+        self.say1(oid, Line::col(Col::Cyan, format!("🔔 {visitor} is visiting your home. (home to wander back)")));
     }
 }

@@ -77,6 +77,12 @@ flowers, a shell mirror, a pinecone lamp, a driftwood table, a pebble doorstop,
 a butterfly bush). `craft feather cushion`, then `place feather cushion` where
 you want it, and paint it if you like.
 
+A home with a building in it looks lived in: its windows glow warm at night
+while you're in the world, and smoke curls from the chimney while something's
+cooking at your campfire or oven. If someone wanders into your home while you're
+off elsewhere, you hear about it (`home` to wander back), at most once every
+half hour for the same visitor.
+
 Finds can be kept on show. `make a jar` (or a display case, a shelf, a
 terrarium, a bug hotel, or a fish tank for fish), then `put firefly in jar` or
 `put shell on shelf`. Anyone who looks there sees what's inside: butterflies
