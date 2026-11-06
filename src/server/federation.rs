@@ -114,17 +114,16 @@ pub async fn verify(token: &str, my_url: &str, now: i64) -> anyhow::Result<Passp
     }
     // Ask their home world for its key. Only http(s), and only this path.
     let home = normalise(&passport.home);
-    if !(home.starts_with("https://") || (home.starts_with("http://") && normalise(my_url).starts_with("http://"))) {
+    let trying_out = normalise(my_url).starts_with("http://");
+    if !(home.starts_with("https://") || (home.starts_with("http://") && trying_out)) {
         anyhow::bail!("that passport comes from a world we can't check");
     }
-    let info: WorldInfo = reqwest::Client::new()
-        .get(format!("{home}{WELL_KNOWN}"))
-        .timeout(std::time::Duration::from_secs(8))
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+    // Anyone can hand over a passport before they're let in, so the details
+    // of what went wrong stay in the log rather than going back to them.
+    let info = home_info(&home, trying_out).await.map_err(|e| {
+        eprintln!("🛂 couldn't check a passport from {home}: {e:#}");
+        anyhow::anyhow!("we couldn't reach your home world to check your passport")
+    })?;
     if normalise(&info.url) != home {
         anyhow::bail!("their home world doesn't recognise its own address");
     }
@@ -133,6 +132,86 @@ pub async fn verify(token: &str, my_url: &str, now: i64) -> anyhow::Result<Passp
         .verify(&body, &Signature::from_bytes(&sig))
         .map_err(|_| anyhow::anyhow!("that passport's stamp doesn't match its home world"))?;
     Ok(passport)
+}
+
+/// The most a home world's /.well-known/world.txt may say.
+const INFO_MAX: usize = 16 * 1024;
+/// How many passports may be checked at once.
+const CHECKING_AT_ONCE: usize = 8;
+static CHECKING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(CHECKING_AT_ONCE);
+
+/// Fetch a home world's /.well-known/world.txt. A stranger chooses the
+/// address, so it must be out on the internet, not somewhere only this
+/// server can reach (its own machine, the network it's hosted on), unless
+/// this world is only being tried out locally itself. The address is looked
+/// up once and the request pinned to it, so it can't change in between, and
+/// redirects aren't followed.
+async fn home_info(home: &str, local_ok: bool) -> anyhow::Result<WorldInfo> {
+    let _turn = CHECKING.try_acquire().map_err(|_| anyhow::anyhow!("too many passports being checked at once"))?;
+    let url = reqwest::Url::parse(&format!("{home}{WELL_KNOWN}"))?;
+    let host = url.host_str().ok_or_else(|| anyhow::anyhow!("no host"))?.to_string();
+    let port = url.port_or_known_default().ok_or_else(|| anyhow::anyhow!("no port"))?;
+    let lookup = host.trim_start_matches('[').trim_end_matches(']').to_string();
+    let addrs: Vec<std::net::SocketAddr> = tokio::time::timeout(std::time::Duration::from_secs(5), tokio::net::lookup_host((lookup.as_str(), port))).await??.collect();
+    if addrs.is_empty() {
+        anyhow::bail!("{host} has no address");
+    }
+    if !local_ok {
+        if let Some(a) = addrs.iter().find(|a| !public(a.ip())) {
+            anyhow::bail!("{host} is at {}, which isn't out on the internet", a.ip());
+        }
+    }
+    let client = reqwest::Client::builder()
+        .resolve_to_addrs(&lookup, &addrs)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(8))
+        .build()?;
+    let mut res = client.get(url).send().await?.error_for_status()?;
+    let mut body = Vec::new();
+    while let Some(chunk) = res.chunk().await? {
+        body.extend_from_slice(&chunk);
+        if body.len() > INFO_MAX {
+            anyhow::bail!("its world.txt is far too long");
+        }
+    }
+    Ok(serde_json::from_slice(&body)?)
+}
+
+/// Whether an address is out on the public internet: not this machine, a
+/// private or link-local network, or anything reserved.
+fn public(ip: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    match ip {
+        IpAddr::V4(v4) => {
+            let [a, b, ..] = v4.octets();
+            !(v4.is_private()
+                || v4.is_loopback()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.is_multicast()
+                || a == 0
+                || a >= 240
+                || (a == 100 && (64..128).contains(&b)) // shared address space
+                || (a == 192 && b == 0 && v4.octets()[2] == 0)
+                || (a == 198 && (18..20).contains(&b))) // benchmarking
+        }
+        IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return public(IpAddr::V4(v4));
+            }
+            let seg = v6.segments();
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                || v6.is_unique_local()
+                || v6.is_unicast_link_local()
+                || (seg[0] == 0x2001 && seg[1] == 0x0db8) // documentation
+                || (seg[0] == 0x0064 && seg[1] == 0xff9b) // NAT64, an IPv4 address in disguise
+                || seg[0] == 0) // other IPv4-compatible and reserved forms
+        }
+    }
 }
 
 #[cfg(test)]
@@ -169,5 +248,41 @@ mod tests {
         assert!(ok.verify(&forged, &sig).is_err());
         assert_eq!(p.visitor_name(), "sunny-otter-42@ryall.island");
         assert_eq!(normalise("HTTPS://Other.World/"), "https://other.world");
+    }
+
+    #[test]
+    fn only_public_addresses_count() {
+        let p = |a: &str| public(a.parse().unwrap());
+        for private in ["127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "0.0.0.0", "100.64.0.1", "::1", "fdaa::1", "fe80::1", "::ffff:127.0.0.1", "64:ff9b::a00:1", "::"] {
+            assert!(!p(private), "{private} isn't public");
+        }
+        for open in ["93.184.216.34", "1.1.1.1", "2606:4700::1111"] {
+            assert!(p(open), "{open} is public");
+        }
+    }
+
+    #[tokio::test]
+    async fn home_worlds_must_be_out_on_the_internet() {
+        let e = home_info("http://127.0.0.1:9", false).await.unwrap_err().to_string();
+        assert!(e.contains("isn't out on the internet"), "{e}");
+        let e = home_info("https://[::1]", false).await.unwrap_err().to_string();
+        assert!(e.contains("isn't out on the internet"), "{e}");
+    }
+
+    #[tokio::test]
+    async fn a_home_world_that_says_too_much_is_cut_off() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut c, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = c.read(&mut buf).await;
+            let _ = c.write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n").await;
+            let junk = vec![b' '; 64 * 1024];
+            let _ = c.write_all(&junk).await;
+        });
+        let e = home_info(&format!("http://{addr}"), true).await.unwrap_err().to_string();
+        assert!(e.contains("far too long"), "{e}");
     }
 }

@@ -1,8 +1,8 @@
 name = "Passports only fetch from places they should"
-status = "todo"
+status = "done"
 description = "Before anyone logs in, a visitor's passport makes the server GET <home>/.well-known/… for any home address (src/server/federation.rs:120). That lets a stranger point the server at private addresses on the host's network, map them from the error text that comes back, and send a huge reply that's read whole into memory. Only fetch from trusted worlds, or refuse private/loopback/link-local addresses; cap the reply size; and send back a plain 'couldn't check your passport' instead of the real error."
 created_at = "2026-11-06T07:24:17.757808Z"
-updated_at = "2026-11-06T07:24:17.757808Z"
+updated_at = "2026-11-06T08:10:31.055121Z"
 tags = [
     "security",
     "federation",
