@@ -1,8 +1,8 @@
 name = "Keep the residents from being talked into mischief"
-status = "todo"
+status = "done"
 description = "Players can try to talk Claudia and Moss into things. They have no keeper powers and are capped at 40 calls an hour, so the worst is mischief and API spend. Worth a look at which commands the agent may run, and whether a daily spend cap is wanted."
 created_at = "2026-11-06T07:24:17.784661Z"
-updated_at = "2026-11-06T07:24:17.784661Z"
+updated_at = "2026-11-06T08:16:42.533880Z"
 tags = [
     "security",
     "residents",
