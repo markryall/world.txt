@@ -1,0 +1,7 @@
+name = "A gentle speed limit on commands"
+status = "todo"
+description = "Logged-in players can send commands as fast as they like. Harmless among friends, but a stolen device token or a runaway script could spam post/make. A per-connection limit of a few a second (a token bucket), saying 'slow down a little' rather than kicking."
+created_at = "2026-11-06T07:24:17.769537Z"
+updated_at = "2026-11-06T07:24:17.769537Z"
+tags = ["security"]
+priority = "medium"
