@@ -389,7 +389,7 @@ fn hook_text(body: &[u8]) -> Option<String> {
         let s = |k: &str| v.get(k).and_then(|t| t.as_str()).map(str::to_string);
         // Pingdom-style alerts: {"current_state": "DOWN", "description": "…"}.
         let state = s("current_state").map(|st| format!("{st} {}", s("description").or_else(|| s("check_name")).unwrap_or_default()));
-        ["text", "content", "message"].iter().find_map(|k| s(k)).or(state)?
+        ["text", "content", "message"].iter().find_map(|k| s(k)).or(state).or_else(|| semaphore(&v))?
     } else {
         raw.to_string()
     };
@@ -398,6 +398,21 @@ fn hook_text(body: &[u8]) -> Option<String> {
     let text: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
     let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
     (!text.is_empty()).then_some(text)
+}
+
+/// Semaphore's notification webhook: {"pipeline": {"result": "failed"},
+/// "project": {"name": …}, "revision": {"branch": {"name": …}}, …}, said as
+/// "failed [web main](https://<org>.semaphoreci.com/workflows/<id>): the commit".
+fn semaphore(v: &serde_json::Value) -> Option<String> {
+    let s = |path: &str| v.pointer(path).and_then(|t| t.as_str()).filter(|t| !t.is_empty());
+    let result = s("/pipeline/result")?;
+    let what = [s("/project/name"), s("/revision/branch/name").or(s("/revision/tag/name"))].into_iter().flatten().collect::<Vec<_>>().join(" ");
+    let what = match (s("/organization/name"), s("/workflow/id")) {
+        (Some(org), Some(id)) if !what.is_empty() => format!("[{what}](https://{org}.semaphoreci.com/workflows/{id})"),
+        _ => what,
+    };
+    let commit = s("/revision/commit_message").and_then(|m| m.lines().next()).map(|m| format!(": {m}")).unwrap_or_default();
+    Some(format!("{result} {what}{commit}"))
 }
 
 async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>, events: &UnboundedSender<Event>) -> anyhow::Result<()> {
@@ -657,6 +672,10 @@ mod tests {
         assert_eq!(hook_text(br#"{"content":"hi from discord","username":"x"}"#).as_deref(), Some("hi from discord"));
         assert_eq!(hook_text(b"two\nlines\r\n  and   spaces").as_deref(), Some("two lines and spaces"));
         assert_eq!(hook_text(br#"{"check_name":"site","current_state":"DOWN","description":"timeout"}"#).as_deref(), Some("DOWN timeout"));
+        assert_eq!(
+            hook_text(br#"{"version":"1.0.0","organization":{"name":"acme","id":"o"},"project":{"name":"web","id":"p"},"revision":{"tag":null,"branch":{"name":"main"},"commit_message":"Fix the thing\n\nmore"},"workflow":{"id":"w1"},"pipeline":{"state":"done","result":"failed"}}"#).as_deref(),
+            Some("failed [web main](https://acme.semaphoreci.com/workflows/w1): Fix the thing")
+        );
         assert_eq!(hook_text(b"   "), None);
         assert_eq!(hook_text(br#"{"nope":1}"#), None);
         assert_eq!(hook_text(b"{not json"), None);

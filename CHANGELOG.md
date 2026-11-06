@@ -33,7 +33,8 @@ posting `clear`) takes it away when it's done.
 ### Status lights
 `status CI` at a noticeboard gives an address that a build or an uptime check
 posts `up` or `down` to, with a note if it likes (`down [build 42](https://…)
-failed`; Pingdom's alerts work as they are). Followers, and
+failed`; Pingdom's alerts and Semaphore's webhook notifications work as
+they are). Followers, and
 anyone nearby, see a green or red light in their side panel and get a message
 when it goes down or comes back up, never for staying up, and at most once a
 minute however much it flaps. Two lights (or bars) with the same name on

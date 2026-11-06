@@ -99,7 +99,8 @@ chat that belongs to that spot:
   words after it kept as a note: `down build 42 failed`, or with a link,
   `down [build 42](https://ci.example.com/builds/42) failed` (the side panel
   shows "build 42", clickable in the browser). Pingdom-style JSON
-  (`current_state`) works as it is. Everyone who follows the board, or is
+  (`current_state`) and Semaphore's notification webhook work as they are.
+  Everyone who follows the board, or is
   near it, sees a green or red light in their side panel, and gets a message
   when it goes down or comes back up. Staying up says nothing, and the first
   word from something that's fine is quiet. A flapping check can't chatter:
