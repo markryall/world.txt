@@ -1,8 +1,11 @@
 name = "Keepers can hush a gramophone"
-status = "todo"
-description = "Gramophones broadcast whatever a player streams to everyone nearby. Invite-only covers most of it, but keepers could use a way to stop or mute someone's sound."
+status = "done"
+description = """
+Gramophones broadcast whatever a player streams to everyone nearby. Invite-only covers most of it, but keepers could use a way to stop or mute someone's sound.
+
+Keepers could already stop music, skip songs and switch radios off; the gap was that muting someone didn't silence their music. Now it does."""
 created_at = "2026-11-06T07:24:17.779890Z"
-updated_at = "2026-11-06T07:24:17.779890Z"
+updated_at = "2026-11-06T08:16:03.349703Z"
 tags = [
     "safety",
     "music",

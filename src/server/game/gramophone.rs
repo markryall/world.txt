@@ -197,8 +197,10 @@ impl Game {
             self.tell_earshot(thing, u64::MAX, line);
         }
         let title = self.spins[&thing].title.clone();
+        let host = self.user(id);
         for (pid, p) in &self.players {
-            if *pid == id || p.bot {
+            // Muting someone silences their music for you too.
+            if *pid == id || p.bot || !p.hears(&host) {
                 continue;
             }
             if self.sound_heard_at(p.x, p.y) != Some(thing) {

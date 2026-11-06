@@ -41,8 +41,10 @@ than deleting it, so `undo` brings back the last thing you unmade (within a day)
 noticeboards with all their notes. Island keepers can tidy up anyone's things.
 
 **Keeping it kind.** `mute Sam` means you stop hearing Sam's talk, emotes,
-shouts, private messages, chat and board notes. It's remembered, and Sam isn't
-told (`unmute Sam`, `mutes`). Keepers can `kick Sam` (30 minutes, or
+shouts, private messages, chat and board notes, or any music Sam plays on a
+gramophone or jukebox. It's remembered, and Sam isn't told (`unmute Sam`,
+`mutes`). Keepers can also `stop music` on anyone's gramophone, `skip` anyone's
+jukebox song and switch off any radio. Keepers can `kick Sam` (30 minutes, or
 `kick Sam 60`): Sam is sent off for a break and can't come back until it ends,
 or a keeper types `unkick Sam`. Since only invited people get in, a kick or ban
 can't be dodged with a new name.

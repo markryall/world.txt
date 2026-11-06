@@ -1564,7 +1564,7 @@ impl Game {
             }
         }
         let msg = if on {
-            format!("🔇 You won't hear from {target} any more. They aren't told. (unmute {target_user} to undo)")
+            format!("🔇 You won't hear from {target} any more, or any music they play. They aren't told. (unmute {target_user} to undo)")
         } else {
             format!("🔈 You'll hear from {target} again.")
         };
