@@ -23,7 +23,9 @@ while you're off wandering, a little doorbell tells you who.
 `make a jar`, then `put firefly in jar`: a home for your favourite finds,
 where friends can see them. Butterflies open and close their wings, beetles
 trundle about, a fish tank's fish turn slow circles, and a jar of fireflies
-glows at night. Butterflies and bugs finally have somewhere to go.
+glows at night. Butterflies and bugs finally have somewhere to go. Guests at
+your home can add to your cases, but a find only ever comes back out to
+whoever put it in.
 
 ## 0.4.0 (2026-11-06)
 

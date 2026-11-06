@@ -1856,15 +1856,15 @@ impl Game {
             Some(i) if !what.is_empty() && !self.may_change(&self.user(id), i) => {
                 self.say1(id, self.not_yours(i));
             }
-            Some(i) if self.case_has_things(i) => {
-                self.say1(id, Line::plain(format!("There are still finds in {}. Take them out first (take … from …).", the(&self.world.things[i].name))));
-            }
             Some(i) if !what.is_empty() => {
                 let t = self.world.remove_thing(i, &self.user(id))?;
                 self.forget_jukebox(t.id);
                 self.forget_kitchen(t.id);
                 self.stop_spin(t.id);
                 self.forget_radio(t.id);
+                if t.kind.as_deref() == Some(cases::KIND) && self.empty_case(t.id)? {
+                    self.say1(id, Line::col(Col::Dim, "The finds inside go back to whoever put them there."));
+                }
                 if t.kind.as_deref() == Some(builds::KIND) {
                     self.say1(id, Line::col(Col::Dim, format!("You take down {}, bit by bit, and the bits go back to the island.", the(&t.name))));
                     self.tell_here(x, y, id, Line::col(Col::Dim, format!("{who} takes down {}.", t.name)));

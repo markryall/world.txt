@@ -89,7 +89,9 @@ terrarium, a bug hotel, or a fish tank for fish), then `put firefly in jar` or
 open and close their wings, beetles trundle about, fish turn circles, and
 anything that glows (fireflies, glow-worms, glowcaps) lights up the dark. A case
 holds twelve finds. `take firefly from jar` puts one back in your satchel. At
-your home, you and your guests can fill each other's cases.
+your home, you and your guests can fill each other's cases, but a find only
+ever comes back out to whoever put it in, and unmaking a case hands everything
+in it back to them.
 
 ## Gardens
 

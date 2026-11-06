@@ -237,13 +237,23 @@ impl Db {
         // Paint: a colour word for a thing, or for a whole home.
         let _ = conn.execute("ALTER TABLE things ADD COLUMN paint TEXT", []);
         let _ = conn.execute("ALTER TABLE homes ADD COLUMN paint TEXT", []);
-        // What's on show in each display case.
+        // What's on show in each display case, and who put it there (only
+        // they can take it back out).
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS displays (
-                 thing INTEGER NOT NULL, species TEXT NOT NULL, count INTEGER NOT NULL,
-                 PRIMARY KEY (thing, species))",
+            "CREATE TABLE IF NOT EXISTS display_items (
+                 thing INTEGER NOT NULL, species TEXT NOT NULL, by TEXT NOT NULL, count INTEGER NOT NULL,
+                 PRIMARY KEY (thing, species, by))",
             [],
         )?;
+        // The first display cases didn't say who put what in: their makers did.
+        let old: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'displays'", [], |r| r.get(0))?;
+        if old > 0 {
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO display_items (thing, species, by, count)
+                     SELECT d.thing, d.species, COALESCE(t.maker, ''), d.count FROM displays d LEFT JOIN things t ON t.id = d.thing;
+                 DROP TABLE displays;",
+            )?;
+        }
         // Repeating events: which days ("mon,tue,wed,thu,fri"), in whose timezone.
         let _ = conn.execute("ALTER TABLE events ADD COLUMN repeat TEXT", []);
         let _ = conn.execute("ALTER TABLE events ADD COLUMN tz TEXT", []);
@@ -583,19 +593,25 @@ impl Db {
         Ok(())
     }
 
-    /// What's in a display case, in the order it went in.
-    pub fn display(&self, thing: i64) -> anyhow::Result<Vec<(String, i64)>> {
-        let mut stmt = self.conn.prepare("SELECT species, count FROM displays WHERE thing = ?1 AND count > 0 ORDER BY rowid")?;
-        let rows = stmt.query_map([thing], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    /// What's in a display case, whoever put it there: (who, species, how many),
+    /// in the order it went in.
+    pub fn display(&self, thing: i64) -> anyhow::Result<Vec<(String, String, i64)>> {
+        let mut stmt = self.conn.prepare("SELECT by, species, count FROM display_items WHERE thing = ?1 AND count > 0 ORDER BY rowid")?;
+        let rows = stmt.query_map([thing], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
-    pub fn display_add(&self, thing: i64, species: &str, n: i64) -> anyhow::Result<()> {
+    pub fn display_add(&self, thing: i64, species: &str, by: &str, n: i64) -> anyhow::Result<()> {
         self.conn.execute(
-            "INSERT INTO displays (thing, species, count) VALUES (?1, ?2, ?3)
-             ON CONFLICT(thing, species) DO UPDATE SET count = count + excluded.count",
-            params![thing, species, n],
+            "INSERT INTO display_items (thing, species, by, count) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(thing, species, by) DO UPDATE SET count = count + excluded.count",
+            params![thing, species, by, n],
         )?;
+        Ok(())
+    }
+
+    pub fn display_clear(&self, thing: i64) -> anyhow::Result<()> {
+        self.conn.execute("DELETE FROM display_items WHERE thing = ?1", [thing])?;
         Ok(())
     }
 

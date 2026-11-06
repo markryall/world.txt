@@ -129,8 +129,30 @@ impl Game {
         self.may_change(user, i) || self.world.home_at(t.x, t.y).is_some_and(|h| h.welcomes(user))
     }
 
+    /// Everything in a case, whoever put it there, counted together.
     fn contents(&self, thing: i64) -> Vec<(&'static Species, i64)> {
-        self.world.db.display(thing).unwrap_or_default().into_iter().filter_map(|(sid, n)| nature::by_id(&sid).map(|s| (s, n))).collect()
+        let mut all: Vec<(&'static Species, i64)> = Vec::new();
+        for (_, sid, n) in self.world.db.display(thing).unwrap_or_default() {
+            let Some(s) = nature::by_id(&sid) else { continue };
+            match all.iter_mut().find(|(t, _)| t.id == s.id) {
+                Some((_, m)) => *m += n,
+                None => all.push((s, n)),
+            }
+        }
+        all
+    }
+
+    /// Hand everything in a case back to whoever put it there, and empty it.
+    /// Whether there was anything.
+    pub(super) fn empty_case(&mut self, thing: i64) -> anyhow::Result<bool> {
+        let items = self.world.db.display(thing)?;
+        for (by, sid, n) in &items {
+            if !by.is_empty() {
+                self.world.db.satchel_add(by, sid, *n)?;
+            }
+        }
+        self.world.db.display_clear(thing)?;
+        Ok(!items.is_empty())
     }
 
     fn put_in_case(&mut self, id: u64, i: usize, what: &str) -> anyhow::Result<()> {
@@ -162,7 +184,7 @@ impl Game {
             return Ok(());
         }
         self.world.db.satchel_add(&user, s.id, -1)?;
-        self.world.db.display_add(thing, s.id, 1)?;
+        self.world.db.display_add(thing, s.id, &user, 1)?;
         let how = match s.kind {
             Kind::Butterfly => "settles on a twig inside",
             Kind::Bug => "crawls in and makes itself at home",
@@ -179,28 +201,26 @@ impl Game {
         let Some((x, y, who)) = self.here(id) else { return Ok(()) };
         let user = self.user(id);
         let case = self.world.things[i].name.clone();
-        if !self.may_fill(&user, i) {
-            let maker = self.world.nick(&self.world.things[i].maker);
-            self.say1(id, Line::plain(format!("That's {maker}'s, so what's in it stays put.")));
-            return Ok(());
-        }
         let thing = self.world.things[i].id;
-        let Some((s, _)) = self.contents(thing).into_iter().find(|(s, _)| super::gather::matches(s, what)) else {
-            self.say1(id, Line::plain(format!("There's no {} in {}.", what.trim(), super::the(&case))));
+        // Only what you put in yourself comes back out to you.
+        let items = self.world.db.display(thing)?;
+        let matching = |by: Option<&str>| {
+            items.iter().filter(|(b, _, _)| by.is_none_or(|by| b == by)).filter_map(|(b, sid, _)| nature::by_id(sid).map(|s| (b.clone(), s))).find(|(_, s)| super::gather::matches(s, what))
+        };
+        let Some((_, s)) = matching(Some(&user)) else {
+            let line = match matching(None) {
+                Some((by, s)) => format!("That {} is {}'s. Only whoever put it there can take it out.", s.name, self.world.nick(&by)),
+                None => format!("There's no {} in {}.", what.trim(), super::the(&case)),
+            };
+            self.say1(id, Line::plain(line));
             return Ok(());
         };
-        self.world.db.display_add(thing, s.id, -1)?;
+        self.world.db.display_add(thing, s.id, &user, -1)?;
         self.world.db.satchel_add(&user, s.id, 1)?;
         let a = nature::a(s.name);
         self.say1(id, Line::col(Col::Yellow, format!("{} You take {a} out of {} and tuck it in your satchel.", s.kind.icon(), super::the(&case))));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("{} {who} takes {a} out of {}.", s.kind.icon(), super::the(&case))));
         Ok(())
-    }
-
-    /// Something's in this case, so it shouldn't simply be unmade.
-    pub(super) fn case_has_things(&self, i: usize) -> bool {
-        let t = &self.world.things[i];
-        t.kind.as_deref() == Some(KIND) && !self.contents(t.id).is_empty()
     }
 
     /// For `look`: what's on show here.
