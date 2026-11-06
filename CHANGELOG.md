@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Going inside
+Every finished building has a room: `go in`, and `out` again. Describe it in
+your own words, furnish it, paint things and fill your cases, rain or shine.
+Friends can drop in, and what's said indoors stays indoors.
+
 ### The village green
 Newcomers now arrive on The Village Green: the Island Journal in the middle,
 with a village noticeboard and a long table for gatherings beside it, which

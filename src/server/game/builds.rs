@@ -273,6 +273,10 @@ impl Game {
 
     fn build(&mut self, id: u64, plan: &'static Plan) -> anyhow::Result<()> {
         let Some((x, y, who)) = self.here(id) else { return Ok(()) };
+        if crate::server::world::room_of(x, y).is_some() {
+            self.say1(id, Line::plain("Buildings go up outdoors. (out to go outside)"));
+            return Ok(());
+        }
         let user = self.user(id);
         if !self.world.terrain(x, y).walkable() || self.world.terrain(x, y).is_wet() {
             self.say1(id, Line::plain("You'd want dry ground under it."));

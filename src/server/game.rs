@@ -14,6 +14,7 @@ mod green;
 mod gramophone;
 mod growing;
 mod homes;
+mod inside;
 mod jukebox;
 mod lighthouse;
 mod meetings;
@@ -316,7 +317,10 @@ impl Game {
                 self.world.weather.wind_label()
             ),
             clock: Clock::label(),
-            map: self.world.minimap(p.x, p.y, &people, &self.find_positions()),
+            map: {
+                let (mx, my) = self.world.outside(p.x, p.y);
+                self.world.minimap(mx, my, &people, &self.find_positions())
+            },
             here: self.others_here(id),
             humans: self.players.values().filter(|p| !p.bot).count() as u32,
             people: self.people_for(id),
@@ -460,11 +464,14 @@ impl Game {
             }
         let saved = self.world.db.player(&user);
         // Invited accounts start off the map, until their first arrival.
-        let first_time = !bot && saved.is_none_or(|s| s.0 < 0);
+        let first_time = !bot && saved.is_none_or(|s| s.0 < 0 && crate::server::world::room_of(s.0, s.1).is_none());
         let tutorial = if bot { tutorial::DONE } else { saved.map_or(0, |s| s.2) };
         let (x, y) = saved
             .map(|s| (s.0, s.1))
-            .filter(|&(x, y)| self.world.terrain(x, y).walkable())
+            .filter(|&(x, y)| match crate::server::world::room_of(x, y) {
+                Some(_) => self.world.room_building(x, y).is_some(),
+                None => self.world.terrain(x, y).walkable(),
+            })
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
         let companion = self.world.db.companion(&user);
@@ -581,11 +588,31 @@ impl Game {
             if self.at_sea(id) {
                 return Ok(());
             }
+            if self.in_room(id) {
+                return self.cmd_go_out(id);
+            }
             self.stop_travelling(id, false);
             return self.walk(id, dx, dy);
         }
         if let Some(done) = self.crab_command(id, &verb, rest) {
             return done;
+        }
+        // In and out of buildings.
+        let r = rest.trim().to_lowercase();
+        match verb.as_str() {
+            "enter" => return self.cmd_enter(id, rest.trim_start_matches("into ")),
+            "in" | "inside" | "indoors" if r.is_empty() => return self.cmd_enter(id, ""),
+            "go" | "walk" | "step" | "head" if matches!(r.as_str(), "in" | "inside" | "indoors") => return self.cmd_enter(id, ""),
+            "go" | "walk" | "step" | "head" if r.starts_with("into ") || r.starts_with("in ") => {
+                return self.cmd_enter(id, r.trim_start_matches("into ").trim_start_matches("in "));
+            }
+            "out" | "outside" | "outdoors" | "exit" if self.in_room(id) => return self.cmd_go_out(id),
+            "leave" if self.in_room(id) && r.is_empty() => return self.cmd_go_out(id),
+            "go" | "walk" | "step" | "head" if self.in_room(id) && matches!(r.as_str(), "out" | "outside" | "outdoors") => return self.cmd_go_out(id),
+            _ => {}
+        }
+        if self.indoors_says_no(id, &verb, rest) {
+            return Ok(());
         }
         if let Some(done) = self.cases_command(id, &verb, rest) {
             return done;
@@ -680,7 +707,7 @@ impl Game {
                     let people: Vec<(i64, i64)> =
                         self.players.iter().filter(|(pid, _)| **pid != id).map(|(_, o)| (o.x, o.y)).collect();
                     let mut lines = vec![Line::new().b(Col::Magenta, "🗺  The island")];
-                    lines.extend(self.world.island_map((p.x, p.y), &people));
+                    lines.extend(self.world.island_map(self.world.outside(p.x, p.y), &people));
                     self.send(id, lines);
                 }
             }
@@ -1097,7 +1124,9 @@ impl Game {
         };
         let (me, them) = (&self.players[&id], &self.players[&tid]);
         let place = self.world.place_title(them.x, them.y);
-        let (dx, dy) = (them.x - me.x, them.y - me.y);
+        let place = place.strip_prefix("Inside ").map_or(place.clone(), |p| format!("{p} (inside)"));
+        let ((mx, my), (tx, ty)) = (self.world.outside(me.x, me.y), self.world.outside(them.x, them.y));
+        let (dx, dy) = (tx - mx, ty - my);
         let d = dx.abs().max(dy.abs());
         let line = if tid == id {
             "You're right here, silly.".to_string()
@@ -1300,7 +1329,7 @@ impl Game {
         let Some((x, y, who)) = self.here(id) else { return Ok(()) };
         let user = self.user(id);
         // Homes are checked before this (only their people may change them).
-        if self.world.home_at(x, y).is_none() && !self.is_keeper(&user) {
+        if self.world.home_at(x, y).is_none() && crate::server::world::room_of(x, y).is_none() && !self.is_keeper(&user) {
             self.say1(id, Line::plain("You can describe places at your home. Find a spot you like and 'claim' it first!"));
             return Ok(());
         }
@@ -1870,6 +1899,8 @@ impl Game {
                 self.say1(id, self.not_yours(i));
             }
             Some(i) if !what.is_empty() => {
+                let (tid, tx, ty) = (self.world.things[i].id, self.world.things[i].x, self.world.things[i].y);
+                self.empty_room(tid, tx, ty);
                 let t = self.world.remove_thing(i, &self.user(id))?;
                 self.forget_jukebox(t.id);
                 self.forget_kitchen(t.id);
@@ -2421,6 +2452,7 @@ const HELP: &[HelpTopic] = &[
             ("home  (or go home)", "walk home from anywhere, rowing across if need be"),
             ("share Lu / unshare Lu / guests", "who else may build at your home"),
             ("describe A cosy den, fairy lights…", "in your own words, what people see here when they look (describe alone clears it)"),
+            ("go in / out", "step inside a finished building (yours or a friend's): a room to describe, furnish and paint, rain or shine"),
             ("make a jar / put firefly in jar", "show off your finds at home (a display case, a shelf, a fish tank, a bug hotel…); take firefly from jar brings one back"),
             ("paint the cottage pink / paint home lilac", "any colour you like, for things you've made or your whole home (it shows on the map); paint … plain scrubs it off"),
         ],

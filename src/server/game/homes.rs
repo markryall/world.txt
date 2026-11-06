@@ -21,6 +21,16 @@ impl Game {
     /// May this player change things where they're standing? Says why not.
     pub(super) fn may_build_here(&self, id: u64) -> bool {
         let Some(p) = self.players.get(&id) else { return false };
+        // Inside a building: the home it's at decides, or else its builder.
+        if let Some(b) = self.world.room_building(p.x, p.y) {
+            let ok = self.world.home_at(b.x, b.y).map_or(b.maker.eq_ignore_ascii_case(&p.user), |h| h.welcomes(&p.user)) || self.is_keeper(&p.user);
+            if !ok {
+                let owner = self.world.home_at(b.x, b.y).map_or(b.maker.clone(), |h| h.owner.clone());
+                let owner = self.world.nick(&owner);
+                self.say1(id, Line::plain(format!("This is {owner}'s room, so it's theirs to change. You're welcome to look around!")));
+            }
+            return ok;
+        }
         match self.world.home_at(p.x, p.y) {
             Some(h) if !h.welcomes(&p.user) && !self.is_keeper(&p.user) => {
                 let owner = self.world.nick(&h.owner);

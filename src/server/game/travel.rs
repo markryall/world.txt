@@ -48,7 +48,7 @@ impl Game {
             self.say1(tid, Line::col(Col::Cyan, format!("🚶 {name} is coming to find you!")));
         }
         // Over the water too, if need be: to the dock, across, then find them.
-        let (tx, ty) = (self.players[&tid].x, self.players[&tid].y);
+        let (tx, ty) = self.world.outside(self.players[&tid].x, self.players[&tid].y);
         self.set_off(id, tx, ty, &target, Some(target_user))
     }
 
@@ -200,7 +200,7 @@ impl Game {
                 self.stop_travelling(id, true);
                 continue;
             };
-            let (me, them) = ((self.players[&id].x, self.players[&id].y), (self.players[&tid].x, self.players[&tid].y));
+            let (me, them) = ((self.players[&id].x, self.players[&id].y), self.world.outside(self.players[&tid].x, self.players[&tid].y));
             if me != them {
                 let island = |p: (i64, i64)| crate::server::islands::island_at(p.0, p.1).id;
                 if island(me) != island(them) {

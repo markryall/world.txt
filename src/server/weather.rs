@@ -242,6 +242,10 @@ impl Weather {
     }
 
     pub fn sky_at(&self, x: i64, y: i64) -> Sky {
+        // Indoors, it never rains.
+        if super::world::in_room_space(x, y) {
+            return Sky::Clear;
+        }
         let (px, py) = (x as f64, y as f64);
         let k = self
             .clouds

@@ -89,6 +89,27 @@ pub struct Home {
     pub paint: Option<String>,
 }
 
+/// Rooms inside buildings live off the map, one per building, on the same
+/// side of it as the building's island, so that which island you're on (and
+/// everything that goes by where you're standing) still works inside.
+pub const ROOMS: i64 = 1_000_000;
+
+/// Where the room inside building `id` (standing at bx, by) is.
+pub fn room_for(id: i64, bx: i64, by: i64) -> (i64, i64) {
+    let side = |v: i64| if v.div_euclid(super::islands::REGION) >= 1 { 1 } else { -1 };
+    (side(bx) * (ROOMS + id), side(by) * ROOMS)
+}
+
+/// Which building's room (x, y) is, if it's a room.
+pub fn room_of(x: i64, y: i64) -> Option<i64> {
+    (y.abs() == ROOMS && x.abs() > ROOMS).then(|| x.abs() - ROOMS)
+}
+
+/// Off the map, where the rooms are.
+pub fn in_room_space(x: i64, y: i64) -> bool {
+    x.abs() >= ROOMS || y.abs() >= ROOMS
+}
+
 /// A home is the 3x3 patch around where it was claimed.
 pub const HOME_RADIUS: i64 = 1;
 
@@ -193,7 +214,25 @@ impl World {
     }
 
     pub fn terrain(&self, x: i64, y: i64) -> Terrain {
+        // Indoors: a floor, never water, where nothing grows or turns up.
+        if in_room_space(x, y) {
+            return Terrain::Dirt;
+        }
         self.tile(x, y).map_or(Terrain::DeepWater, |t| t.terrain)
+    }
+
+    /// The building a room is inside, if it's still standing.
+    pub fn room_building(&self, x: i64, y: i64) -> Option<&Thing> {
+        let id = room_of(x, y)?;
+        self.things.iter().find(|t| t.id == id)
+    }
+
+    /// Where (x, y) is out on the island: the building's spot, for a room.
+    pub fn outside(&self, x: i64, y: i64) -> (i64, i64) {
+        match room_of(x, y) {
+            Some(_) => self.room_building(x, y).map_or_else(|| self.spawn_point(), |b| (b.x, b.y)),
+            None => (x, y),
+        }
     }
 
     pub fn set_terrain(&mut self, x: i64, y: i64, terrain: Terrain) -> anyhow::Result<()> {
@@ -271,6 +310,12 @@ impl World {
     }
 
     pub fn place_title(&self, x: i64, y: i64) -> String {
+        if room_of(x, y).is_some() {
+            return match self.room_building(x, y) {
+                Some(b) => format!("Inside {}'s {}", self.nick(&b.maker), strip_article(&b.name)),
+                None => "Somewhere Indoors".into(),
+            };
+        }
         match self.tile(x, y) {
             Some(Tile { name: Some(n), .. }) => n.clone(),
             Some(_) if self.home_at(x, y).is_some() => {
@@ -486,6 +531,10 @@ impl World {
         let title = paint::glyph_colour(self.home_at(x, y).and_then(|h| h.paint.as_deref()), Col::Magenta);
         out.push(Line::new().t("").b(title, format!("~ {} ~", self.place_title(x, y))));
 
+        if room_of(x, y).is_some() {
+            return self.describe_room(x, y, others, out);
+        }
+
         // Someone's own words for the place, or the land's.
         // (or what's been planted here, as it is now).
         let growing = self.plantings.get(&(x, y)).and_then(|p| super::gardens::stage_of(p, now()));
@@ -522,6 +571,34 @@ impl World {
             out.push(Line::col(Col::Dim, s));
         }
 
+        self.describe_contents(x, y, others, &mut out);
+        let exits: Vec<&str> = DIRS
+            .iter()
+            .filter(|(_, _, dx, dy)| self.terrain(x + dx, y + dy).walkable())
+            .map(|d| d.0)
+            .collect();
+        out.push(Line::new().c(Col::Dim, "exits: ").c(Col::Green, exits.join(" ")));
+        out
+    }
+
+    /// Inside a building: its owner's words for the room, or a cosy default.
+    fn describe_room(&self, x: i64, y: i64, others: &[String], mut out: Vec<Line>) -> Vec<Line> {
+        let text = match (self.descriptions.get(&(x, y)), self.room_building(x, y)) {
+            (Some(d), _) => d.clone(),
+            (None, Some(b)) => format!(
+                "A snug little room inside the {}. Light comes in through a small window, and the walls still smell of the island.",
+                strip_article(&b.name)
+            ),
+            (None, None) => "A snug little room.".into(),
+        };
+        out.push(Line::plain(text));
+        self.describe_contents(x, y, others, &mut out);
+        out.push(Line::new().c(Col::Dim, "exits: ").c(Col::Green, "out"));
+        out
+    }
+
+    /// The things and people at a place, for `describe`.
+    fn describe_contents(&self, x: i64, y: i64, others: &[String], out: &mut Vec<Line>) {
         let things: Vec<&Thing> = self.things_at(x, y).collect();
         if !things.is_empty() {
             // Each in its own paint, so a pink cottage looks pink.
@@ -550,14 +627,6 @@ impl World {
                 format!(" {verb} here."),
             ));
         }
-
-        let exits: Vec<&str> = DIRS
-            .iter()
-            .filter(|(_, _, dx, dy)| self.terrain(x + dx, y + dy).walkable())
-            .map(|d| d.0)
-            .collect();
-        out.push(Line::new().c(Col::Dim, "exits: ").c(Col::Green, exits.join(" ")));
-        out
     }
 
     /// The whole island at half scale (each character is a 2x2 patch), with
@@ -818,6 +887,19 @@ fn load_homes(db: &Db) -> anyhow::Result<Vec<Home>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rooms_stay_on_their_islands_side() {
+        use super::super::islands::{REGION, island_at};
+        for (bx, by) in [(5, 5), (REGION + 5, 5), (5, REGION + 5), (REGION + 5, REGION + 5)] {
+            let (rx, ry) = room_for(42, bx, by);
+            assert_eq!(room_of(rx, ry), Some(42));
+            assert_eq!(island_at(rx, ry).id, island_at(bx, by).id, "a room is on its building's island");
+            assert!(in_room_space(rx, ry) && !in_room_space(bx, by));
+        }
+        assert_eq!(room_of(5, 5), None);
+        assert_ne!(room_for(1, 5, 5), room_for(2, 5, 5), "every building has its own room");
+    }
 
     /// `cargo test -- --nocapture print_island` to eyeball the generator.
     #[test]

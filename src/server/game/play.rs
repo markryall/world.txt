@@ -776,6 +776,24 @@ impl Game {
         let t = self.world.terrain(x, y);
         let dry = !t.is_wet();
         let mut hints: Vec<&'static str> = Vec::new();
+        if let Some(b) = self.world.room_building(x, y) {
+            // Indoors: only indoor thoughts.
+            if self.world.home_at(b.x, b.y).is_some_and(|h| h.welcomes(&user)) || b.maker == user {
+                hints.extend([
+                    "This room could be anything you like. Describe it in your own words. (describe …)",
+                    "A feather cushion and a leaf rug would make it in here cosier. (recipes)",
+                    "A jar on the windowsill would be just the place for your finds.",
+                ]);
+            }
+            hints.push("Rain or shine, it's snug in here.");
+            let fresh: Vec<&'static str> = hints.into_iter().filter(|h| !self.players.get(&id).is_some_and(|p| p.fun.hinted.contains(h))).collect();
+            if fresh.is_empty() {
+                return None;
+            }
+            let hint = *self.rng.pick(&fresh);
+            self.players.get_mut(&id)?.fun.hinted.insert(hint);
+            return Some(hint);
+        }
         // Toys.
         if self.season == Season::Winter && dry {
             hints.extend(["The snow here is just right for a snowman.", "The snow looks soft enough to lie down and make a snow angel in."]);

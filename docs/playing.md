@@ -84,6 +84,15 @@ flowers, a shell mirror, a pinecone lamp, a driftwood table, a pebble doorstop,
 a butterfly bush). `craft feather cushion`, then `place feather cushion` where
 you want it, and paint it if you like.
 
+Every finished building has a room inside: `go in` (or `enter the cottage`)
+from beside it, and `out` (or any direction) to leave. Anyone can visit. A
+room is a place like any other, just indoors: no weather, nothing that needs
+open ground (no digging, planting, kites or building), and what's said inside
+stays inside. Whoever may build at the home it's in (or its builder, if it's not
+at a home) can `describe` the room in their own words and fill it with
+furniture, cases and anything they make. Taking a building down sees anyone
+inside safely out, and `undo` brings it back with its room as it was.
+
 A home with a building in it looks lived in: its windows glow warm at night
 while you're in the world, and smoke curls from the chimney while something's
 cooking at your campfire or oven. If someone wanders into your home while you're
