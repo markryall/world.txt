@@ -1,6 +1,7 @@
 //! The island: a grid of tiles plus the things people have made on it.
 
 use super::db::{Db, PlantingRow, ThingRow, TileRow};
+use super::paint;
 use super::rng;
 use super::terrain::Terrain;
 use super::weather::{Clock, Phase, Season, Sky, Weather};
@@ -58,6 +59,8 @@ pub struct Thing {
     pub maker: String,
     /// "board" or "journal" for noticeboards.
     pub kind: Option<String>,
+    /// The colour it's painted, in the painter's own word.
+    pub paint: Option<String>,
 }
 
 impl Thing {
@@ -82,6 +85,8 @@ pub struct Home {
     pub x: i64,
     pub y: i64,
     pub guests: Vec<String>,
+    /// The colour it's painted, in the owner's own word.
+    pub paint: Option<String>,
 }
 
 /// A home is the 3x3 patch around where it was claimed.
@@ -170,13 +175,10 @@ impl World {
                 trigger: Trigger::from_code(r.trigger.as_deref().unwrap_or("always")),
                 maker: r.maker,
                 kind: r.kind,
+                paint: r.paint,
             })
             .collect();
-        let homes = db
-            .homes()?
-            .into_iter()
-            .map(|(owner, x, y, guests)| Home { owner, x, y, guests })
-            .collect();
+        let homes = load_homes(&db)?;
         let nicks = db.users()?.into_iter().collect();
         let descriptions = db.descriptions()?.into_iter().map(|(x, y, t)| ((x, y), t)).collect();
         let plantings = db.plantings()?.into_iter().map(|p| ((p.x, p.y), p)).collect();
@@ -304,8 +306,9 @@ impl World {
             trigger: Some(trigger.code().into()),
             maker: maker.into(),
             kind: kind.map(Into::into),
+            paint: None,
         })?;
-        self.things.push(Thing { id, x, y, name, action, trigger, maker: maker.into(), kind: kind.map(Into::into) });
+        self.things.push(Thing { id, x, y, name, action, trigger, maker: maker.into(), kind: kind.map(Into::into), paint: None });
         Ok(id)
     }
 
@@ -414,6 +417,7 @@ impl World {
             trigger: Trigger::from_code(r.trigger.as_deref().unwrap_or("always")),
             maker: r.maker,
             kind: r.kind,
+            paint: r.paint,
         });
         Ok(self.things.last())
     }
@@ -424,8 +428,22 @@ impl World {
         for t in self.things.iter_mut().filter(|t| t.maker == old) {
             t.maker = new.to_string();
         }
-        self.homes = self.db.homes()?.into_iter().map(|(owner, x, y, guests)| Home { owner, x, y, guests }).collect();
+        self.homes = load_homes(&self.db)?;
         self.nicks.remove(old);
+        Ok(())
+    }
+
+    pub fn paint_thing(&mut self, i: usize, paint: Option<String>) -> anyhow::Result<()> {
+        self.db.paint_thing(self.things[i].id, paint.as_deref())?;
+        self.things[i].paint = paint;
+        Ok(())
+    }
+
+    pub fn paint_home(&mut self, owner: &str, paint: Option<String>) -> anyhow::Result<()> {
+        self.db.paint_home(owner, paint.as_deref())?;
+        if let Some(h) = self.homes.iter_mut().find(|h| h.owner == owner) {
+            h.paint = paint;
+        }
         Ok(())
     }
 
@@ -465,7 +483,8 @@ impl World {
         let phase = Clock::phase();
         let mut out = Vec::new();
 
-        out.push(Line::new().t("").b(Col::Magenta, format!("~ {} ~", self.place_title(x, y))));
+        let title = paint::glyph_colour(self.home_at(x, y).and_then(|h| h.paint.as_deref()), Col::Magenta);
+        out.push(Line::new().t("").b(title, format!("~ {} ~", self.place_title(x, y))));
 
         // Someone's own words for the place, or the land's.
         // (or what's been planted here, as it is now).
@@ -505,8 +524,24 @@ impl World {
 
         let things: Vec<&Thing> = self.things_at(x, y).collect();
         if !things.is_empty() {
-            let names: Vec<String> = things.iter().map(|t| t.name.clone()).collect();
-            out.push(Line::new().c(Col::Yellow, "✦ ").c(Col::Yellow, capitalise(&join_and(&names))));
+            // Each in its own paint, so a pink cottage looks pink.
+            let mut line = Line::new().c(Col::Yellow, "✦ ");
+            for (i, t) in things.iter().enumerate() {
+                if i > 0 {
+                    let sep = match (things.len(), i == things.len() - 1) {
+                        (2, _) => " and ",
+                        (_, true) => ", and ",
+                        _ => ", ",
+                    };
+                    line = line.c(Col::Yellow, sep);
+                }
+                let name = if i == 0 { capitalise(&t.name) } else { t.name.clone() };
+                line = paint::painted(line, &name, t.paint.as_deref(), Col::Yellow);
+                if let Some(p) = &t.paint {
+                    line = line.c(Col::Dim, format!(" (painted {p})"));
+                }
+            }
+            out.push(line);
         }
         if !others.is_empty() {
             let verb = if others.len() == 1 { "is" } else { "are" };
@@ -568,8 +603,8 @@ impl World {
                     line = line.b(Col::White, "☺");
                 } else if let Some(i) = named.iter().position(|(x, y, _)| covers((*x, *y))) {
                     line = line.b(Col::Yellow, KEYS.chars().nth(i).unwrap().to_string());
-                } else if self.homes.iter().any(|h| covers((h.x, h.y))) {
-                    line = line.b(Col::Magenta, "⌂");
+                } else if let Some(h) = self.homes.iter().find(|h| covers((h.x, h.y))) {
+                    line = line.b(paint::glyph_colour(h.paint.as_deref(), Col::Magenta), "⌂");
                 } else if self.things.iter().any(|t| t.is_dock() && covers((t.x, t.y))) {
                     line = line.b(Col::Brown, "⚓");
                 } else if lit && self.things.iter().any(|t| t.is_lighthouse() && covers((t.x, t.y))) {
@@ -621,14 +656,14 @@ impl World {
                     ("@", Col::Magenta, true)
                 } else if people.contains(&(x, y)) {
                     ("☺", Col::White, true)
-                } else if self.homes.iter().any(|h| (h.x, h.y) == (x, y)) {
-                    ("⌂", Col::Magenta, true)
+                } else if let Some(h) = self.homes.iter().find(|h| (h.x, h.y) == (x, y)) {
+                    ("⌂", paint::glyph_colour(h.paint.as_deref(), Col::Magenta), true)
                 } else if self.things_at(x, y).any(|t| t.is_board()) {
                     ("▣", Col::Yellow, true)
                 } else if lit && self.things_at(x, y).any(|t| t.is_lighthouse()) {
                     ("☼", Col::Yellow, true)
-                } else if self.things_at(x, y).next().is_some() {
-                    ("✦", Col::Yellow, false)
+                } else if let Some(t) = self.things_at(x, y).next() {
+                    ("✦", paint::glyph_colour(self.things_at(x, y).find_map(|t| t.paint.as_deref()).or(t.paint.as_deref()), Col::Yellow), false)
                 } else if finds.contains(&(x, y)) {
                     ("•", Col::Pink, true)
                 } else if !in_bounds(x, y) {
@@ -773,6 +808,12 @@ fn idx(x: i64, y: i64) -> usize {
     (y * SIZE + x) as usize
 }
 
+
+/// Every home, with its guests and its paint.
+fn load_homes(db: &Db) -> anyhow::Result<Vec<Home>> {
+    let paints = db.home_paints()?;
+    Ok(db.homes()?.into_iter().map(|(owner, x, y, guests)| Home { paint: paints.get(&owner).cloned(), owner, x, y, guests }).collect())
+}
 
 #[cfg(test)]
 mod tests {

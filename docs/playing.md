@@ -64,6 +64,13 @@ sees in place of the land's: `describe A messy little den, records stacked
 everywhere and fairy lights strung over the jukebox.` (up to 280 characters;
 `describe` on its own puts it back).
 
+Anything you've made can be painted, and so can your whole home: `paint the
+shell cottage pink`, `paint the bench in sky blue`, `paint home lilac`. Say the
+colour however you like (lilac, sea green, tangerine, rainbow…): your word is
+what people read, drawn in the nearest of the island's colours, and a painted
+home's `⌂` shows in its colour on the map. At your home you can paint what
+your guests made too. `paint the bench plain` scrubs it off.
+
 ## Gardens
 
 What you plant grows slowly, over real time. A tree starts as a sapling, is a

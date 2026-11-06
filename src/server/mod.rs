@@ -10,6 +10,7 @@ mod gardens;
 pub mod islands;
 pub mod names;
 mod nature;
+pub mod paint;
 mod rng;
 mod terrain;
 mod tutorial;

@@ -808,6 +808,9 @@ impl Game {
         if dry && self.world.tile(x, y).is_some_and(|t| t.name.is_none()) && self.world.home_at(x, y).is_none() {
             hints.push("This spot doesn't have a name yet. You could give it one.");
         }
+        if self.world.home_at(x, y).is_some_and(|h| h.owner == user) {
+            hints.push("A pot of paint sits by your door. Anything here could be any colour you like.");
+        }
         if dry && matches!(t, Terrain::Grass | Terrain::Meadow) && !self.world.homes.iter().any(|h| h.owner == user) {
             hints.push("This would be a lovely spot to make a home. You could claim it.");
         }

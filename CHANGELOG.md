@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Paint
+`paint the shell cottage pink`, `paint home lilac`: anything you've made, or
+your whole home, in any colour you can name (rainbow included). People read
+your word for it, things show in their colour wherever they're described, and
+your home's `⌂` turns your colour on the map.
+
 ## 0.4.0 (2026-11-06)
 
 ### Things to stumble on

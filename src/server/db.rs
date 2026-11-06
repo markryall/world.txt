@@ -45,6 +45,8 @@ pub struct ThingRow {
     pub maker: String,
     /// "board" or "journal" for noticeboards; none for ordinary things.
     pub kind: Option<String>,
+    /// The colour someone painted it, in their own word ("lilac").
+    pub paint: Option<String>,
 }
 
 pub struct EventRow {
@@ -232,6 +234,9 @@ impl Db {
         let _ = conn.execute("ALTER TABLE events ADD COLUMN local INTEGER NOT NULL DEFAULT 0", []);
         // Where in the world someone last was, for times written to them while away.
         let _ = conn.execute("ALTER TABLE players ADD COLUMN tz TEXT", []);
+        // Paint: a colour word for a thing, or for a whole home.
+        let _ = conn.execute("ALTER TABLE things ADD COLUMN paint TEXT", []);
+        let _ = conn.execute("ALTER TABLE homes ADD COLUMN paint TEXT", []);
         // Repeating events: which days ("mon,tue,wed,thu,fri"), in whose timezone.
         let _ = conn.execute("ALTER TABLE events ADD COLUMN repeat TEXT", []);
         let _ = conn.execute("ALTER TABLE events ADD COLUMN tz TEXT", []);
@@ -536,7 +541,7 @@ impl Db {
     pub fn things(&self) -> anyhow::Result<Vec<ThingRow>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, x, y, name, action, trigger, maker, kind FROM things WHERE removed_at IS NULL")?;
+            .prepare("SELECT id, x, y, name, action, trigger, maker, kind, paint FROM things WHERE removed_at IS NULL")?;
         let rows = stmt.query_map([], |r| {
             Ok(ThingRow {
                 id: r.get(0)?,
@@ -547,6 +552,7 @@ impl Db {
                 trigger: r.get(5)?,
                 maker: r.get(6)?,
                 kind: r.get(7)?,
+                paint: r.get(8)?,
             })
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -563,6 +569,23 @@ impl Db {
     pub fn set_thing_action(&self, id: i64, action: Option<&str>) -> anyhow::Result<()> {
         self.conn.execute("UPDATE things SET action = ?2 WHERE id = ?1", params![id, action])?;
         Ok(())
+    }
+
+    pub fn paint_thing(&self, id: i64, paint: Option<&str>) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE things SET paint = ?2 WHERE id = ?1", params![id, paint])?;
+        Ok(())
+    }
+
+    pub fn paint_home(&self, owner: &str, paint: Option<&str>) -> anyhow::Result<()> {
+        self.conn.execute("UPDATE homes SET paint = ?2 WHERE owner = ?1", params![owner, paint])?;
+        Ok(())
+    }
+
+    /// Every painted home's colour, by owner.
+    pub fn home_paints(&self) -> anyhow::Result<std::collections::HashMap<String, String>> {
+        let mut stmt = self.conn.prepare("SELECT owner, paint FROM homes WHERE paint IS NOT NULL")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     pub fn move_thing(&self, id: i64, x: i64, y: i64) -> anyhow::Result<()> {
@@ -584,7 +607,7 @@ impl Db {
     pub fn last_removed(&self, by: &str, since: i64) -> Option<ThingRow> {
         self.conn
             .query_row(
-                "SELECT id, x, y, name, action, trigger, maker, kind FROM things
+                "SELECT id, x, y, name, action, trigger, maker, kind, paint FROM things
                  WHERE removed_by = ?1 AND removed_at >= ?2 ORDER BY removed_at DESC, id DESC LIMIT 1",
                 params![by, since],
                 |r| {
@@ -597,6 +620,7 @@ impl Db {
                         trigger: r.get(5)?,
                         maker: r.get(6)?,
                         kind: r.get(7)?,
+                        paint: r.get(8)?,
                     })
                 },
             )

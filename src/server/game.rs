@@ -765,6 +765,7 @@ impl Game {
             "users" | "accounts" => return self.cmd_users(id),
             "unkick" => return self.cmd_unkick(id, rest),
             "push" | "carry" | "move" => return self.cmd_push(id, rest),
+            "paint" | "repaint" | "colour" | "color" => return self.cmd_paint(id, rest),
             "quit" | "exit" | "bye" => {
                 if let Some(p) = self.players.get(&id) {
                     let _ = p.tx.send(ToClient::Bye { reason: "Sweet dreams. ✨".into() });
@@ -2388,6 +2389,7 @@ const HELP: &[HelpTopic] = &[
             ("home  (or go home)", "walk home from anywhere, rowing across if need be"),
             ("share Lu / unshare Lu / guests", "who else may build at your home"),
             ("describe A cosy den, fairy lights…", "in your own words, what people see here when they look (describe alone clears it)"),
+            ("paint the cottage pink / paint home lilac", "any colour you like, for things you've made or your whole home (it shows on the map); paint … plain scrubs it off"),
         ],
         footer: None,
     },

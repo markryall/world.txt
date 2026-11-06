@@ -1,0 +1,10 @@
+name = "Paint your home"
+status = "done"
+description = "Kids love choosing colours. 'paint the shell cottage pink', 'paint the bench yellow': things and buildings you made (or at your home) take a colour, which shows wherever they're described and on the map, so your house is visibly yours from across the island."
+created_at = "2026-11-06T08:53:26.007814Z"
+updated_at = "2026-11-06T08:57:19.608153Z"
+tags = [
+    "homes",
+    "decorating",
+]
+priority = "high"

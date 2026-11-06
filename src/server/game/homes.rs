@@ -3,12 +3,13 @@
 
 use super::Game;
 use crate::protocol::{Col, Line};
+use crate::server::paint;
 use crate::server::world::{HOME_RADIUS, Home};
 
 /// Commands that change a place, which a home's owner gets a say over.
 pub const BUILDING: &[&str] = &[
     "dig", "fill", "plant", "raise", "pile", "path", "pave", "name", "call-this", "make", "build", "create", "construct",
-    "place", "drop", "put", "describe",
+    "place", "drop", "put", "describe", "paint", "repaint", "colour", "color",
 ];
 
 impl Game {
@@ -57,7 +58,7 @@ impl Game {
                 h.x = x;
                 h.y = y;
             }
-            None => self.world.homes.push(Home { owner: user.clone(), x, y, guests: vec![] }),
+            None => self.world.homes.push(Home { owner: user.clone(), x, y, guests: vec![], paint: None }),
         }
         let msg = if moved { "🏡 You move your home here." } else { "🏡 This is your home now! The patch around you is yours to decorate." };
         self.say1(id, Line::new().b(Col::Magenta, msg));
@@ -135,6 +136,69 @@ impl Game {
             ),
         };
         self.say1(id, Line::col(Col::Dim, msg));
+        Ok(())
+    }
+
+    /// `paint the bench pink`, `paint home lilac`, `paint the bench plain`.
+    /// Things are painted by whoever made them (or at their home, its
+    /// owner); a home by its owner, from anywhere.
+    pub(super) fn cmd_paint(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        let Some((x, y, who)) = self.here(id) else { return Ok(()) };
+        let Some((what, word)) = paint::parse(rest) else {
+            self.say1(id, Line::plain("Paint what, and what colour? For example: paint the bench pink, or paint home lilac."));
+            return Ok(());
+        };
+        let user = self.user(id);
+        let colour = (!paint::PLAIN.contains(&word.as_str())).then(|| word.clone());
+        let thing = if what.is_empty() { None } else { self.world.find_thing(x, y, &what) };
+        let Some(i) = thing else {
+            if !(what.is_empty() || ["home", "house", "place", "garden"].contains(&what.to_lowercase().as_str())) {
+                self.say1(id, Line::plain(format!("You don't see any {what} here to paint.")));
+                return Ok(());
+            }
+            if !self.world.homes.iter().any(|h| h.owner == user) {
+                let line = if what.is_empty() { "Paint what? For example: paint the bench pink." } else { "You don't have a home to paint yet. Find a spot you love and claim it!" };
+                self.say1(id, Line::plain(line));
+                return Ok(());
+            }
+            self.world.paint_home(&user, colour.clone())?;
+            let at_home = self.world.home_at(x, y).is_some_and(|h| h.owner == user);
+            match &colour {
+                Some(c) => {
+                    self.say1(id, paint::painted(Line::plain("🎨 You paint your home "), c, Some(c), Col::Plain).t(". It shows on the map now."));
+                    if at_home {
+                        self.tell_here(x, y, id, paint::painted(Line::plain(format!("🎨 {who} paints their home ")), c, Some(c), Col::Plain).t("."));
+                    }
+                }
+                None => self.say1(id, Line::plain("🧽 You scrub the paint off your home.")),
+            }
+            self.status_all();
+            return Ok(());
+        };
+        if self.world.things[i].is_fixed() {
+            self.say1(id, Line::plain("That belongs to the island, just as it is."));
+            return Ok(());
+        }
+        let host = self.world.home_at(x, y).is_some_and(|h| h.owner == user);
+        if !self.may_change(&user, i) && !host {
+            let t = &self.world.things[i];
+            let maker = self.world.nick(&t.maker);
+            self.say1(id, Line::plain(format!("That's {maker}'s {}, so it's theirs to paint. (Ask them: @{maker} ...)", crate::server::world::strip_article(&t.name))));
+            return Ok(());
+        }
+        let name = super::the(&self.world.things[i].name);
+        self.world.paint_thing(i, colour.clone())?;
+        match &colour {
+            Some(c) => {
+                self.say1(id, paint::painted(Line::plain(format!("🎨 You paint {name} ")), c, Some(c), Col::Plain).t("."));
+                self.tell_here(x, y, id, paint::painted(Line::plain(format!("🎨 {who} paints {name} ")), c, Some(c), Col::Plain).t("."));
+            }
+            None => {
+                self.say1(id, Line::plain(format!("🧽 You scrub the paint off {name}.")));
+                self.tell_here(x, y, id, Line::plain(format!("🧽 {who} scrubs the paint off {name}.")));
+            }
+        }
+        self.status_all();
         Ok(())
     }
 }
