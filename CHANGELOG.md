@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### The hills
+The high ground has a few things to find now. Climb up and see what the
+scenery suggests.
+
 ### Paint
 `paint the shell cottage pink`, `paint home lilac`: anything you've made, or
 your whole home, in any colour you can name (rainbow included). People read

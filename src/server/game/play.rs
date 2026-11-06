@@ -55,7 +55,7 @@ impl Fun {
 
 pub struct Kite {
     colour: &'static str,
-    at: (i64, i64),
+    pub(super) at: (i64, i64),
     tangled: bool,
 }
 
@@ -793,6 +793,13 @@ impl Game {
         }
         if self.world.weather.breezy() && t != Terrain::Forest && dry {
             hints.push("The wind tugs at your sleeves. Proper kite weather.");
+        }
+        if super::hills::high(t) {
+            hints.extend([
+                "The wind's fresh up here, and the view must be something. You could look out over the whole island.",
+                "Up here, your voice would carry for miles. The hills might even shout back.",
+                "A round stone sits at the top of the slope, just asking to be rolled.",
+            ]);
         }
         if t == Terrain::Meadow {
             hints.extend(["Daisies everywhere. You could make a daisy chain and wear it.", "You catch a smell of wild mint. It'd make lovely tea, over a campfire."]);

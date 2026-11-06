@@ -8,6 +8,7 @@ mod cook;
 mod craft;
 mod events;
 mod games;
+mod hills;
 mod gather;
 mod gramophone;
 mod growing;
@@ -584,6 +585,9 @@ impl Game {
         if let Some(done) = self.cases_command(id, &verb, rest) {
             return done;
         }
+        if let Some(done) = self.hills_command(id, &verb, rest) {
+            return done;
+        }
         if let Some(done) = self.games_command(id, &verb, rest) {
             return done;
         }
@@ -895,6 +899,7 @@ impl Game {
             };
             let _ = p.tx.send(ToClient::Lines { lines: vec![line] });
         }
+        self.echo(id, msg);
         Ok(())
     }
 

@@ -61,7 +61,7 @@ fn some(n: i64, name: &str) -> String {
 }
 
 /// "three fireflies, a ladybird and a peacock butterfly".
-fn and_list(items: &[String]) -> String {
+pub(super) fn and_list(items: &[String]) -> String {
     match items {
         [] => String::new(),
         [one] => one.clone(),
