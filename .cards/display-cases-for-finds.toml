@@ -1,0 +1,11 @@
+name = "Display cases for finds"
+status = "todo"
+description = "Butterflies and bugs (11 species) have nowhere to go but the journal or 'release'. 'make a display case' at home, then 'put butterfly in case': finds shown off where friends can see them. A jar of fireflies glows at night; a beetle collection shimmers; a shelf of shells."
+created_at = "2026-11-06T08:53:26.013075Z"
+updated_at = "2026-11-06T08:53:26.013075Z"
+tags = [
+    "homes",
+    "decorating",
+    "loop",
+]
+priority = "high"

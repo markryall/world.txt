@@ -1,0 +1,7 @@
+name = "Homes that come alive"
+status = "todo"
+description = "Windows glow at night when you're home, chimney smoke while something cooks, the welcome mat says who's visiting. Small touches so a home feels lived in, especially when friends 'look'."
+created_at = "2026-11-06T08:53:26.025074Z"
+updated_at = "2026-11-06T08:53:26.025074Z"
+tags = ["homes"]
+priority = "medium"

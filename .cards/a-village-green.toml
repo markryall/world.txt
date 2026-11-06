@@ -1,0 +1,10 @@
+name = "A village green"
+status = "todo"
+description = "The practical features (noticeboards, hooks, events, gathering tables, ask) have no address. Give them one: a green by the Island Journal at the spawn point, so arriving reads as 'a little village', and the rest of the island stays for pottering."
+created_at = "2026-11-06T08:53:26.028696Z"
+updated_at = "2026-11-06T08:53:26.028696Z"
+tags = [
+    "places",
+    "coherence",
+]
+priority = "medium"

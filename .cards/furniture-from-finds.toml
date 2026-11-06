@@ -1,0 +1,11 @@
+name = "Furniture from finds"
+status = "todo"
+description = "Recipes that turn finds into things for home rather than wearables or food: a shell mirror, a pinecone lamp, a feather cushion, a toadstool stool, a butterfly-wing lampshade."
+created_at = "2026-11-06T08:53:26.017076Z"
+updated_at = "2026-11-06T08:53:26.017076Z"
+tags = [
+    "homes",
+    "decorating",
+    "loop",
+]
+priority = "medium"

@@ -1,0 +1,10 @@
+name = "Something to do in the hills"
+status = "todo"
+description = "Hills and rock have the best stones but no toy, view or hint. A lookout that shows the whole island, an echo when you shout, rolling stones down a slope."
+created_at = "2026-11-06T08:53:26.032439Z"
+updated_at = "2026-11-06T08:53:26.032439Z"
+tags = [
+    "places",
+    "coherence",
+]
+priority = "low"

@@ -1,0 +1,10 @@
+name = "Going inside"
+status = "todo"
+description = "'go in' to a cottage you built: rooms you can describe, fill and arrange. A whole new kind of space, and what makes decorating feel endless. Bigger: probably after paint, cases and furniture."
+created_at = "2026-11-06T08:53:26.021350Z"
+updated_at = "2026-11-06T08:53:26.021350Z"
+tags = [
+    "homes",
+    "decorating",
+]
+priority = "low"
