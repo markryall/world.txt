@@ -229,6 +229,7 @@ async fn connection(
     });
 
     let mut joined = false;
+    let mut pace = Pace::new(std::time::Instant::now());
     while let Some(msg) = source.next().await {
         // A connection that drops without a goodbye (a phone losing signal)
         // is an error here: it still has to leave, not linger as a ghost.
@@ -268,7 +269,12 @@ async fn connection(
                 events.send(Event::Join { id, bot, invite, token, back, tz, tx: tx.clone() })?;
             }
             ToServer::Cmd { text } if joined => {
-                events.send(Event::Cmd { id, text })?;
+                if pace.take(std::time::Instant::now()) {
+                    events.send(Event::Cmd { id, text })?;
+                } else if pace.warn() {
+                    let line = crate::protocol::Line::col(crate::protocol::Col::Dim, "🐢 Slow down a little: the island can't keep up. Try again in a moment.");
+                    let _ = tx.send(ToClient::Lines { lines: vec![line] });
+                }
             }
             ToServer::Audio { frames, title } if joined => {
                 events.send(Event::Audio { id, frames, title })?;
@@ -294,6 +300,43 @@ async fn connection(
         writer.abort();
     }
     Ok(())
+}
+
+/// Commands someone can send in a rush before they're asked to slow down.
+const PACE_BURST: f64 = 20.0;
+/// How many a second they can keep up after that.
+const PACE_PER_SEC: f64 = 4.0;
+
+/// A gentle speed limit on one connection's commands (a token bucket):
+/// plenty for anyone typing, or a script, but not a flood.
+struct Pace {
+    tokens: f64,
+    at: std::time::Instant,
+    warned: bool,
+}
+
+impl Pace {
+    fn new(now: std::time::Instant) -> Pace {
+        Pace { tokens: PACE_BURST, at: now, warned: false }
+    }
+
+    /// Whether a command may go through now.
+    fn take(&mut self, now: std::time::Instant) -> bool {
+        self.tokens = (self.tokens + now.duration_since(self.at).as_secs_f64() * PACE_PER_SEC).min(PACE_BURST);
+        self.at = now;
+        if self.tokens >= 1.0 {
+            self.tokens -= 1.0;
+            self.warned = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Whether to say so: once each time they run out, not for every command dropped.
+    fn warn(&mut self) -> bool {
+        !std::mem::replace(&mut self.warned, true)
+    }
 }
 
 /// One port, two doors: websocket upgrades go to the game, anything else
@@ -696,6 +739,19 @@ mod tests {
         assert_eq!(hook_text(b"   "), None);
         assert_eq!(hook_text(br#"{"nope":1}"#), None);
         assert_eq!(hook_text(b"{not json"), None);
+    }
+
+    #[test]
+    fn commands_go_at_a_gentle_pace() {
+        let start = std::time::Instant::now();
+        let mut pace = Pace::new(start);
+        assert!((0..20).all(|_| pace.take(start)), "a rush of twenty is fine");
+        assert!(!pace.take(start), "the twenty-first waits");
+        assert!(pace.warn() && !pace.warn(), "said once, not every time");
+        let later = start + std::time::Duration::from_millis(500);
+        assert!(pace.take(later) && pace.take(later), "two more half a second later");
+        assert!(!pace.take(later));
+        assert!(pace.warn(), "running out again is said again");
     }
 
     #[tokio::test]
