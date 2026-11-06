@@ -97,7 +97,7 @@ impl Game {
             let link = spot.as_ref().and_then(|s| self.meeting_links.get(&s.0).cloned()).or_else(|| self.event_link_now(x, y));
             let Some(link) = link else {
                 let msg = if spot.is_some() {
-                    "There are no links here yet. Its maker (or a keeper) can add some: meet https://…"
+                    "There are no links here yet. Leave some for whatever happens here: meet https://…"
                 } else {
                     "There's nothing to join here. Gatherings happen at a gathering table: make a gathering table, then meet https://…"
                 };
@@ -115,7 +115,9 @@ impl Game {
         };
         let user = self.user(id);
         let home_owner = self.world.home_at(x, y).is_some_and(|h| h.owner == user);
-        if maker != user && !home_owner && !self.is_keeper(&user) {
+        // The island's own tables (the one on the village green) are everyone's.
+        let everyones = maker == super::green::BY;
+        if maker != user && !home_owner && !everyones && !self.is_keeper(&user) {
             self.say1(id, Line::plain(format!("Only whoever made {} (or a keeper) can change its links.", super::the(&spot_name))));
             return Ok(());
         }

@@ -1,5 +1,12 @@
 # Wandering the island
 
+Everyone arrives on **The Village Green**, in the middle of Home Island. The
+Island Journal stands there, with the village noticeboard and a long table for
+gatherings beside it: the island's notes, hooks and plans can all live there,
+and anyone can leave links on the table (`meet https://…`) for whatever happens
+at it. Worlds that started before the green get one the next time they start,
+wherever there's room around the Journal.
+
 New arrivals get five tiny first steps: walk, say hi, make something, plant
 something, see who's around. One hint shows at a time and clears when they do it.
 In the browser the hint glows above the input, and tapping it does the step.

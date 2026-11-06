@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### The village green
+Newcomers now arrive on The Village Green: the Island Journal in the middle,
+with a village noticeboard and a long table for gatherings beside it, which
+anyone can leave links on. A little village to arrive in, and a home for the
+island's notes and plans, so the rest of the island is free for wandering.
+
 ### Little things for two
 A few small things that work on your own and are nicer with someone else
 there. The scenery will mention them when you've company.

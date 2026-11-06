@@ -10,6 +10,7 @@ mod events;
 mod games;
 mod hills;
 mod gather;
+mod green;
 mod gramophone;
 mod growing;
 mod homes;
@@ -179,6 +180,9 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
     game.load_radios();
     if let Err(e) = game.ensure_journal() {
         eprintln!("couldn't put up the Island Journal: {e}");
+    }
+    if let Err(e) = game.ensure_green() {
+        eprintln!("couldn't lay out the village green: {e}");
     }
     let mut tick = tokio::time::interval(TICK);
     let mut stride = tokio::time::interval(Duration::from_millis(500));
@@ -2429,6 +2433,7 @@ const HELP: &[HelpTopic] = &[
         keepers: false,
         listed: true,
         items: &[
+            ("go to the village green", "everyone's spot: a village noticeboard, and a long table anyone can leave links on (or make your own, below)"),
             ("name The Frog Pond Gazebo", "1. find a spot and name it, so it's easy to find (places, go to)"),
             ("make a gathering table", "2. somewhere to gather (a gazebo works too)"),
             ("meet https://… https://…", "3. leave links there for whatever you get up to (up to three)"),
