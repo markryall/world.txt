@@ -99,6 +99,7 @@ Keepers can do everything above that says "or a keeper". On top of that:
 | `users` | Everyone, with devices and when they were last seen. |
 | `suggestions` | The latest suggestions people have left for the keepers. |
 | `reports` | The latest reports of someone being unkind, in the reporters' own words. |
+| `discoveries` | Which features people have found: each feature, how many have tried it, and who. Just that, nothing more. |
 | `kick Sam 60` / `unkick Sam` | Sends someone off for a break, by name (and by device too, if they're on). 30 minutes if no time is given; at least 1 minute, at most 7 days. |
 | `ban Sam` / `unban Sam` | Closes the island to someone, with no end. |
 | `promote Lu` / `demote Lu` | Makes someone a keeper, or not. The last keeper can't demote themselves. Visitors from other worlds can't be promoted. |
@@ -297,6 +298,7 @@ someone chooses to send them:
 | Thing | What's kept, and who sees it |
 |---|---|
 | `suggest …` | The suggestion, who left it and when. Only keepers can read them (`suggestions`, newest 20). Keepers in the world get a one-line heads-up when a new one arrives. |
+| Which features you've found | The first time you try each feature (a kite, paint, going inside, the hat…), the island notes that you did, and when. Nothing else: not what you said or made, not where you were, not how often. Keepers see who's found what with `discoveries`. Reports are never counted, and residents and visitors from other worlds aren't noted. |
 | `report Sam …` | The report, in the reporter's own words: who made it, who it's about, and when. Only keepers can read them (`reports`, newest 20), and Sam isn't told. Reporting never shows the keepers what Sam actually said: only what the reporter chose to write. |
 
 ### Muting

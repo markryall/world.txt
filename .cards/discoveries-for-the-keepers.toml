@@ -1,0 +1,7 @@
+name = "Discoveries for the keepers"
+status = "done"
+description = "discoveries shows keepers which features people have tried (who and when, nothing else). Reports never counted; residents and visitors not noted."
+created_at = "2026-11-07T01:16:59.635193Z"
+updated_at = "2026-11-07T01:16:59.635193Z"
+tags = ["feedback"]
+priority = "medium"

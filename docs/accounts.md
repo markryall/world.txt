@@ -40,6 +40,11 @@ something; everyone else is told whose it is. Unmaking tucks a thing away rather
 than deleting it, so `undo` brings back the last thing you unmade (within a day),
 noticeboards with all their notes. Island keepers can tidy up anyone's things.
 
+**What keepers can see.** Keepers can read `suggestions` and `reports`
+(only what people chose to send them) and `discoveries` (who has tried which
+feature, and when, with no other detail). Nobody can read anyone's
+conversations. The full list is in [the rules](rules.md).
+
 **Keeping it kind.** If someone's being unkind, `report Sam …` tells the
 keepers what's been happening, in your own words: only the keepers see it
 (`reports`), Sam isn't told, and nobody ever sees your conversations, only what

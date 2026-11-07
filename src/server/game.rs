@@ -7,6 +7,7 @@ mod companions;
 mod cook;
 mod craft;
 mod events;
+mod discoveries;
 mod feedback;
 mod games;
 mod hills;
@@ -566,6 +567,7 @@ impl Game {
         if input.is_empty() {
             return Ok(());
         }
+        self.notice_feature(id, input);
         // Shortcuts: 'hello  and  :waves
         // Phones like to "smarten" quotes, so curly ones count too.
         if let Some(rest) = input.strip_prefix(SAY_QUOTES) {
@@ -803,6 +805,7 @@ impl Game {
             "suggestions" => return self.cmd_suggestions(id),
             "report" | "complain" => return self.cmd_report(id, rest),
             "reports" => return self.cmd_reports(id),
+            "discoveries" | "discovered" => return self.cmd_discoveries(id),
             "kick" => return self.cmd_kick(id, rest),
             "ban" => return self.cmd_ban(id, rest),
             "unban" => return self.cmd_unkick(id, rest),
@@ -2563,6 +2566,7 @@ const HELP: &[HelpTopic] = &[
             ("visitors / admit / turn away", "people sailing in from other worlds"),
             ("suggestions", "what people have suggested to the keepers"),
             ("reports", "anyone who's been reported for being unkind, in the reporter's own words"),
+            ("discoveries", "which features people have found (just that they've tried them, nothing more)"),
             ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
             ("event sat 4pm Beach party", "plan an event for the whole island, right here (cancel event 1)"),
             ("event fri 4pm Tea party https://…", "an event with links (at a gathering table, it uses the table's)"),

@@ -278,6 +278,14 @@ impl Db {
             )?;
             conn.execute("INSERT INTO meta (key, value) VALUES ('notes_by_username', '1')", [])?;
         }
+        // Which features each person has tried, and when they first did:
+        // nothing else (see game/discoveries.rs).
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS discoveries (
+                 player TEXT NOT NULL, feature TEXT NOT NULL, at INTEGER NOT NULL,
+                 PRIMARY KEY (player, feature))",
+            [],
+        )?;
         // Things people chose to tell the keepers: suggestions, and reports.
         conn.execute(
             "CREATE TABLE IF NOT EXISTS feedback (
@@ -653,6 +661,19 @@ impl Db {
     pub fn display_clear(&self, thing: i64) -> anyhow::Result<()> {
         self.conn.execute("DELETE FROM display_items WHERE thing = ?1", [thing])?;
         Ok(())
+    }
+
+    /// Someone's tried a feature: noted the first time only.
+    pub fn discovered(&self, player: &str, feature: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute("INSERT OR IGNORE INTO discoveries (player, feature, at) VALUES (?1, ?2, ?3)", params![player, feature, at])?;
+        Ok(())
+    }
+
+    /// Everyone's discoveries: (player, feature), first found first.
+    pub fn discoveries(&self) -> anyhow::Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT player, feature FROM discoveries ORDER BY at")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     pub fn add_feedback(&self, kind: &str, by: &str, about: Option<&str>, text: &str, at: i64) -> anyhow::Result<()> {
