@@ -10,6 +10,10 @@ wherever there's room around the Journal.
 New arrivals get five tiny first steps: walk, say hi, make something, plant
 something, see who's around. One hint shows at a time and clears when they do it.
 In the browser the hint glows above the input, and tapping it does the step.
+
+On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
+menu) makes the island an app of its own: its own icon, full screen, no
+browser bars.
 Progress is saved by name, so returning visitors never see it again
 (`skip` hides it, `tutorial` brings it back).
 

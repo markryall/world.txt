@@ -20,6 +20,10 @@ Little Lamb. Plain `hum along` lists them, and in the browser you just tap
 one, so joining Pachelbel's Canon from a phone is two taps. Tap one of your
 own sections in that list and it's in the box, ready to fix a wrong note.
 
+### The island on your home screen
+Add to Home Screen on a phone gives the island its own icon (a little bit of
+map, with you on it) and opens it full screen, with no browser bars.
+
 ### Tap the map to walk
 Tap a spot on the map and you walk there, a step at a time, finding a way
 around the water. No more tap, tap, tap on the arrows. (Underneath it's
@@ -32,7 +36,8 @@ them.
 
 ### Fixes
 - **Who am I?** The browser shows your name at the top of the side panel and
-  in the tab, so with a few windows open you can tell whose is whose.
+  in the tab (before the world's own name), so with a few windows open you
+  can tell whose is whose.
 - **The newest lines stay in view.** On a narrow screen the log could get
   left partway up when the panel above it filled in, so what came next landed
   out of sight. It stays at the bottom now, unless you've scrolled up to read.

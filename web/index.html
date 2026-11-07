@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>world.txt</title>
+<!-- On a phone's home screen: an app of its own, full screen. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#1d1927">
 <style>
   :root {
     --bg: #15121c; --panel: #1d1927; --line: #2c2639; --fg: #e6e1ef;
@@ -225,6 +233,8 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const log = $('#log');
+// The page's own title ("Willow Bank · world.txt"), before your name goes on it.
+const pageTitle = document.title;
 let ws, sky = '', audio, soundOn = false, heard = {};
 const typed = []; let hist = 0;
 
@@ -544,7 +554,8 @@ function connect() {
       $('#me').textContent = '☺ ' + m.nickname;
       $('#me').title = 'you: ' + m.nickname + ' (' + m.user + ')';
       $('#me').hidden = false;
-      document.title = m.nickname + ' · world.txt';
+      // Your name in front of the world's own title.
+      document.title = m.nickname + ' · ' + pageTitle;
       // The invite or passport is used up: tidy it out of the address bar.
       invite = null;
       passport = null;

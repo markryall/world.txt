@@ -361,6 +361,31 @@ async fn is_websocket(stream: &TcpStream) -> anyhow::Result<bool> {
 }
 
 const PAGE: &str = include_str!("../../web/index.html");
+const ICON_192: &[u8] = include_bytes!("../../web/icon-192.png");
+const ICON_512: &[u8] = include_bytes!("../../web/icon-512.png");
+
+/// What lets a phone keep the island on its home screen as an app of its
+/// own: full screen, no browser bars, with the world's name and icon.
+fn manifest(info: &Option<federation::WorldInfo>) -> String {
+    let name = match info {
+        Some(i) if i.name != federation::host(&i.url) => i.name.clone(),
+        _ => "world.txt".to_string(),
+    };
+    serde_json::json!({
+        "name": name,
+        "short_name": name,
+        "start_url": "./",
+        "scope": "./",
+        "display": "standalone",
+        "background_color": "#15121c",
+        "theme_color": "#1d1927",
+        "icons": [
+            { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+            { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+        ],
+    })
+    .to_string()
+}
 
 /// The page, wearing the world's name if it has one.
 fn page(info: &Option<federation::WorldInfo>) -> String {
@@ -481,7 +506,7 @@ fn semaphore(v: &serde_json::Value) -> Option<String> {
 async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>, events: &UnboundedSender<Event>) -> anyhow::Result<()> {
     use tokio::io::AsyncWriteExt;
     let read = tokio::time::timeout(std::time::Duration::from_secs(10), read_request(&mut stream)).await;
-    let text = |status: &'static str, body: &str| (status, "text/plain; charset=utf-8", format!("{body}\n"));
+    let text = |status: &'static str, body: &str| (status, "text/plain; charset=utf-8", format!("{body}\n").into_bytes());
     let (status, ctype, body) = match read {
         Err(_) | Ok(Err(ReadError::Bad)) => text("400 Bad Request", "that didn't make sense, babe"),
         Ok(Err(ReadError::TooBig)) => text("413 Payload Too Large", "that's a lot, babe: keep it under 16KB"),
@@ -504,16 +529,17 @@ async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>,
                     }
                 }
             }
-            (_, "/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", page(info)),
-            (_, federation::WELL_KNOWN, Some(info)) => ("200 OK", "application/json", serde_json::to_string(info)?),
+            (_, "/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", page(info).into_bytes()),
+            (_, "/manifest.webmanifest", _) => ("200 OK", "application/manifest+json", manifest(info).into_bytes()),
+            (_, "/icon-192.png", _) => ("200 OK", "image/png", ICON_192.to_vec()),
+            (_, "/icon-512.png", _) => ("200 OK", "image/png", ICON_512.to_vec()),
+            (_, federation::WELL_KNOWN, Some(info)) => ("200 OK", "application/json", serde_json::to_vec(info)?),
             _ => text("404 Not Found", "nothing here, babe"),
         },
     };
-    let resp = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    );
-    stream.write_all(resp.as_bytes()).await?;
+    let head = format!("HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+    stream.write_all(head.as_bytes()).await?;
+    stream.write_all(&body).await?;
     stream.shutdown().await?;
     Ok(())
 }
