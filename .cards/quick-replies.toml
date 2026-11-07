@@ -1,0 +1,7 @@
+name = "Quick replies"
+status = "todo"
+description = "Most chat is hi, 😂, thanks and see you. A few quick replies as taps when someone's talking to you or arrives, so the keyboard only comes up for real conversation."
+created_at = "2026-11-07T22:48:24.961418Z"
+updated_at = "2026-11-07T22:48:24.961418Z"
+tags = ["phone"]
+blocked_by = ["Tappable lines"]

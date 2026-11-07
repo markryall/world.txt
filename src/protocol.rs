@@ -29,6 +29,20 @@ pub struct Span {
     pub c: Col,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub b: bool,
+    /// Tapping these words runs this command (a client that can't tap just
+    /// shows the words).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
+    /// Tapping these words puts this in the command box, ready to finish
+    /// ("@Sam " to message Sam).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<String>,
+}
+
+impl Span {
+    fn new(t: impl Into<String>, c: Col, b: bool) -> Self {
+        Span { t: t.into(), c, b, run: None, fill: None }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -40,17 +54,29 @@ impl Line {
     }
     /// plain text
     pub fn t(mut self, text: impl Into<String>) -> Self {
-        self.0.push(Span { t: text.into(), c: Col::Plain, b: false });
+        self.0.push(Span::new(text, Col::Plain, false));
         self
     }
     /// coloured text
     pub fn c(mut self, col: Col, text: impl Into<String>) -> Self {
-        self.0.push(Span { t: text.into(), c: col, b: false });
+        self.0.push(Span::new(text, col, false));
         self
     }
     /// bold coloured text
     pub fn b(mut self, col: Col, text: impl Into<String>) -> Self {
-        self.0.push(Span { t: text.into(), c: col, b: true });
+        self.0.push(Span::new(text, col, true));
+        self
+    }
+    /// Bold coloured words that run `cmd` when tapped.
+    pub fn run(mut self, col: Col, text: impl Into<String>, cmd: impl Into<String>) -> Self {
+        self.0.push(Span { run: Some(cmd.into()), ..Span::new(text, col, true) });
+        self
+    }
+    /// Someone's name, which sets you up to message them when tapped.
+    pub fn who(mut self, name: impl Into<String>) -> Self {
+        let name = name.into();
+        let fill = format!("@{name} ");
+        self.0.push(Span { fill: Some(fill), ..Span::new(name, Col::Cyan, true) });
         self
     }
     pub fn plain(text: impl Into<String>) -> Self {
@@ -337,6 +363,18 @@ pub fn board_lines(msg: &ToClient) -> Option<Vec<Line>> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn taps_travel_only_when_there_are_any() {
+        use super::{Col, Line};
+        let plain = serde_json::to_string(&Line::col(Col::Pink, "hi")).unwrap();
+        assert_eq!(plain, r#"[{"t":"hi","c":"pink"}]"#, "a plain span is just as it was");
+        let line = Line::new().who("Sam").run(Col::Pink, "the canon", "hum along canon tune");
+        let json = serde_json::to_string(&line).unwrap();
+        assert!(json.contains(r#""fill":"@Sam ""#) && json.contains(r#""run":"hum along canon tune""#), "{json}");
+        let back: Line = serde_json::from_str(r#"[{"t":"hi","c":"pink"}]"#).unwrap();
+        assert!(back.0[0].run.is_none() && back.0[0].fill.is_none());
+    }
+
     #[test]
     fn spots_shared_labels() {
         let shared = super::shared_labels(["Surf", "Pizza", "Surf"].into_iter());

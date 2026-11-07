@@ -1,0 +1,8 @@
+name = "Tappable lines"
+status = "inprogress"
+owner = "claudia"
+description = "On a phone everything means typing, and the keyboard takes half the screen. Let the world send words you can tap: a bit of a line can carry a command to run (a songbook pick) or text to put in the box ready to finish (a person's name sets you up to message them, @Sam, as the names in the side panel already do). People's names are taps wherever they say, do or hum something, which makes chatting discoverable on any screen. The terminal just shows the words."
+created_at = "2026-11-07T22:48:24.922934Z"
+updated_at = "2026-11-07T22:48:43.491648Z"
+tags = ["phone"]
+priority = "high"

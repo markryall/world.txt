@@ -1,0 +1,7 @@
+name = "What can I do here?"
+status = "todo"
+description = "Design first. Each step, the world works out what's at your spot (a music box, a board, a cat, someone to wave at, a circle) and offers it as a few taps: 📖 read the board · 🐱 pat Biscuit · 👋 wave at Sam. They fill the chip row and change as you walk, so most of the time the keyboard stays down. Words in descriptions could be taps too, opening what you can do with that thing."
+created_at = "2026-11-07T22:48:24.952621Z"
+updated_at = "2026-11-07T22:48:24.952621Z"
+tags = ["phone"]
+blocked_by = ["Tappable lines"]

@@ -754,7 +754,7 @@ impl World {
                         last.t.push_str(g);
                         last.t.push_str(gap);
                     }
-                    _ => spans.push(Span { t: format!("{g}{gap}"), c, b }),
+                    _ => spans.push(Span { t: format!("{g}{gap}"), c, b, run: None, fill: None }),
                 }
             }
             out.push(Line(spans));

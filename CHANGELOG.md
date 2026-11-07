@@ -11,6 +11,11 @@ round all fit. Hit a wrong note? `hum along 2 …` fixes section 2 for next time
 round, and `hush` stops. Pachelbel's Canon and Frère Jacques are in
 [playing.md](docs/playing.md#humming-along) to try.
 
+### Tap a name to talk
+In the browser, tap (or click) someone's name where they say, do, hum or
+shout something, or arrive, and the box is ready with `@Sam ` to message
+them.
+
 ### Fixes
 - **Who am I?** The browser shows your name at the top of the side panel and
   in the tab, so with a few windows open you can tell whose is whose.

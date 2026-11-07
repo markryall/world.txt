@@ -319,7 +319,7 @@ impl Game {
                         if h.id == pid {
                             Line::new().c(Col::Dim, format!("You {} along {which}", plain_verb(h.verb))).c(Col::Pink, tune)
                         } else {
-                            Line::new().b(Col::Cyan, &h.name).c(Col::Dim, format!(" {} along {which}", h.verb)).c(Col::Pink, tune)
+                            Line::new().who(&h.name).c(Col::Dim, format!(" {} along {which}", h.verb)).c(Col::Pink, tune)
                         }
                     })
                     .collect();

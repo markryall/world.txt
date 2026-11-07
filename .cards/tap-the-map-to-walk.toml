@@ -1,0 +1,6 @@
+name = "Tap the map to walk"
+status = "todo"
+description = "Walking somewhere a few steps away on a phone is tap, tap, tap on the arrows. Tap a spot on the minimap and walk there, a step at a time as usual, stopping if something's in the way."
+created_at = "2026-11-07T22:48:24.957911Z"
+updated_at = "2026-11-07T22:48:24.957911Z"
+tags = ["phone"]

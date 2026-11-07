@@ -1,0 +1,9 @@
+name = "Humming with the screen locked"
+status = "todo"
+description = "Phones stop a page's sound when the screen locks or the tab's in the background. The world keeps the beat, so you come back in on the next turn; say so in playing.md."
+created_at = "2026-11-07T22:48:24.971181Z"
+updated_at = "2026-11-07T22:48:24.971181Z"
+tags = [
+    "phone",
+    "music",
+]

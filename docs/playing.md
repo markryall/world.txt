@@ -16,7 +16,8 @@ Progress is saved by name, so returning visitors never see it again
 - `n s e w ne nw se sw`, `look`, `who`, and `map` for the whole island at half
   scale: you, friends, homes, boards, and numbered named places
 - `say hi` (or `'hi`), `:waves`, `shout`, `hum C E G`
-- `@Poppy hi` talks to someone anywhere (if they're away it's kept as mail and
+- `@Poppy hi` talks to someone anywhere (in the browser, tapping someone's
+  name in the log or the side panel starts one for you; if they're away it's kept as mail and
   shown when they next arrive), `reply` answers them, `chat` (or `@all`) reaches
   everyone, `find Poppy` tells you which way to walk, and `join Poppy` walks you
   there automatically (around the water, rowing across if they're on another

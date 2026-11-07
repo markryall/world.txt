@@ -1,0 +1,6 @@
+name = "Humming along"
+status = "done"
+description = "Two people humming at once never land in time. hum along starts a circle the world keeps in time: every part plays together at the start of each turn, a part is a loop of sections (| between them), and hum along 2 … / hush 2 fix or remove a section as it plays. Pachelbel's Canon and Frère Jacques in playing.md."
+created_at = "2026-11-07T22:48:24.917161Z"
+updated_at = "2026-11-07T22:48:24.917161Z"
+tags = ["music"]

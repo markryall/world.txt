@@ -93,7 +93,10 @@ passport), `cmd` (anything typed), `audio` (gramophone music), and `queue` /
 
 - `lines`: text for the scrolling log. A line is a list of spans, each with
   a *named* colour (`cyan`, `sand`, `deep_blue`…) rather than an ANSI code,
-  so every client draws them its own way.
+  so every client draws them its own way. A span can also be a tap: `run`
+  is a command to send when it's tapped, and `fill` is text to put in the
+  command box ready to finish (people's names fill `@Sam `). Clients that
+  can't tap, like the terminal, just show the words.
 - `status`: the side panel. Place, weather, clock, a minimap (itself just
   coloured lines), who's about, and any progress bars and status lights.
 - `board`: a noticeboard's notes, for the board view.

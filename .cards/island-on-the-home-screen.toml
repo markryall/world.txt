@@ -1,0 +1,6 @@
+name = "Island on the home screen"
+status = "todo"
+description = "Add to Home Screen should give a proper app: full screen with no browser bars (a web app manifest and icon), opening straight onto the island."
+created_at = "2026-11-07T22:48:24.966772Z"
+updated_at = "2026-11-07T22:48:24.966772Z"
+tags = ["phone"]

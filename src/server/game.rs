@@ -568,7 +568,7 @@ impl Game {
         for (&pid, p) in &self.players {
             if pid != id && !back {
                 let line = if p.x == x && p.y == y {
-                    Line::new().b(Col::Cyan, &name).c(Col::Cyan, " appears, blinking, as if from a dream.")
+                    Line::new().who(&name).c(Col::Cyan, " appears, blinking, as if from a dream.")
                 } else if first_time {
                     Line::col(Col::Dim, format!("🐣 {full} has arrived on the island for the first time!"))
                 } else {
@@ -905,7 +905,7 @@ impl Game {
             p.sky = self.world.weather.sky_at(nx, ny);
             p.fishing = None; // walking off reels the line in
         }
-        self.tell_here(nx, ny, id, Line::col(Col::Cyan, format!("{name} arrives from the {back}{with}.")));
+        self.tell_here(nx, ny, id, Line::new().who(&name).c(Col::Cyan, format!(" arrives from the {back}{with}.")));
         self.visit_home(id, (ox, oy), (nx, ny));
         if quiet {
             // just the step, below
@@ -941,7 +941,7 @@ impl Game {
         let Some(p) = self.players.get(&id) else { return Ok(()) };
         let (x, y, name, user) = (p.x, p.y, p.name.clone(), p.user.clone());
         self.say1(id, Line::new().c(Col::Dim, "You say, ").c(Col::White, format!("\"{msg}\"")));
-        self.tell_here_from(x, y, id, &user, Line::new().b(Col::Cyan, &name).c(Col::Dim, " says, ").c(Col::White, format!("\"{msg}\"")));
+        self.tell_here_from(x, y, id, &user, Line::new().who(&name).c(Col::Dim, " says, ").c(Col::White, format!("\"{msg}\"")));
         self.react_to_words(x, y);
         self.folk_hear(id, msg);
         Ok(())
@@ -954,7 +954,7 @@ impl Game {
         }
         let Some(p) = self.players.get(&id) else { return Ok(()) };
         let (x, y, name, user) = (p.x, p.y, p.name.clone(), p.user.clone());
-        let line = Line::new().b(Col::Cyan, &name).c(Col::Cyan, format!(" {msg}"));
+        let line = Line::new().who(&name).c(Col::Cyan, format!(" {msg}"));
         self.say1(id, line.clone());
         self.tell_here_from(x, y, id, &user, line);
         Ok(())
@@ -986,9 +986,9 @@ impl Game {
                 continue;
             }
             let line = if let (Some(b), None) = (&indoors, their_room) {
-                Line::new().c(Col::Dim, format!("From inside {b}, ")).b(Col::Cyan, &me.name).c(Col::Dim, " shouts, ").c(Col::White, format!("\"{msg}!\""))
+                Line::new().c(Col::Dim, format!("From inside {b}, ")).who(&me.name).c(Col::Dim, " shouts, ").c(Col::White, format!("\"{msg}!\""))
             } else if d == 0 {
-                Line::new().b(Col::Cyan, &me.name).c(Col::Dim, " shouts, ").b(Col::White, format!("\"{msg}!\""))
+                Line::new().who(&me.name).c(Col::Dim, " shouts, ").b(Col::White, format!("\"{msg}!\""))
             } else {
                 let dir = DIRS
                     .iter()
@@ -997,7 +997,7 @@ impl Game {
                 if d <= 4 {
                     Line::new()
                         .c(Col::Dim, format!("From the {dir}, "))
-                        .b(Col::Cyan, &me.name)
+                        .who(&me.name)
                         .c(Col::Dim, " shouts, ")
                         .c(Col::White, format!("\"{msg}!\""))
                 } else {
@@ -1021,7 +1021,7 @@ impl Game {
         };
         self.say1(id, Line::new().c(Col::Dim, format!("You {verb} ")).c(Col::Pink, &tune));
         // Mutes are kept by username, so it's the username that's checked.
-        self.tell_here_from(x, y, id, &user, Line::new().b(Col::Cyan, &name).c(Col::Dim, format!(" {verbs} ")).c(Col::Pink, &tune));
+        self.tell_here_from(x, y, id, &user, Line::new().who(&name).c(Col::Dim, format!(" {verbs} ")).c(Col::Pink, &tune));
         for (&pid, o) in &self.players {
             let d = (o.x - x).abs().max((o.y - y).abs());
             if pid != id && (1..=2).contains(&d) && o.hears(&user) {
@@ -1224,7 +1224,7 @@ impl Game {
             lines.push(
                 Line::new()
                     .c(Col::Cyan, if p.bot { "  🐾 " } else { "  ☺ " })
-                    .b(Col::Cyan, &p.name)
+                    .who(&p.name)
                     .c(Col::Dim, format!(" {}", p.user))
                     .c(Col::Magenta, p.fun.wearing.as_ref().map_or(String::new(), |w| format!(" (wearing {w})")))
                     .c(Col::Dim, format!("  · {}", self.world.place_title(p.x, p.y)))
