@@ -29,6 +29,15 @@ It's also a cosy place for a group to meet: plan events (one-offs or repeating,
 in everyone's own timezone), leave links for calls at a gathering table, and keep
 a noticeboard that works like a group chat, which outside tools can post to.
 
+## Private by design
+
+Nobody can read anyone else's conversations: not other players, and not the
+island's keepers either. Private messages and mail go to the person they're
+for and nowhere else. Keepers only ever see what someone chooses to send them
+(a suggestion, say), plus a list of which features people have tried, with no
+detail beyond that. [The rules](docs/rules.md) spell out exactly what's kept
+and who can see it.
+
 ## More
 
 - 🏝 [Wandering the island](docs/playing.md): homes, gardens, boats, foraging,

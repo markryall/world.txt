@@ -17,6 +17,10 @@ Keepers can see which features people have found with `discoveries`: just
 that someone's tried each one, and when. Nothing about what they said, made or
 where they were. It's a way to notice what's going unfound.
 
+### Private by design
+The README now says plainly what's always been true: nobody, keepers included,
+can read anyone else's conversations.
+
 ### Music indoors
 A gramophone, radio or jukebox inside a building plays just to the people in
 that room. It can go right next to one outdoors, and outdoor music stays out.
