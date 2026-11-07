@@ -24,6 +24,8 @@ One per room.
   you're visiting someone else's home.
 - **Muting someone hides their humming** too, and any "making music together"
   that involves them.
+- **Muting someone hides their noticeboard notes** when you `read` a board,
+  not just as they're posted, old notes included.
 
 ## 0.5.0 (2026-11-07)
 

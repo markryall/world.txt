@@ -247,7 +247,8 @@ impl Game {
             return Ok(());
         }
         let at = now();
-        let note_id = self.world.db.add_note(board, &name, &text, at, &week_key(at), None)?;
+        // Kept by username (shown by nickname), so mutes and renames work.
+        let note_id = self.world.db.add_note(board, &user, &text, at, &week_key(at), None)?;
         let was_following = self.world.db.membership(&user, board).is_some_and(|m| m.0);
         self.world.db.set_following(&user, board, true)?;
         self.world.db.set_seen(&user, board, note_id)?;

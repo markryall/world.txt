@@ -261,6 +261,18 @@ impl Db {
             }
             conn.execute("INSERT INTO meta (key, value) VALUES ('rooms_spread', '1')", [])?;
         }
+        // Noticeboard notes used to be signed with a nickname: sign them with
+        // the username instead, so muting someone hides their old notes too.
+        let signed: i64 = conn.query_row("SELECT COUNT(*) FROM meta WHERE key = 'notes_by_username'", [], |r| r.get(0))?;
+        if signed == 0 {
+            conn.execute(
+                "UPDATE notes SET author = (SELECT p.name FROM players p WHERE p.nickname = notes.author)
+                 WHERE author NOT IN (SELECT name FROM players)
+                   AND (SELECT COUNT(*) FROM players p WHERE p.nickname = notes.author) = 1",
+                [],
+            )?;
+            conn.execute("INSERT INTO meta (key, value) VALUES ('notes_by_username', '1')", [])?;
+        }
         // The first display cases didn't say who put what in: their makers did.
         let old: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'displays'", [], |r| r.get(0))?;
         if old > 0 {

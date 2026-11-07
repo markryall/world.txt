@@ -295,7 +295,7 @@ don't get:
   someone;
 - Sam's private messages (Sam is shown them as sent; they're just never
   delivered), or any mail Sam left while you were away;
-- word of Sam's new noticeboard notes as they're posted;
+- Sam's noticeboard notes, whether they're new or you're reading back;
 - music Sam plays on a gramophone or a jukebox;
 - a bottle Sam threw out to sea;
 - the doorbell when Sam visits your home;

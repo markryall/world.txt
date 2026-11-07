@@ -1,8 +1,8 @@
 name = "Muting doesn't hide board notes when reading"
-status = "todo"
+status = "done"
 description = "cmd_post stores note authors by nickname, and cmd_read checks them against muted usernames, so read still shows a muted person's notes (live post notices do respect mute). Hook posts and place-event notes store other kinds of author. Store usernames from now on, and work out what to do with existing notes (match nicknames to accounts, or leave them)."
 created_at = "2026-11-07T00:35:30.427319Z"
-updated_at = "2026-11-07T00:35:30.427319Z"
+updated_at = "2026-11-07T00:46:44.755348Z"
 tags = [
     "bug",
     "safety",
