@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Music indoors
+A gramophone, radio or jukebox inside a building plays just to the people in
+that room. It can go right next to one outdoors, and outdoor music stays out.
+One per room.
+
 ### Fixes
 - **Rooms keep to themselves.** Rooms inside buildings sat so close together
   that a shout, a gramophone or the smell of cooking could carry from one to

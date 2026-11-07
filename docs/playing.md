@@ -51,6 +51,8 @@ Progress is saved by name, so returning visitors never see it again
   Radios say what's playing when the stream does, or, with a guide (AirNet's
   format, used by many community stations), what show is on air. Sound makers must be more
   than ten steps apart, and you only ever hear the nearest, never two at once.
+  Inside a building it's one per room, heard only by whoever's in there, and it
+  doesn't mind what's playing outside.
   Browser only, with the sound on; playing a gramophone needs a browser with
   WebCodecs (Chrome, Edge, recent Safari and Firefox).
 

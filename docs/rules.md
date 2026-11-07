@@ -142,7 +142,7 @@ says otherwise.
 | Buildings on one spot | 1. Turrets, porches, chimneys, bell towers and arches only go next door to a building. Buildings need dry ground and go up outdoors. |
 | Sandcastles and snowmen | 6 bits each |
 | Bottles at sea | 1 per person at a time |
-| Gramophones, radios and jukeboxes | Must be more than 10 steps apart. Each is heard up to 5 steps away. |
+| Gramophones, radios and jukeboxes | Outdoors: more than 10 steps apart, each heard up to 5 steps away. Inside a building: one per room, heard only by the people in that room. Indoor and outdoor ones don't get in each other's way, and outdoor music isn't heard indoors. |
 | Jukebox queue | 20 songs per person per jukebox |
 | Gramophones | You play one at a time. Residents can't play music. |
 | Homes | 1 per person (see `claim` above) |

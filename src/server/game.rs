@@ -1387,7 +1387,12 @@ impl Game {
         let (name, action, trigger) = parse_make(text);
         if gramophone::is_gramophone(&name) || radio::is_radio(&name) || jukebox::is_jukebox(&name) {
             if let Some(other) = self.sound_too_close(x, y, None) {
-                self.say1(id, Line::plain(format!("{} is too close: two songs at once would be a muddle. Try ten or so steps further away.", capitalise(&the(&other)))));
+                let line = if crate::server::world::room_of(x, y).is_some() {
+                    format!("There's already {} in here: one thing playing music to a room is plenty.", crate::server::nature::a(crate::server::world::strip_article(&other)))
+                } else {
+                    format!("{} is too close: two songs at once would be a muddle. Try ten or so steps further away.", capitalise(&the(&other)))
+                };
+                self.say1(id, Line::plain(line));
                 return Ok(());
             }
             let (kind, how) = if jukebox::is_jukebox(&name) {

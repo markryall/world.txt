@@ -1,8 +1,8 @@
 name = "Music indoors stays indoors"
-status = "todo"
+status = "done"
 description = "A radio, jukebox or gramophone inside a building is only heard by people in that building, and only plays to them. Indoors and outdoors don't constrain each other's placement: the 'more than ten steps apart' spacing rule applies between outdoor sound makers only, and within a room there's room for one. Outdoor music isn't heard indoors either (or decide: faintly?)."
 created_at = "2026-11-07T00:35:30.406606Z"
-updated_at = "2026-11-07T00:35:30.406606Z"
+updated_at = "2026-11-07T00:39:35.889289Z"
 tags = [
     "inside",
     "music",
