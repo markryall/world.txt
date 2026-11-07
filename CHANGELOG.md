@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- **Gifts to residents aren't lost.** Giving Claudia or Moss something used
+  to make it vanish. Now they thank you and set it down right there for
+  everyone to enjoy, or let it go if it's alive, or hand it back if there's
+  no room.
+
 ## 0.6.0 (2026-11-07)
 
 ### Suggestions

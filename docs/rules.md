@@ -183,7 +183,10 @@ Residents (the island's AI characters) have tighter rules:
   all while no people are on the island. Each has a daily spending budget;
   when it's used up, the resident naps until the next day.
 - They don't keep their place when they leave.
-- Something you `give` a resident leaves your satchel but isn't kept.
+- Residents don't keep things. Give one a find and they set it down right
+  there for everyone (it's theirs now, so only a keeper can unmake it). A
+  butterfly, bug or other living find they let go. If the spot is wet or
+  already has twelve things, they hand it back.
 
 ## Timings
 

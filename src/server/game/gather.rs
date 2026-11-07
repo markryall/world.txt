@@ -363,26 +363,62 @@ impl Game {
             self.say1(id, Line::plain(format!("{tname} isn't here. Try 'find {tname}' and go to them!")));
             return Ok(());
         }
+        if tbot {
+            return self.give_resident(id, tid, s);
+        }
         let theirs: i64 = self.world.db.satchel(&tuser)?.iter().map(|(_, n)| n).sum();
-        if !tbot && theirs >= SATCHEL_SIZE {
+        if theirs >= SATCHEL_SIZE {
             self.say1(id, Line::plain(format!("{tname}'s satchel is too full to take it.")));
             return Ok(());
         }
         self.world.db.satchel_add(&user, s.id, -1)?;
-        if !tbot {
-            self.world.db.satchel_add(&tuser, s.id, 1)?;
-            if self.world.db.journal_add(&tuser, s.id)? {
-                self.say1(tid, Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, capitalise(s.name)).c(Col::Yellow, s.rarity.label()));
-            }
+        self.world.db.satchel_add(&tuser, s.id, 1)?;
+        if self.world.db.journal_add(&tuser, s.id)? {
+            self.say1(tid, Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, capitalise(s.name)).c(Col::Yellow, s.rarity.label()));
         }
         let thing = nature::a(s.name);
         self.say1(id, Line::col(Col::Pink, format!("🎁 You give {tname} {thing}.")));
         self.say1(tid, Line::new().c(Col::Pink, "🎁 ").b(Col::Pink, &name).c(Col::Pink, format!(" gives you {thing}!")));
-        for (&pid, p) in &self.players {
-            if pid != id && pid != tid && (p.x, p.y) == (x, y) {
-                let _ = p.tx.send(ToClient::Lines { lines: vec![Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}."))] });
+        self.tell_onlookers(x, y, &[id, tid], Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}.")));
+        Ok(())
+    }
+
+    /// Everyone here but the people it's happening to.
+    fn tell_onlookers(&self, x: i64, y: i64, not: &[u64], line: Line) {
+        for (pid, p) in &self.players {
+            if !not.contains(pid) && (p.x, p.y) == (x, y) {
+                let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
             }
         }
+    }
+
+    /// Residents don't keep things. A live find is let go; anything else is
+    /// set down right here with thanks, for everyone to enjoy, or, with no
+    /// room for it, handed back.
+    fn give_resident(&mut self, id: u64, tid: u64, s: &'static Species) -> anyhow::Result<()> {
+        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let user = self.user(id);
+        let (tname, tuser) = (self.players[&tid].name.clone(), self.players[&tid].user.clone());
+        let thing = nature::a(s.name);
+        if s.kind.alive() {
+            self.world.db.satchel_add(&user, s.id, -1)?;
+            self.say1(id, Line::col(Col::Pink, format!("🎁 {tname} takes {thing} from you very gently, admires it, and lets it go. Off it goes.")));
+            self.say1(tid, Line::col(Col::Pink, format!("🎁 {name} gives you {thing}. You admire it and let it go.")));
+            self.tell_onlookers(x, y, &[id, tid], Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}, and {tname} lets it go.")));
+            return Ok(());
+        }
+        if self.world.terrain(x, y).is_wet() || self.world.things_at(x, y).count() >= 12 {
+            self.say1(id, Line::col(Col::Pink, format!("🎁 {tname} smiles and closes your hand back around {thing}. \"Keep it for somewhere with a bit more room.\"")));
+            self.say1(tid, Line::col(Col::Pink, format!("🎁 {name} offers you {thing}, but there's nowhere here to put it, so you hand it back.")));
+            return Ok(());
+        }
+        self.world.db.satchel_add(&user, s.id, -1)?;
+        let (action, trigger) = comes_alive(s);
+        self.world.add_thing(x, y, thing.clone(), action, trigger, &tuser, None)?;
+        self.say1(id, Line::col(Col::Pink, format!("🎁 {tname} thanks you for {thing} and sets it down right here, just so.")));
+        self.say1(tid, Line::col(Col::Pink, format!("🎁 {name} gives you {thing}. You set it down here for everyone to enjoy.")));
+        self.tell_onlookers(x, y, &[id, tid], Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}, and {tname} sets it down here.")));
+        self.status_near(id, &[(x, y)]);
         Ok(())
     }
 
@@ -406,19 +442,7 @@ impl Game {
             return Ok(());
         }
         self.world.db.satchel_add(&user, s.id, -1)?;
-        // Crafted things come alive once placed: a wind chime tinkles, a lantern glows.
-        let (action, trigger) = if s.kind == Kind::Craft && !s.here.is_empty() {
-            let t = match s.when {
-                nature::When::Night => Trigger::Night,
-                nature::When::Rain => Trigger::Rain,
-                nature::When::Day => Trigger::Day,
-                nature::When::DryDay => Trigger::Sun,
-                nature::When::Any | nature::When::In(_) | nature::When::Festival(_) | nature::When::On(_) => Trigger::Always,
-            };
-            (Some(s.here.to_string()), t)
-        } else {
-            (None, Trigger::Always)
-        };
+        let (action, trigger) = comes_alive(s);
         self.world.add_thing(x, y, nature::a(s.name), action, trigger, &user, None)?;
         self.say1(id, Line::col(Col::Yellow, format!("{} You place {} here, just so.", s.kind.icon(), nature::a(s.name))));
         self.tell_here(x, y, id, Line::col(Col::Yellow, format!("{} {name} places {} here.", s.kind.icon(), nature::a(s.name))));
@@ -444,4 +468,19 @@ impl Game {
         self.tell_here(x, y, id, Line::col(Col::Pink, format!("{} {name} lets a {} go. It {how}.", s.kind.icon(), s.name)));
         Ok(())
     }
+}
+
+/// Crafted things come alive once placed: a wind chime tinkles, a lantern glows.
+fn comes_alive(s: &Species) -> (Option<String>, Trigger) {
+    if s.kind != Kind::Craft || s.here.is_empty() {
+        return (None, Trigger::Always);
+    }
+    let t = match s.when {
+        nature::When::Night => Trigger::Night,
+        nature::When::Rain => Trigger::Rain,
+        nature::When::Day => Trigger::Day,
+        nature::When::DryDay => Trigger::Sun,
+        nature::When::Any | nature::When::In(_) | nature::When::Festival(_) | nature::When::On(_) => Trigger::Always,
+    };
+    (Some(s.here.to_string()), t)
 }
