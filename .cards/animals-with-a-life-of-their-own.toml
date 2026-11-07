@@ -1,0 +1,9 @@
+name = "Animals with a life of their own"
+status = "done"
+description = "Wild animals (fox, duckling, rabbit, hedgehog, turtle) sit still where they appear. Make them wander their own ground step by step, so they come and go past people; notice things people have made, each other and companions; and react when patted. Hidden: discovered, not in help (secrets.md)."
+created_at = "2026-11-07T11:56:43.205240Z"
+updated_at = "2026-11-07T12:02:05.090414Z"
+tags = [
+    "animals",
+    "nature",
+]

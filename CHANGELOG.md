@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+### Animals with lives of their own
+Wild animals wander about now instead of waiting where they turn up, and get
+on with their day when someone's watching. Some of them might even let you
+pat them.
+
 ### Fixes
+- **Quiet while you're away.** Companions used to keep getting up to their
+  little tricks at people who'd stepped away. Now they, and the wandering
+  animals, save it for when you're about.
 - **Gifts to residents aren't lost.** Giving Claudia or Moss something used
   to make it vanish. Now they thank you and set it down right there for
   everyone to enjoy, or let it go if it's alive, or hand it back if there's

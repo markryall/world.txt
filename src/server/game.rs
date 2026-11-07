@@ -111,6 +111,12 @@ impl Player {
     fn hears(&self, from: &str) -> bool {
         !self.muted.contains(&from.to_lowercase())
     }
+
+    /// A person who's actually about: not a resident, and not stepped away
+    /// (the same measure that quietens the scenery).
+    fn about(&self) -> bool {
+        !self.bot && self.ambient_quiet < AMBIENT_WHILE_IDLE
+    }
 }
 
 struct Game {
@@ -281,6 +287,16 @@ impl Game {
     fn tell_here_from(&self, x: i64, y: i64, except: u64, from: &str, line: Line) {
         for (&pid, p) in &self.players {
             if pid != except && p.x == x && p.y == y && p.hears(from) {
+                let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
+            }
+        }
+    }
+
+    /// Comings and goings of the island's own creatures: only for people at
+    /// (x, y) who are about, so nobody comes back to a screenful of rabbit.
+    fn tell_watchers(&self, x: i64, y: i64, line: Line) {
+        for p in self.players.values() {
+            if p.x == x && p.y == y && p.about() {
                 let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
             }
         }
@@ -674,7 +690,7 @@ impl Game {
             "befriend" | "feed" | "tame" => return self.cmd_befriend(id, rest),
             "petname" => return self.cmd_nickname(id, rest),
             "nickname" | "nick" => return self.cmd_rename(id, rest),
-            "pet" | "pat" | "cuddle" => return self.cmd_pet(id),
+            "pet" | "pat" | "cuddle" | "stroke" => return self.cmd_pet(id, rest),
             "dismiss" => return self.cmd_let_go(id),
             "let" if rest.trim_start().starts_with("go") => return self.cmd_let_go(id),
             "teach" => return self.cmd_teach(id, rest),

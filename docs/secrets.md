@@ -110,6 +110,19 @@ someone standing with you: what they're wearing and whether they're flying a
 kite. *Hint (in a meadow): "Daisies everywhere. You could make a daisy chain and
 wear it."*
 
+## Wild animals have their own lives
+
+The wild animals (see Companions in [playing.md](playing.md)) don't wait
+where they turn up. Each wanders its own kind of ground a step at a time (the
+rabbit hops, the hedgehog trundles, the turtle plods, very slowly), now and
+then drawn towards whoever's close by, so they come and go past you. With
+someone watching, they get on with their day: a fox washes a paw, a duckling
+upends itself for weed. They nose at things people have left about, size each
+other up, and touch noses with a companion of their own kind. `pat` (or
+`stroke`) a wild one and it might let you, or might not. Night creatures turn
+in at dawn, and day ones at dusk. Animals (and companions) keep quiet for
+anyone who's stepped away.
+
 ## The sulking crab
 
 While a status light on a noticeboard is down (see

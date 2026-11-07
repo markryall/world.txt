@@ -57,7 +57,7 @@ pub fn feature(input: &str) -> Option<&'static str> {
         "journal" | "j" => "the journal",
         "craft" | "recipes" => "crafting",
         "cook" | "bake" | "brew" | "grill" | "roast" | "toast" | "eat" | "drink" | "serve" => "cooking",
-        "befriend" | "feed" | "tame" | "pet" | "pat" | "petname" => "companions",
+        "befriend" | "feed" | "tame" | "pet" | "pat" | "stroke" | "petname" => "companions",
         "paint" | "repaint" | "colour" | "color" => "paint",
         "put" | "place" | "display" | "keep" if has(" in ") || has(" into ") || has(" on ") && !rest.starts_with("on ") => "display cases",
         "take" if has(" from ") || has(" out of ") => "display cases",
