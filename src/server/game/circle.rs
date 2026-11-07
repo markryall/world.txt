@@ -447,10 +447,12 @@ impl Game {
                 lines.push(Line::col(Col::Dim, format!("Your part (section {} is next):", p.next_up())));
                 for (k, s) in p.sections().iter().enumerate() {
                     // Without the ♪s, so the browser doesn't play the list.
+                    // Tapping one puts it in the box, ready to fix a note.
                     let notes = s.split_once(' ').map_or("", |(_, n)| n);
-                    lines.push(Line::new().b(Col::Pink, format!("  {:>2}  ", k + 1)).c(Col::Dim, notes));
+                    let fix = format!("hum along {} {notes}", k + 1);
+                    lines.push(Line::new().b(Col::Pink, format!("  {:>2}  ", k + 1)).fill(Col::Dim, notes, fix));
                 }
-                lines.push(Line::col(Col::Dim, "'hum along 2 …' changes section 2, 'hush 2' takes it out, 'hush' stops."));
+                lines.push(Line::col(Col::Dim, "Tap a section (or type 'hum along 2 …') to change it, 'hush 2' takes it out, 'hush' stops."));
             }
         }
         self.send(id, lines);

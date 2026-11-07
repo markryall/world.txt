@@ -72,6 +72,12 @@ impl Line {
         self.0.push(Span { run: Some(cmd.into()), ..Span::new(text, col, true) });
         self
     }
+    /// Coloured words that put `fill` in the command box when tapped, ready
+    /// to finish or change.
+    pub fn fill(mut self, col: Col, text: impl Into<String>, fill: impl Into<String>) -> Self {
+        self.0.push(Span { fill: Some(fill.into()), ..Span::new(text, col, false) });
+        self
+    }
     /// Someone's name, which sets you up to message them when tapped.
     pub fn who(mut self, name: impl Into<String>) -> Self {
         let name = name.into();

@@ -108,7 +108,8 @@ each turn, together, so it doesn't matter when you typed it.
   filling the log.
 - `hum along` with nothing after it shows the circle and your sections,
   numbered. Hit a wrong note? `hum along 2 …` puts new notes in section 2, and
-  it plays the new way next time round. `hum along 5 …` past the end adds one,
+  it plays the new way next time round. In the browser, tap a section in the
+  list and it's in the box ready to fix. `hum along 5 …` past the end adds one,
   `hush 2` takes section 2 out, and `hush` stops.
 - A short section is fine: the rest of its turn is quiet. A note can't run
   over the end of a turn, though (you'll be told which section to fix), and

@@ -17,7 +17,8 @@ talking. Pachelbel's Canon and Frère Jacques are in
 No need to type the notes: `hum along canon bass`, `hum along canon tune`,
 `hum along frère jacques`, Twinkle, Ode to Joy, Jingle Bells and Mary Had a
 Little Lamb. Plain `hum along` lists them, and in the browser you just tap
-one, so joining Pachelbel's Canon from a phone is two taps.
+one, so joining Pachelbel's Canon from a phone is two taps. Tap one of your
+own sections in that list and it's in the box, ready to fix a wrong note.
 
 ### Tap a name to talk
 In the browser, tap (or click) someone's name where they say, do, hum or
