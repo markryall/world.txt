@@ -39,6 +39,10 @@ a noticeboard that works like a group chat, which outside tools can post to.
   nicknames, and keeping it kind
 - ⛵ [Visiting other worlds](docs/visiting.md): sail between islands run by
   different people
+- 📏 [The rules](docs/rules.md): who can change what, every limit and every
+  timing, for anyone who'd rather not be surprised
+- 🔮 [Things to find](docs/secrets.md): the toys left out of `help` on purpose
+  (spoilers!)
 - ☁️ Hosting: on your own machine [through Cloudflare](docs/hosting-cloudflare.md),
   or always-on [on Fly.io](docs/hosting-fly.md)
 - 🦊 [Island residents](docs/residents.md): AI characters who live there too
