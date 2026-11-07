@@ -1,8 +1,8 @@
 name = "paint home from anywhere"
-status = "todo"
+status = "done"
 description = "'paint' is in homes::BUILDING, so 'paint home lilac' is refused while standing at someone else's home or room, though it's meant to work from anywhere. Exempt painting your own home from the BUILDING check."
 created_at = "2026-11-07T00:35:30.415771Z"
-updated_at = "2026-11-07T00:35:30.415771Z"
+updated_at = "2026-11-07T00:42:34.132388Z"
 tags = [
     "bug",
     "homes",

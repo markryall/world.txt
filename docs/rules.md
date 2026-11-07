@@ -33,8 +33,8 @@ the next section).
 | `unmake` (or `demolish`) a thing | Whoever made it, or a keeper. This isn't limited by homes: it's about the thing, not the spot. A home's owner can't unmake a guest's things. |
 | `push` a thing | Whoever made it, or a keeper. Only onto ground you could walk on. |
 | `undo` | Brings back the last thing *you* unmade, as long as it was within the last day. Repeat it to go further back. |
-| `paint` a thing | Whoever made it, a keeper, or the owner of the home it stands in (outdoors only). You also need to be allowed to build where you're standing. |
-| `paint home lilac` | The home's owner, from anywhere they may build (so not while standing at someone else's home). |
+| `paint` a thing | Whoever made it, a keeper, or the owner of the home it stands in (indoors or out). You also need to be allowed to build where you're standing. |
+| `paint home lilac` | The home's owner, from anywhere, even while standing at someone else's home. |
 | Put a find in a display case | Whoever made the case, a keeper, or the owner or a guest of the home it stands in (outdoors only). |
 | Take a find out of a case | Only whoever put that find in. Not the case's maker, and not a keeper. |
 | Unmake a case | As for any thing. Every find inside goes back to whoever put it there. |

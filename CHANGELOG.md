@@ -20,6 +20,8 @@ One per room.
   friends used to fall back to event 1 when they couldn't tell which you
   meant. Now an event is picked by its number, or by a name only one event has,
   and anything else asks which.
+- **`paint home lilac` works from anywhere,** as it always meant to, even while
+  you're visiting someone else's home.
 
 ## 0.5.0 (2026-11-07)
 

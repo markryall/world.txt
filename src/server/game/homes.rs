@@ -11,6 +11,17 @@ use std::time::Duration;
 const DOORBELL_EVERY: Duration = Duration::from_secs(30 * 60);
 use crate::server::world::{HOME_RADIUS, Home};
 
+/// "home", "my house": painting your own home, which works from anywhere.
+pub fn means_home(what: &str) -> bool {
+    ["home", "house", "place", "garden"].contains(&what.trim().to_lowercase().as_str())
+}
+
+/// `paint home lilac` (and the like) changes your own home, not the place
+/// you're standing, so where you are doesn't matter.
+pub fn paints_own_home(verb: &str, rest: &str) -> bool {
+    matches!(verb, "paint" | "repaint" | "colour" | "color") && paint::parse(rest).is_some_and(|(what, _)| means_home(&what))
+}
+
 /// Commands that change a place, which a home's owner gets a say over.
 pub const BUILDING: &[&str] = &[
     "dig", "fill", "plant", "raise", "pile", "path", "pave", "name", "call-this", "make", "build", "create", "construct",
@@ -167,7 +178,7 @@ impl Game {
         let colour = (!paint::PLAIN.contains(&word.as_str())).then(|| word.clone());
         let thing = if what.is_empty() { None } else { self.world.find_thing(x, y, &what) };
         let Some(i) = thing else {
-            if !(what.is_empty() || ["home", "house", "place", "garden"].contains(&what.to_lowercase().as_str())) {
+            if !(what.is_empty() || means_home(&what)) {
                 self.say1(id, Line::plain(format!("You don't see any {what} here to paint.")));
                 return Ok(());
             }
@@ -266,5 +277,16 @@ impl Game {
         }
         self.doorbells.insert(key, std::time::Instant::now());
         self.say1(oid, Line::col(Col::Cyan, format!("🔔 {visitor} is visiting your home. (home to wander back)")));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn painting_your_own_home_from_anywhere() {
+        assert!(paints_own_home("paint", "home lilac") && paints_own_home("paint", "my house sky blue"));
+        assert!(!paints_own_home("paint", "the bench pink") && !paints_own_home("dig", "home"));
     }
 }

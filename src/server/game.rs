@@ -629,7 +629,7 @@ impl Game {
         if let Some(done) = self.play_command(id, &verb, rest) {
             return done;
         }
-        if homes::BUILDING.contains(&verb.as_str()) && !self.may_build_here(id) {
+        if homes::BUILDING.contains(&verb.as_str()) && !homes::paints_own_home(&verb, rest) && !self.may_build_here(id) {
             return Ok(());
         }
 
