@@ -28,6 +28,8 @@ One per room.
   not just as they're posted, old notes included.
 - **The Village Green keeps its name.** Only keepers can rename the spot
   where everyone arrives.
+- **Buildings count towards the twelve things a spot can hold,** like
+  anything else you make or place.
 
 ## 0.5.0 (2026-11-07)
 

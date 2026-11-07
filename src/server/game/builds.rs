@@ -277,6 +277,11 @@ impl Game {
             self.say1(id, Line::plain("Buildings go up outdoors. (out to go outside)"));
             return Ok(());
         }
+        // The same twelve-things-a-spot as making or placing anything.
+        if self.world.things_at(x, y).count() >= 12 {
+            self.say1(id, Line::plain("It's getting crowded here. Try somewhere else?"));
+            return Ok(());
+        }
         let user = self.user(id);
         if !self.world.terrain(x, y).walkable() || self.world.terrain(x, y).is_wet() {
             self.say1(id, Line::plain("You'd want dry ground under it."));

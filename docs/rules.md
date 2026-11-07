@@ -136,7 +136,7 @@ says otherwise.
 | Thing | Limit |
 |---|---|
 | Satchel | 30 things. Gathering stops when it's full, and nobody can `give` you more. Cooking, being served, and finds coming back from a case can still take you past 30. |
-| Things on one spot | 12. `make` and `place` refuse past that. |
+| Things on one spot | 12. `make`, `place` and `build` refuse past that. |
 | One display case | 12 finds, whoever put them in. Fish need a tank, aquarium or bowl. Food can't go in. |
 | Buildings going up at once | 2 per person |
 | Buildings on one spot | 1. Turrets, porches, chimneys, bell towers and arches only go next door to a building. Buildings need dry ground and go up outdoors. |

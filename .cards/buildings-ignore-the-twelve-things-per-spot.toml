@@ -1,8 +1,8 @@
 name = "Buildings ignore the twelve things per spot"
-status = "todo"
+status = "done"
 description = "build never checks the 12-things-per-spot limit that make and place do."
 created_at = "2026-11-07T00:35:30.419975Z"
-updated_at = "2026-11-07T00:35:30.419975Z"
+updated_at = "2026-11-07T00:47:33.801970Z"
 tags = [
     "bug",
     "building",
