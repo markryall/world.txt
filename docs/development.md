@@ -7,6 +7,9 @@ gives you `world-txt` (alias it, or just type that). `cargo run -- serve` works 
 One port serves both doors: websocket upgrades go to the game, and plain HTTP
 gets the browser page (`web/index.html`, compiled into the binary).
 
+For how it all fits together (the game loop, the protocol, sound), see
+[architecture.md](architecture.md).
+
 ## Layout
 
 - `src/protocol.rs`: JSON messages with named colours, so any client can draw them

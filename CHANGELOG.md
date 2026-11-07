@@ -20,6 +20,11 @@ Wild animals wander about now instead of waiting where they turn up, and get
 on with their day when someone's watching. Some of them might even let you
 pat them.
 
+### How it works
+A new [architecture doc](docs/architecture.md) tours the machinery: the
+game loop, what travels over the wire, how the islands grow and the weather
+drifts, and how tunes, rain, gramophones and radios make their sounds.
+
 ### Fixes
 - **Quiet while you're away.** Companions used to keep getting up to their
   little tricks at people who'd stepped away. Now they, and the wandering

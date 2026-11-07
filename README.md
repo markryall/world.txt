@@ -56,6 +56,7 @@ and who can see it.
   or always-on [on Fly.io](docs/hosting-fly.md)
 - 🦊 [Island residents](docs/residents.md): AI characters who live there too
 - 🛠 [Development](docs/development.md): how the code is laid out
+- ⚙️ [How it works](docs/architecture.md): the game loop, the wire, the weather, and how tunes, rain, gramophones and radios make sound
 - 📜 [Changelog](CHANGELOG.md)
 
 ## License
