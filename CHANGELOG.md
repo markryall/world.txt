@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 (2026-11-07)
 
 ### Sounds of the island
 Rain's not alone any more. With the sound on, you'll hear the wind gust
