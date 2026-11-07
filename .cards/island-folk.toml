@@ -1,8 +1,8 @@
 name = "Island folk"
-status = "todo"
+status = "done"
 description = "One or two scripted (not AI) characters on each island at a time, with names drawn from a big pool and a trade (beachcomber, painter, lamplighter...). They stay a while, then row off and someone new arrives. They follow the clock and weather, talk now and then (only to active people, rarely), chat when they meet each other, make small temporary things they tidy away (never covering the island), and occasionally throw a little celebration as an event on the village noticeboard. Hidden: discovered, not in help. Mutable."
 created_at = "2026-11-07T11:56:43.210612Z"
-updated_at = "2026-11-07T11:56:43.210612Z"
+updated_at = "2026-11-07T12:35:44.321771Z"
 tags = [
     "folk",
     "nature",

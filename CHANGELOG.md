@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Island folk
+Someone new might row in to your island: a beachcomber, a painter, a
+lamplighter, a fiddler… They potter about for a while, keep island hours,
+make little things that don't last, and now and then throw a celebration.
+Say hello.
+
 ### Humming with rhythm
 Tunes can have long and short notes, rests and a tempo now, so real songs
 fit: `-` holds a note longer, `/` makes it shorter, `.` dots it, `_` is a

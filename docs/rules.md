@@ -87,6 +87,17 @@ the next section).
 | Stop a gramophone | Whoever's playing it, or a keeper. |
 | Skip a jukebox song | Whoever chose it, or a keeper. |
 
+### Island folk
+
+| Thing | Limit |
+|---|---|
+| On each island | 1 or 2 at a time. Each stays between 3 hours and 2 days. |
+| Talking to you unasked | Only while you're about, and at most once every 10 minutes from each of them |
+| Gifts from them | One a day from each, and none when your satchel's full |
+| What they make | One thing each at a time, 8 across the world, gone after 1 to 48 hours. Only a keeper can unmake one sooner. |
+| Notes | One per visit, on the village noticeboard |
+| Celebrations | One every 2 to 5 days, between 11am and 7pm in the world's time. Keepers can cancel one like any event. |
+
 ### Keepers
 
 Keepers can do everything above that says "or a keeper". On top of that:

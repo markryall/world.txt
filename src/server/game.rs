@@ -9,6 +9,7 @@ mod craft;
 mod events;
 mod discoveries;
 mod feedback;
+mod folk;
 mod games;
 mod hills;
 mod gather;
@@ -174,16 +175,19 @@ struct Game {
     doorbells: HashMap<(String, String), std::time::Instant>,
     /// When the tide next comes in.
     next_tide: std::time::Instant,
+    /// The island folk: who's about on which island.
+    folk: Vec<folk::Folk>,
     /// For work done elsewhere (looking up what's on) to report back.
     inbox: tokio::sync::mpsc::UnboundedSender<Event>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), doorbells: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600) };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), doorbells: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600), folk: Vec::new() };
     game.load_meetings();
     game.load_snowmen();
     game.load_progress();
+    game.load_folk();
     game.load_lights();
     game.load_buildings();
     game.load_radios();
@@ -411,6 +415,7 @@ impl Game {
         lines.extend(self.cases_lines_here(id));
         lines.extend(self.games_lines_here(id));
         lines.extend(self.animal_lines(id));
+        lines.extend(self.folk_lines(id));
         lines.extend(self.find_lines(p.x, p.y));
         lines.extend(exits);
         self.send(id, lines);
@@ -636,6 +641,9 @@ impl Game {
             return Ok(());
         }
         if let Some(done) = self.cases_command(id, &verb, rest) {
+            return done;
+        }
+        if let Some(done) = self.folk_command(id, &verb, rest) {
             return done;
         }
         if let Some(done) = self.together_command(id, &verb, rest) {
@@ -909,6 +917,7 @@ impl Game {
         self.say1(id, Line::new().c(Col::Dim, "You say, ").c(Col::White, format!("\"{msg}\"")));
         self.tell_here_from(x, y, id, &user, Line::new().b(Col::Cyan, &name).c(Col::Dim, " says, ").c(Col::White, format!("\"{msg}\"")));
         self.react_to_words(x, y);
+        self.folk_hear(id, msg);
         Ok(())
     }
 
@@ -1650,7 +1659,8 @@ impl Game {
         let known = self
             .find_player(name)
             .map(|pid| self.players[&pid].user.clone())
-            .or_else(|| self.world.db.resolve_user(name));
+            .or_else(|| self.world.db.resolve_user(name))
+            .or_else(|| self.folk_named(name));
         let Some(target_user) = known else {
             self.say1(id, Line::plain(format!("There's nobody called {name} on the island.")));
             return Ok(());
@@ -2103,6 +2113,7 @@ impl Game {
         self.nature_tick();
         self.events_tick();
         self.animals_tick();
+        self.folk_tick();
 
         // Things doing their things, but only when someone's there to see.
         let mut acts: Vec<(i64, i64, i64, String)> = Vec::new();

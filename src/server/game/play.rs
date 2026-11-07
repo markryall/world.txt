@@ -328,6 +328,19 @@ impl Game {
         Ok(())
     }
 
+    /// Someone who isn't a player (island folk) adds a bit to the sandcastle
+    /// at (x, y), or starts one. The bit added, if there was room for one.
+    pub(super) fn sandcastle_by(&mut self, x: i64, y: i64, who: &str) -> Option<&'static str> {
+        let castle = self.castles.entry((x, y)).or_default();
+        let left: Vec<&'static str> = CASTLE_BITS.iter().copied().filter(|b| !castle.bits.iter().any(|c| c == b)).collect();
+        if castle.bits.len() >= MOST_BITS || left.is_empty() {
+            return None;
+        }
+        let bit = left[(self.rng.next() % left.len() as u64) as usize];
+        self.castles.entry((x, y)).or_default().add(who, bit);
+        Some(bit)
+    }
+
     fn cmd_skim(&mut self, id: u64) -> anyhow::Result<()> {
         let Some((x, y, name)) = self.here(id) else { return Ok(()) };
         let Some(pond) = self.water_by(x, y) else {
@@ -799,6 +812,9 @@ impl Game {
             hints.extend(["The snow here is just right for a snowman.", "The snow looks soft enough to lie down and make a snow angel in."]);
         } else if sky.wet() && dry {
             hints.push("Puddles are gathering everywhere. Very jumpable.");
+        }
+        if self.folk_nearby(x, y) {
+            hints.extend(["Somebody nearby is whistling to themself.", "You hear someone chatting away nearby, to nobody in particular."]);
         }
         if t == Terrain::Sand && !self.castles.contains_key(&(x, y)) {
             hints.push("The damp sand here would make a lovely sandcastle.");

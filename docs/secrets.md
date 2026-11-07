@@ -123,6 +123,44 @@ other up, and touch noses with a companion of their own kind. `pat` (or
 in at dawn, and day ones at dusk. Animals (and companions) keep quiet for
 anyone who's stepped away.
 
+## Island folk
+
+Each island has one or two folk on it at a time: scripted characters (not
+AI, and not people) with names drawn from a long list and a trade. There's
+a beachcomber, a gardener, a painter, a lamplighter, a fiddler, a knitter, a
+birdwatcher, a kite-maker, a baker and a storyteller. Somebody new rows in
+now and then, potters about for anything from a few hours to a couple of
+days, then heads for the dock and rows off again.
+
+- They wander their island, to the kind of ground their trade likes (the
+  beachcomber to the sand, the painter up the hills), and sometimes over to
+  a friend or to whoever's about. They never go into anyone's home or
+  building.
+- They keep island hours: up at dawn, and asleep under a blanket at night.
+- With someone there, they get on with things: the knitter counts stitches,
+  the fiddler plays an old tune (which plays in the browser). Two who meet
+  have a little chat. They say hello to animals and companions.
+- Now and then they say something to whoever's standing with them, but only
+  to someone who's about (never to someone who's stepped away), and to the
+  same person at most once every ten minutes. Some of them hand over a
+  little something, once a day at most.
+- They answer if you say hello, or say their name, or `talk to Bramble`.
+  `look Bramble` looks at them, and `give daisy to Bramble` gives them
+  something, which they keep. Asleep, only their name stirs them.
+- They make small things that don't last (a painting drying on an easel, a
+  lantern on a pole for the night, a tray of buns cooling on a stump) and
+  tidy them away again after a few hours. One thing each at a time, eight
+  on the whole island at most, never in a crowded spot, never close to
+  another. The beachcomber adds to sandcastles, for the tide to take.
+- Each pins at most one note a visit on the village noticeboard.
+- Every few days one of them throws a little celebration: an event at a
+  spot on their island, pinned on the village noticeboard, between 11am and
+  7pm. They'll mention it to people they meet, and they're there on the day.
+- `mute Bramble` works on them like anyone.
+
+*Hints: "Somebody nearby is whistling to themself." "You hear someone
+chatting away nearby, to nobody in particular."*
+
 ## The sulking crab
 
 While a status light on a noticeboard is down (see

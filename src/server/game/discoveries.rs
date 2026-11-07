@@ -21,7 +21,7 @@ pub const FEATURES: &[(&str, &str)] = &[
     ("the hat", "🎩"), ("rock, paper, scissors", "✊"), ("kites", "🪁"), ("sandcastles", "🏰"),
     ("bottles", "🍾"), ("skimming", "🪨"), ("puddles", "💦"), ("snow", "⛄"), ("dressing up", "👒"),
     ("the seagull", "🐦"), ("the hills", "⛰"), ("picnics", "🧺"), ("umbrellas", "☂️"),
-    ("stargazing", "✨"), ("high fives", "✋"), ("suggestions", "💌"),
+    ("stargazing", "✨"), ("high fives", "✋"), ("suggestions", "💌"), ("island folk", "🧺"),
 ];
 
 /// The feature a command is trying, if it's one that's noted.

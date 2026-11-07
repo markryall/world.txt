@@ -1,0 +1,9 @@
+name = "More weather sounds"
+status = "todo"
+description = "Rain is the only weather sound. Synthesised like the rain (no audio files): wind that gusts on breezy days, waves rolling in by the sea, a distant rumble of thunder in storms, birdsong in the woods by day, crickets at night, and a crackle beside a campfire. Quiet and gentle, only with sound on."
+created_at = "2026-11-07T12:10:48.448319Z"
+updated_at = "2026-11-07T12:10:48.448319Z"
+tags = [
+    "sound",
+    "weather",
+]
