@@ -31,7 +31,7 @@ the next section).
 | What | Who |
 |---|---|
 | `unmake` (or `demolish`) a thing | Whoever made it, or a keeper. This isn't limited by homes: it's about the thing, not the spot. A home's owner can't unmake a guest's things. |
-| `push` a thing | Whoever made it, or a keeper. Only onto ground you could walk on. |
+| `push` a thing | Whoever made it, or a keeper. One step, onto ground you could walk on, and only where you could make something: a spot with room (twelve things), and not into a home that isn't yours to build in. Nothing inside a room can be pushed. |
 | `undo` | Brings back the last thing *you* unmade, as long as it was within the last day. Repeat it to go further back. |
 | `paint` a thing | Whoever made it, a keeper, or the owner of the home it stands in (indoors or out). You also need to be allowed to build where you're standing. |
 | `paint home lilac` | The home's owner, from anywhere, even while standing at someone else's home. |
@@ -136,7 +136,7 @@ says otherwise.
 | Thing | Limit |
 |---|---|
 | Satchel | 30 things. When it's full you can't gather, be given or served anything, or take a find out of a case. Cooking gives you what fits and leaves the rest by the fire for whoever comes by. The one exception: when a display case is unmade, your finds always come back to you, even past 30, so nothing's lost. |
-| Things on one spot | 12. `make`, `place` and `build` refuse past that. |
+| Things on one spot | 12. `make`, `place`, `build` and `push` refuse past that. |
 | One display case | 12 finds, whoever put them in. Fish need a tank, aquarium or bowl. Food can't go in. |
 | Buildings going up at once | 2 per person |
 | Buildings on one spot | 1. Turrets, porches, chimneys, bell towers and arches only go next door to a building. Buildings need dry ground and go up outdoors. |

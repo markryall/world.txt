@@ -33,6 +33,9 @@ One per room.
 - **A full satchel is full.** Being served, or taking a find out of a display
   case, now needs room, and finished cooking gives you what fits and leaves the
   rest by the fire for whoever comes by.
+- **Pushing follows the rules where things land:** not into a full spot, not
+  into a home that isn't yours to build in, and not out of a room into the
+  nowhere around it.
 
 ## 0.5.0 (2026-11-07)
 

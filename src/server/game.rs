@@ -1958,8 +1958,23 @@ impl Game {
             self.say1(id, Line::plain("Try something like 'push bench north'."));
             return Ok(());
         };
+        if crate::server::world::room_of(x, y).is_some() {
+            self.say1(id, Line::plain("There's nowhere to push it in here: rooms are snug. (out to go outside)"));
+            return Ok(());
+        }
         if !self.world.terrain(x + dx, y + dy).walkable() {
             self.say1(id, Line::plain("It would sink without a trace."));
+            return Ok(());
+        }
+        // Where it lands has the same rules as making something there.
+        if self.world.things_at(x + dx, y + dy).count() >= 12 {
+            self.say1(id, Line::plain(format!("It's too crowded to the {long} for anything more.")));
+            return Ok(());
+        }
+        let user = self.user(id);
+        if let Some(h) = self.world.home_at(x + dx, y + dy).filter(|h| !h.welcomes(&user) && !self.is_keeper(&user)) {
+            let owner = self.world.nick(&h.owner);
+            self.say1(id, Line::plain(format!("That would push it into {owner}'s home, and it's theirs to fill.")));
             return Ok(());
         }
         if self.world.things[i].is_fixed() {

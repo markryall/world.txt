@@ -1,0 +1,7 @@
+name = "Pushing ignores the rules where things land"
+status = "done"
+description = "push checks the ground is walkable but not that the spot it lands on has room (twelve things) or whether you may build there (someone else's home). And inside a room, a push sends the thing off into the empty space around the room. Check the landing spot like make/place would, and keep things in rooms put."
+created_at = "2026-11-07T00:54:29.533690Z"
+updated_at = "2026-11-07T00:55:21.914577Z"
+tags = ["bug"]
+priority = "medium"
