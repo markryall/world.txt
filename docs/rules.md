@@ -97,6 +97,7 @@ Keepers can do everything above that says "or a keeper". On top of that:
 | `link Poppy` | A new magic link for someone else's device. (Anyone can `link me` for their own, except visitors from other worlds.) |
 | `invites` / `revoke Sam` | The 20 most recent magic links, and cancelling someone's unused ones. |
 | `users` | Everyone, with devices and when they were last seen. |
+| `suggestions` | The latest suggestions people have left for the keepers. |
 | `kick Sam 60` / `unkick Sam` | Sends someone off for a break, by name (and by device too, if they're on). 30 minutes if no time is given; at least 1 minute, at most 7 days. |
 | `ban Sam` / `unban Sam` | Closes the island to someone, with no end. |
 | `promote Lu` / `demote Lu` | Makes someone a keeper, or not. The last keeper can't demote themselves. Visitors from other worlds can't be promoted. |
@@ -123,6 +124,7 @@ keeper coming in. Bans, kicks and mutes work on visitors too.
 | `say`, `chat`, live `@Poppy` messages | No limit of their own, beyond the size of one message to the world (below) |
 | What you're wearing | 40 characters. Longer is refused, not cut. |
 | A note in a bottle | 200 characters |
+| A suggestion (`suggest`) | 280 characters |
 | `ask` a question / `answer` | 200 / 60 characters |
 | An event's name | 80 characters |
 | Links on one gathering table, or one event | 3 |
@@ -284,6 +286,16 @@ else sees it in their own time.
 | A place event's links | Only the people who'd hear about it (see Events) |
 
 No command, keeper or otherwise, shows anyone else's private messages or mail.
+
+### What keepers can see
+
+Keepers never see what people say to each other: not private messages, not
+mail, not chat they weren't there for. What reaches them is only what
+someone chooses to send them:
+
+| Thing | What's kept, and who sees it |
+|---|---|
+| `suggest …` | The suggestion, who left it and when. Only keepers can read them (`suggestions`, newest 20). Keepers in the world get a one-line heads-up when a new one arrives. |
 
 ### Muting
 

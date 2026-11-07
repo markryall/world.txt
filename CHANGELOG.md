@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Suggestions
+`suggest …` leaves an idea, or something that muddled you, for the island's
+keepers, who read them with `suggestions`. Only what you choose to send them
+is ever seen.
+
 ### Music indoors
 A gramophone, radio or jukebox inside a building plays just to the people in
 that room. It can go right next to one outdoors, and outdoor music stays out.

@@ -1,0 +1,7 @@
+name = "Suggestions for the keepers"
+status = "done"
+description = "suggest … leaves an idea or a muddle for the keepers, who read them with suggestions. Part of watching the first friends play, without watching."
+created_at = "2026-11-07T01:14:09.150789Z"
+updated_at = "2026-11-07T01:14:09.150789Z"
+tags = ["feedback"]
+priority = "medium"

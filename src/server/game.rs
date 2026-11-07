@@ -7,6 +7,7 @@ mod companions;
 mod cook;
 mod craft;
 mod events;
+mod feedback;
 mod games;
 mod hills;
 mod gather;
@@ -798,6 +799,8 @@ impl Game {
             "mute" | "block" => return self.cmd_mute(id, rest, true),
             "unmute" | "unblock" => return self.cmd_mute(id, rest, false),
             "mutes" => return self.cmd_mutes(id),
+            "suggest" | "suggestion" | "idea" | "feedback" => return self.cmd_suggest(id, rest),
+            "suggestions" => return self.cmd_suggestions(id),
             "kick" => return self.cmd_kick(id, rest),
             "ban" => return self.cmd_ban(id, rest),
             "unban" => return self.cmd_unkick(id, rest),
@@ -2374,6 +2377,7 @@ const HELP: &[HelpTopic] = &[
             ("nickname Pip", "change what you're called (your username stays)"),
             ("link me", "a magic link to sign in on another device of yours"),
             ("mute Sam / unmute Sam / mutes", "stop hearing from someone (they aren't told)"),
+            ("suggest a way to sit on benches", "an idea, or something that muddled you, for the island's keepers"),
             ("ask How many ducks are on the pond?", "everyone here answers in secret (answer 7), and the answers all come out together"),
         ],
         footer: None,
@@ -2554,6 +2558,7 @@ const HELP: &[HelpTopic] = &[
             ("signout Sam", "sign out all their devices (a lost iPad)"),
             ("fold Poppy into sunny-otter-42", "move an old account's things into someone's account"),
             ("visitors / admit / turn away", "people sailing in from other worlds"),
+            ("suggestions", "what people have suggested to the keepers"),
             ("trust their.address / untrust / worlds", "let a friendly world's people straight in"),
             ("event sat 4pm Beach party", "plan an event for the whole island, right here (cancel event 1)"),
             ("event fri 4pm Tea party https://…", "an event with links (at a gathering table, it uses the table's)"),

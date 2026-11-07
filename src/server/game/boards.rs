@@ -60,7 +60,7 @@ fn week_label(key: &str) -> String {
     }
 }
 
-fn when(ts: i64) -> String {
+pub(super) fn when(ts: i64) -> String {
     let ago = now() - ts;
     match ago {
         ..60 => "just now".into(),

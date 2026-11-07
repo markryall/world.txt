@@ -24,6 +24,10 @@ pub type BuildingRow = (i64, String, String, i64, i64, bool);
 /// much, and its label.
 pub type BarRow = (i64, i64, String, u64, u64, Option<String>);
 
+/// Something told to the keepers: who by, who about (for a report), what
+/// they said, and when.
+pub type FeedbackRow = (String, Option<String>, String, i64);
+
 pub struct Db {
     conn: Connection,
 }
@@ -274,6 +278,13 @@ impl Db {
             )?;
             conn.execute("INSERT INTO meta (key, value) VALUES ('notes_by_username', '1')", [])?;
         }
+        // Things people chose to tell the keepers: suggestions, and reports.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS feedback (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, by TEXT NOT NULL,
+                 about TEXT, text TEXT NOT NULL, at INTEGER NOT NULL)",
+            [],
+        )?;
         // The first display cases didn't say who put what in: their makers did.
         let old: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'displays'", [], |r| r.get(0))?;
         if old > 0 {
@@ -642,6 +653,21 @@ impl Db {
     pub fn display_clear(&self, thing: i64) -> anyhow::Result<()> {
         self.conn.execute("DELETE FROM display_items WHERE thing = ?1", [thing])?;
         Ok(())
+    }
+
+    pub fn add_feedback(&self, kind: &str, by: &str, about: Option<&str>, text: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO feedback (kind, by, about, text, at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![kind, by, about, text, at],
+        )?;
+        Ok(())
+    }
+
+    /// The latest of one kind of feedback, newest first.
+    pub fn feedback(&self, kind: &str, limit: usize) -> anyhow::Result<Vec<FeedbackRow>> {
+        let mut stmt = self.conn.prepare("SELECT by, about, text, at FROM feedback WHERE kind = ?1 ORDER BY id DESC LIMIT ?2")?;
+        let rows = stmt.query_map(params![kind, limit as i64], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 
     pub fn paint_home(&self, owner: &str, paint: Option<&str>) -> anyhow::Result<()> {
