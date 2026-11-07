@@ -290,6 +290,10 @@ pub enum ToClient {
         token: Option<String>,
         user: String,
         nickname: String,
+        /// Which version of the browser page the world serves now, so a page
+        /// left open across an update can offer to reload.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<String>,
     },
     /// Go to another world (or back home): the browser should open this.
     Travel {

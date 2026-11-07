@@ -39,6 +39,11 @@ them. On a phone, when someone talks to you or arrives, a few quick replies
 under the log for a minute, so the keyboard can stay down.
 
 ### Fixes
+- **Updates don't go unnoticed.** A page left open across an update used to
+  carry on as the old one, missing whatever was new. Now it says "The
+  island's had an update" and reloads with a tap (keeping what was on
+  screen). Pages from before this one can't tell, so give them one last
+  reload by hand.
 - **Who am I?** The browser shows your name at the top of the side panel and
   in the tab (before the world's own name), so with a few windows open you
   can tell whose is whose.

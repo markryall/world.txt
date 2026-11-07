@@ -533,7 +533,7 @@ impl Game {
             }
             None => (self.zone_of(&user), self.world.db.zone(&user).is_some()),
         };
-        let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
+        let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone(), page: Some(super::page_version().to_string()) });
         self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false), sounds: std::cell::Cell::new(crate::protocol::Sounds::default()), fun: play::Fun::wearing(self.world.db.wearing(&user)) });
 
         self.send(
@@ -1658,7 +1658,7 @@ impl Game {
         if let Some(p) = self.players.get_mut(&id) {
             p.name = nick.clone();
             // So the browser shows the new name (no token: the device keeps its own).
-            let _ = p.tx.send(ToClient::Welcome { token: None, user: user.clone(), nickname: nick.clone() });
+            let _ = p.tx.send(ToClient::Welcome { token: None, user: user.clone(), nickname: nick.clone(), page: Some(super::page_version().to_string()) });
         }
         let (x, y) = (self.players[&id].x, self.players[&id].y);
         self.say1(id, Line::col(Col::Cyan, format!("✨ You're {nick} now. (Your username is still {user}.)")));

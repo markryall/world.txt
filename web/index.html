@@ -12,6 +12,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#1d1927">
+<!-- Which version of this page it is (the world fills it in). -->
+<meta name="world-page" content="">
 <style>
   :root {
     --bg: #15121c; --panel: #1d1927; --line: #2c2639; --fg: #e6e1ef;
@@ -88,6 +90,7 @@
   #hint { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel);
     border-top: 1px solid var(--line); color: var(--yellow); font-weight: bold; cursor: pointer; }
   #hint.on { display: flex; animation: glow 2s ease-in-out infinite; }
+  #update { display: block; width: 100%; border: 0; border-top: 1px solid var(--line); background: var(--panel); color: var(--yellow); font: inherit; font-size: 14px; padding: 10px 14px; text-align: left; cursor: pointer; }
   /* Now playing: a humming circle where you are. */
   #circle { display: none; position: relative; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--line); font-size: 14px; overflow: hidden; }
   #circle.on { display: flex; }
@@ -561,6 +564,7 @@ function connect() {
       // Your name in front of the world's own title.
       document.title = m.nickname + ' · ' + pageTitle;
       myName = m.nickname;
+      offerReload(m.page);
       // The invite or passport is used up: tidy it out of the address bar.
       invite = null;
       passport = null;
@@ -1094,6 +1098,21 @@ document.addEventListener('keydown', (e) => {
   if (e.key === ' ' && document.activeElement?.closest('button, [role=button]')) return;
   $('#cmd').focus({ preventScroll: true });
 });
+
+// ---- a new version ---------------------------------------------------------
+// After an update the page reconnects by itself but is still the old page:
+// the world says which page it serves now, and if it isn't this one, offer
+// to reload (the log comes back, so nothing's lost).
+function offerReload(page) {
+  const mine = document.querySelector('meta[name="world-page"]')?.content;
+  if (!page || !mine || page === mine || $('#update')) return;
+  const bar = document.createElement('button');
+  bar.id = 'update';
+  bar.type = 'button';
+  bar.textContent = "✨ The island's had an update. Tap to reload.";
+  bar.onclick = () => { keepLog(); location.reload(); };
+  $('#input').before(bar);
+}
 
 // ---- quick replies -----------------------------------------------------------
 // When someone says or does something where you are (or arrives, or sends you

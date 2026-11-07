@@ -103,7 +103,9 @@ passport), `cmd` (anything typed), `audio` (gramophone music), and `queue` /
 - `circle`: a turn of the humming circle where you are (below).
 - `hint`: the current first-steps nudge.
 - `welcome`, `bye`, `restarting`, `travel`: signing in, being turned away, a
-  redeploy in progress, going to another world.
+  redeploy in progress, going to another world. `welcome` also carries a
+  fingerprint of the page the world serves (it's written into the page too),
+  so a browser left open across an update offers to reload.
 - `audio`, `audio_end`, `radio`, `spin_start`, `juke_turn`…: sound (below).
 
 Clients are deliberately thin. The world decides what everyone sees, and the

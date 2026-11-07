@@ -362,6 +362,17 @@ async fn is_websocket(stream: &TcpStream) -> anyhow::Result<bool> {
 
 const PAGE: &str = include_str!("../../web/index.html");
 const ICON_192: &[u8] = include_bytes!("../../web/icon-192.png");
+
+/// A fingerprint of the page this world serves (FNV-1a of it), written into
+/// the page and sent with every welcome: a page that's open from before an
+/// update sees it's changed.
+pub fn page_version() -> &'static str {
+    static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    VERSION.get_or_init(|| {
+        let hash = PAGE.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ b as u64).wrapping_mul(0x0100_0000_01b3));
+        format!("{hash:016x}")
+    })
+}
 const ICON_512: &[u8] = include_bytes!("../../web/icon-512.png");
 
 /// What lets a phone keep the island on its home screen as an app of its
@@ -389,13 +400,14 @@ fn manifest(info: &Option<federation::WorldInfo>) -> String {
 
 /// The page, wearing the world's name if it has one.
 fn page(info: &Option<federation::WorldInfo>) -> String {
+    let page = PAGE.replacen(r#"<meta name="world-page" content="">"#, &format!(r#"<meta name="world-page" content="{}">"#, page_version()), 1);
     match info {
         Some(i) if i.name != federation::host(&i.url) => {
             let name = i.name.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
-            PAGE.replacen("<title>world.txt</title>", &format!("<title>{name} · world.txt</title>"), 1)
+            page.replacen("<title>world.txt</title>", &format!("<title>{name} · world.txt</title>"), 1)
                 .replacen("<h1>✨ world.txt ✨</h1>", &format!("<h1>✨ {name} ✨</h1>"), 1)
         }
-        _ => PAGE.to_string(),
+        _ => page,
     }
 }
 
@@ -688,6 +700,15 @@ pub fn backfill_journal(db_path: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_page_says_which_version_it_is() {
+        let v = page_version();
+        assert_eq!(v.len(), 16);
+        assert!(page(&None).contains(&format!(r#"<meta name="world-page" content="{v}">"#)));
+        let json = serde_json::to_string(&crate::protocol::ToClient::Welcome { token: None, user: "u".into(), nickname: "Sam".into(), page: Some(v.into()) }).unwrap();
+        assert!(json.contains(v));
+    }
 
     #[test]
     fn the_recommended_stations_are_all_good() {
