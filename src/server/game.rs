@@ -22,6 +22,7 @@ mod jukebox;
 mod lighthouse;
 mod meetings;
 mod circle;
+mod songbook;
 mod music;
 mod sounds;
 mod play;
@@ -2455,6 +2456,7 @@ const HELP: &[HelpTopic] = &[
         items: &[
             ("hum @100 C C G G A A G-", "a little tune: - holds a note longer, / makes it shorter, _ is a rest, @100 sets the tempo (hum together to jam!)"),
             ("hum along @60 C E G | C5 G E C / hush", "hum in a circle, kept in time by the world: your part is a loop of sections (| starts the next); 'hum along 2 …' changes section 2, 'hum along' shows them"),
+            ("hum along canon bass", "or hum a song from the songbook: plain 'hum along' lists them (Pachelbel's Canon, Frère Jacques, Twinkle…)"),
             ("make a music box / teach C E G / play", "a box that remembers your tune"),
             ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
             ("make a jukebox / add songs / jukebox", "everyone adds songs from their computer; it plays one each, taking turns"),

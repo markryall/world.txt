@@ -13,6 +13,12 @@ who's humming and which section they're on, and the log stays free for
 talking. Pachelbel's Canon and Frère Jacques are in
 [playing.md](docs/playing.md#humming-along) to try.
 
+### A songbook
+No need to type the notes: `hum along canon bass`, `hum along canon tune`,
+`hum along frère jacques`, Twinkle, Ode to Joy, Jingle Bells and Mary Had a
+Little Lamb. Plain `hum along` lists them, and in the browser you just tap
+one, so joining Pachelbel's Canon from a phone is two taps.
+
 ### Tap a name to talk
 In the browser, tap (or click) someone's name where they say, do, hum or
 shout something, or arrive, and the box is ready with `@Sam ` to message

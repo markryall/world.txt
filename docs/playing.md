@@ -90,6 +90,10 @@ Two people typing a hum at the same moment never quite land together. In a
 humming circle the world keeps the time: everyone's part plays at the start of
 each turn, together, so it doesn't matter when you typed it.
 
+- The songbook saves typing notes: `hum along canon bass`, `hum along canon
+  tune`, `hum along frère jacques`, and Twinkle, Ode to Joy, Jingle Bells and
+  Mary Had a Little Lamb. Plain `hum along` lists them, and in the browser
+  you just tap one.
 - `hum along @110 D3- A2- B2- F#2- G2- D2- G2- A2-` starts a circle where you
   stand. A turn lasts as long as that first tune (16 beats here) at its tempo,
   and that's how the circle goes round from then on.
@@ -118,6 +122,10 @@ while three violins play the same tune, each starting two bars after the last.
 That's exactly a humming circle. The notes below are doubled in length from
 Pachelbel's score so they sit nicely at `@110`, and each section is one time
 round the ground: 16 beats, about 9 seconds.
+
+It's in the songbook: one person taps (or types) `hum along canon bass`, the
+others `hum along canon tune`, each a turn after the one before, and that's
+the whole canon. Here are the notes, for humming it your own way.
 
 The bass starts the circle with the ground, and hums it for ever:
 
@@ -166,7 +174,8 @@ Project from IMSLP, with every note held twice as long.)
 
 ### A round: Frère Jacques
 
-In a round everyone hums the same tune and comes in a bit later. Each
+In a round everyone hums the same tune and comes in a bit later. It's in the
+songbook too (`hum along frère jacques`). Each
 section of Frère Jacques is two bars (8 beats), so the first section sets the
 turn:
 

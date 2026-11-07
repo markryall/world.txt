@@ -16,6 +16,7 @@
 
 use super::Game;
 use super::music::clean_word;
+use super::songbook::{self, Found, SONGS, Song};
 use crate::protocol::{CirclePart, Col, Line, ToClient};
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
@@ -345,6 +346,21 @@ impl Game {
             self.show_part(id, x, y);
             return Ok(());
         }
+        // A song from the songbook, or notes.
+        let from_book;
+        let tune = match songbook::find(tune) {
+            Some(Found::Part(part)) => {
+                from_book = (part.tune)();
+                from_book.as_str()
+            }
+            Some(Found::Song(song)) => {
+                let mut lines = vec![Line::col(Col::Pink, format!("🎶 Which part of {}?", song.title))];
+                lines.extend(song_lines(song));
+                self.send(id, lines);
+                return Ok(());
+            }
+            None => tune,
+        };
         let now = Instant::now();
         let started = !self.circles.contains_key(&(x, y));
         if started {
@@ -416,12 +432,17 @@ impl Game {
     /// Bare `hum along`: how the circle here goes, and your part, numbered.
     fn show_part(&self, id: u64, x: i64, y: i64) {
         let Some(c) = self.circles.get(&(x, y)) else {
-            self.say1(id, Line::col(Col::Pink, "🎶 Hum along with what? 'hum along @60 C E G C5' starts a circle: each turn goes round as long as your tune (or up to the first |), and others join in with parts of their own."));
+            let mut lines = vec![Line::col(Col::Pink, "🎶 Hum along with what? Start a humming circle with a song (tap one), or your own notes: 'hum along @60 C E G C5'. Others join in with parts of their own.")];
+            lines.extend(songbook_lines());
+            self.send(id, lines);
             return;
         };
         let mut lines = vec![Line::col(Col::Pink, format!("🎶 The circle here goes round every {} beats at @{}.", show_beats(c.beats), c.bpm))];
         match c.part(id) {
-            None => lines.push(Line::col(Col::Dim, "'hum along' a part of your own to join in: it comes in at the next turn.")),
+            None => {
+                lines.push(Line::col(Col::Dim, "Join in with a part of your own (it comes in at the next turn): a song, or 'hum along <notes>'."));
+                lines.extend(songbook_lines());
+            }
             Some(p) => {
                 lines.push(Line::col(Col::Dim, format!("Your part (section {} is next):", p.next_up())));
                 for (k, s) in p.sections().iter().enumerate() {
@@ -466,6 +487,28 @@ impl Game {
         }
         Ok(())
     }
+}
+
+/// The songbook, a song a line, each part a tap.
+fn songbook_lines() -> Vec<Line> {
+    let mut lines: Vec<Line> = SONGS.iter().flat_map(song_lines).collect();
+    lines.push(Line::col(Col::Dim, "  (or type it: hum along canon bass, hum along frère jacques, hum along twinkle…)"));
+    lines
+}
+
+/// One song's parts as taps: "Pachelbel's Canon: bass (the ground…) · tune (…)".
+fn song_lines(song: &Song) -> Vec<Line> {
+    if song.parts.len() == 1 {
+        return vec![Line::new().t("  ").run(Col::Pink, song.title, songbook::command(song, &song.parts[0]))];
+    }
+    let mut line = Line::new().t("  ").c(Col::Pink, format!("{}: ", song.title));
+    for (i, p) in song.parts.iter().enumerate() {
+        if i > 0 {
+            line = line.c(Col::Dim, " · ");
+        }
+        line = line.run(Col::Pink, p.name, songbook::command(song, p)).c(Col::Dim, format!(" ({})", p.about));
+    }
+    vec![line]
 }
 
 fn misfit(m: &Misfit, turn: Option<f64>) -> String {

@@ -1,8 +1,8 @@
 name = "A songbook to hum along with"
-status = "todo"
+status = "done"
 description = "Typing F#5- | D5/ on a phone keyboard is miserable, and Pachelbel's very fast part is 56 notes. A songbook of old tunes: hum along canon bass, hum along canon tune, hum along frère jacques, twinkle… Plain hum along lists the songs and their parts as taps, so joining the canon from a phone is two taps."
 created_at = "2026-11-07T22:48:24.932001Z"
-updated_at = "2026-11-07T22:48:24.932001Z"
+updated_at = "2026-11-07T22:55:15.399378Z"
 tags = [
     "phone",
     "music",
