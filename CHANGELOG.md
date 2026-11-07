@@ -16,6 +16,10 @@ One per room.
 - **Home rules carry indoors.** Inside a building at your home, you can now do
   everything you can outdoors there: paint your guests' things, fill their
   display cases, and set the links on their gathering tables.
+- **A typo can't cancel the wrong event.** `cancel Tea party`, `going x` and
+  friends used to fall back to event 1 when they couldn't tell which you
+  meant. Now an event is picked by its number, or by a name only one event has,
+  and anything else asks which.
 
 ## 0.5.0 (2026-11-07)
 

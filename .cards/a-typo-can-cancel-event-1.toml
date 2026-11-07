@@ -1,8 +1,8 @@
 name = "A typo can cancel event 1"
-status = "todo"
+status = "done"
 description = "pick_event falls back to event 1 when the number doesn't parse, so 'cancel Tea party', 'going x' or 'add Poppy to event x' with a typo acts on event 1: a host or keeper could cancel the wrong event. Refuse instead, and say how to pick one."
 created_at = "2026-11-07T00:35:30.430992Z"
-updated_at = "2026-11-07T00:35:30.430992Z"
+updated_at = "2026-11-07T00:41:23.174881Z"
 tags = [
     "bug",
     "events",

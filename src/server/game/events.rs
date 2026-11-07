@@ -253,6 +253,19 @@ pub fn invited(name: &str, lookup: impl Fn(&str) -> Vec<String>) -> Option<Resul
     }
 }
 
+/// Which of `events` someone means by `which` (see `Game::pick_event`).
+fn pick(events: Vec<EventRow>, which: &str) -> Option<EventRow> {
+    let w = which.trim().trim_start_matches("to").trim().trim_start_matches("event").trim().to_lowercase();
+    if w.is_empty() {
+        return if events.len() == 1 { events.into_iter().next() } else { None };
+    }
+    if let Ok(n) = w.parse::<usize>() {
+        return events.into_iter().nth(n.checked_sub(1)?);
+    }
+    let mut named: Vec<EventRow> = events.into_iter().filter(|e| e.name.to_lowercase().contains(&w)).collect();
+    if named.len() == 1 { named.pop() } else { None }
+}
+
 impl Game {
     /// Who hears about an event: everyone online, or for a place event its
     /// host, whoever's going, followers of a noticeboard on that spot, and
@@ -594,10 +607,12 @@ impl Game {
         Ok(())
     }
 
+    /// The event someone means: its number from `events` ("2", "event 2"),
+    /// a name only one event has ("Tea party"), or, when there's only one
+    /// event, nothing at all. Anything else is no event, never a guess.
     fn pick_event(&self, which: &str) -> anyhow::Result<Option<EventRow>> {
         let events = self.world.db.upcoming_events(super::boards::now() - KEEP_AFTER)?;
-        let n: usize = which.trim().trim_start_matches("to").trim().trim_start_matches("event").trim().parse().unwrap_or(1);
-        Ok(events.into_iter().nth(n.saturating_sub(1)))
+        Ok(pick(events, which))
     }
 
     /// `going 2` / `not going 2`: say you'll come to a place event, so you
@@ -754,6 +769,23 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ev(id: i64, name: &str) -> EventRow {
+        EventRow { id, at: 0, name: name.into(), x: 0, y: 0, host: String::new(), reminded: false, started: false, link: None, local: true, repeat: None, tz: None }
+    }
+
+    #[test]
+    fn events_are_picked_by_number_or_name_and_never_guessed() {
+        let all = || vec![ev(1, "Sunrise stretch"), ev(2, "Tea party"), ev(3, "Tea tasting")];
+        assert_eq!(pick(all(), "2").map(|e| e.id), Some(2));
+        assert_eq!(pick(all(), "event 3").map(|e| e.id), Some(3));
+        assert_eq!(pick(all(), "tea party").map(|e| e.id), Some(2), "a name only one has");
+        assert!(pick(all(), "tea").is_none(), "two events have that in their name");
+        assert!(pick(all(), "Tae party").is_none(), "a typo isn't event 1");
+        assert!(pick(all(), "").is_none(), "no number, several events");
+        assert!(pick(all(), "9").is_none() && pick(all(), "0").is_none());
+        assert_eq!(pick(vec![ev(7, "Picnic")], "").map(|e| e.id), Some(7), "the only one");
+    }
 
     #[test]
     fn reads_friendly_times() {

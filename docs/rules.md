@@ -71,7 +71,7 @@ the next section).
 | `add Poppy to event 2` | Place events only: the host, anyone already going, or a keeper. |
 | `remove Poppy from event 2` | The host or a keeper. The host can't be removed. |
 | `going 2` / `not going 2` / `leave event 2` | Anyone, for themselves, on place events. On a repeating event, `not going` skips just the next one; `leave event` drops out of all of them. The host can't leave their own event. |
-| `cancel event 2` | The host or a keeper. On a repeating event this stops the whole series. |
+| `cancel event 2` | The host or a keeper. On a repeating event this stops the whole series. Events are picked by their number in `events`, by a name only one event has, or (with nothing given) the only event there is; anything else picks none. |
 | Who hears about it | Island-wide: everyone who's on. A place event: its host, whoever's going, followers of a noticeboard on that very spot, and anyone within 10 steps of it on the same island. Skipping the next one means you only hear if you're nearby. |
 | Who sees its links | The same people. Others see that it has links, but not what they are. A place event's links are never written on the noticeboard. |
 

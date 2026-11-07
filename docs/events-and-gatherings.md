@@ -19,6 +19,10 @@ on your spot is marked "here"); `who` shows what time it is for everyone online
 last were if they're away. It goes in the Island Journal, everyone hears a
 reminder ten minutes before and a shout when it starts, `events` lists what's
 coming up, and `go event` walks you there. `cancel event 1` for its host or a keeper.
+Wherever a command takes an event, you can give its number from `events`
+(`cancel event 2`), a name only one event has (`cancel Tea party`), or nothing
+at all when there's just one event. Anything else is answered with a question,
+never a guess.
 
 Events can also belong to just one place, so a little get-together doesn't ping
 the whole island: `event here fri 4pm Tea party`. Anyone can plan one. Only its host,
