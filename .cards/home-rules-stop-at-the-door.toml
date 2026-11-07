@@ -1,0 +1,11 @@
+name = "Home rules stop at the door"
+status = "todo"
+description = "home_at() is nothing for room coordinates, so inside a building at your home the owner can't paint guests' things (cmd_paint host), fill a guest's display case (may_fill), or set links on a gathering table there (cmd_meet). Rooms should count as part of the home their building stands in."
+created_at = "2026-11-07T00:35:30.410964Z"
+updated_at = "2026-11-07T00:35:30.410964Z"
+tags = [
+    "bug",
+    "inside",
+    "homes",
+]
+priority = "high"

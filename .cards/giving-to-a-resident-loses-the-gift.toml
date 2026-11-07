@@ -1,0 +1,10 @@
+name = "Giving to a resident loses the gift"
+status = "todo"
+description = "give X to Claudia takes it from your satchel but never adds it to the resident's (cmd_give, tbot). Decide what residents do with gifts: keep them (a resident satchel), thank you and place it somewhere, or politely decline."
+created_at = "2026-11-07T00:35:30.442959Z"
+updated_at = "2026-11-07T00:35:30.442959Z"
+tags = [
+    "bug",
+    "residents",
+]
+priority = "low"

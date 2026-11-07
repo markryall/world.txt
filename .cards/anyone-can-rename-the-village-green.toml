@@ -1,0 +1,10 @@
+name = "Anyone can rename the Village Green"
+status = "todo"
+description = "Any spot outside a home can be renamed by anyone, even one someone else named, including The Village Green. At least protect the green (keepers only); maybe let only whoever named a spot rename it."
+created_at = "2026-11-07T00:35:30.434775Z"
+updated_at = "2026-11-07T00:35:30.434775Z"
+tags = [
+    "bug",
+    "places",
+]
+priority = "medium"

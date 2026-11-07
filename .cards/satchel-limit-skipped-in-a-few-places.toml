@@ -1,0 +1,7 @@
+name = "Satchel limit skipped in a few places"
+status = "todo"
+description = "The 30-thing satchel cap isn't checked when cooking finishes (up to 6 portions), when serving, on 'take … from case', or when an unmade case hands finds back. Decide what happens when it's full: leave it on the ground, say it doesn't fit, or let it overflow a little."
+created_at = "2026-11-07T00:35:30.439138Z"
+updated_at = "2026-11-07T00:35:30.439138Z"
+tags = ["bug"]
+priority = "low"
