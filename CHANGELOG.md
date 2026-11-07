@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- **Rooms keep to themselves.** Rooms inside buildings sat so close together
+  that a shout, a gramophone or the smell of cooking could carry from one to
+  the next. They're far apart now (anything already in a room moves with it).
+  A shout indoors fills the room and carries just outside the door; one from
+  outside stays outside.
+
 ## 0.5.0 (2026-11-07)
 
 ### Going inside

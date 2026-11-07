@@ -1,8 +1,8 @@
 name = "Rooms are too close together"
-status = "todo"
+status = "done"
 description = "Rooms sit at x = ±(1,000,000 + building id), so anything that goes by distance treats rooms with nearby building ids as neighbours: a shout in one room is heard in rooms within 10 ids, but not by people right outside the building. Hum range, gramophone earshot and spacing, cooking smell, board bar/light visibility, place-event 'nearby' leak the same way. Space rooms far apart (e.g. stride of 1000) and think about whether a shout indoors should carry just outside."
 created_at = "2026-11-07T00:35:30.401503Z"
-updated_at = "2026-11-07T00:35:30.401503Z"
+updated_at = "2026-11-07T00:37:53.642877Z"
 tags = [
     "bug",
     "inside",

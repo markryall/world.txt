@@ -906,16 +906,27 @@ impl Game {
         }
         let Some(me) = self.players.get(&id) else { return Ok(()) };
         self.say1(id, Line::new().c(Col::Dim, "You shout, ").b(Col::White, format!("\"{msg}!\"")));
+        // Indoors, a shout fills the room and carries just outside; walls
+        // keep it from anyone in another room.
+        let my_room = crate::server::world::room_of(me.x, me.y);
+        let from = self.world.outside(me.x, me.y);
+        let indoors = my_room.and_then(|_| self.world.room_building(me.x, me.y)).map(|b| the(&b.name));
         for (&pid, p) in &self.players {
             if pid == id || !p.hears(&me.user) {
                 continue;
             }
-            let (dx, dy) = (me.x - p.x, me.y - p.y);
-            let d = dx.abs().max(dy.abs());
-            if d > SHOUT_RANGE {
+            let their_room = crate::server::world::room_of(p.x, p.y);
+            if their_room.is_some() && their_room != my_room {
                 continue;
             }
-            let line = if d == 0 {
+            let (dx, dy) = if their_room.is_some() { (0, 0) } else { (from.0 - p.x, from.1 - p.y) };
+            let d = dx.abs().max(dy.abs());
+            if d > SHOUT_RANGE || (indoors.is_some() && their_room.is_none() && d > 1) {
+                continue;
+            }
+            let line = if let (Some(b), None) = (&indoors, their_room) {
+                Line::new().c(Col::Dim, format!("From inside {b}, ")).b(Col::Cyan, &me.name).c(Col::Dim, " shouts, ").c(Col::White, format!("\"{msg}!\""))
+            } else if d == 0 {
                 Line::new().b(Col::Cyan, &me.name).c(Col::Dim, " shouts, ").b(Col::White, format!("\"{msg}!\""))
             } else {
                 let dir = DIRS

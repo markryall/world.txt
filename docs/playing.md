@@ -88,7 +88,7 @@ Every finished building has a room inside: `go in` (or `enter the cottage`)
 from beside it, and `out` (or any direction) to leave. Anyone can visit. A
 room is a place like any other, just indoors: no weather, nothing that needs
 open ground (no digging, planting, kites or building), and what's said inside
-stays inside. Whoever may build at the home it's in (or its builder, if it's not
+stays inside, except a `shout`, which carries just outside the door. Whoever may build at the home it's in (or its builder, if it's not
 at a home) can `describe` the room in their own words and fill it with
 furniture, cases and anything they make. Taking a building down sees anyone
 inside safely out, and `undo` brings it back with its room as it was.

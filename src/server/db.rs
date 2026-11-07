@@ -245,6 +245,22 @@ impl Db {
                  PRIMARY KEY (thing, species, by))",
             [],
         )?;
+        // Rooms used to sit right next to each other off the map: spread
+        // whatever's in them (things, people, words, plans) out to where
+        // they are now (see world::room_for).
+        let spread: i64 = conn.query_row("SELECT COUNT(*) FROM meta WHERE key = 'rooms_spread'", [], |r| r.get(0))?;
+        if spread == 0 {
+            for table in ["things", "players", "descriptions", "events"] {
+                conn.execute(
+                    &format!(
+                        "UPDATE {table} SET x = (CASE WHEN x < 0 THEN -1 ELSE 1 END) * (1000000 + (ABS(x) - 1000000) * 1000)
+                         WHERE ABS(y) = 1000000 AND ABS(x) > 1000000 AND ABS(x) < 1001000"
+                    ),
+                    [],
+                )?;
+            }
+            conn.execute("INSERT INTO meta (key, value) VALUES ('rooms_spread', '1')", [])?;
+        }
         // The first display cases didn't say who put what in: their makers did.
         let old: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'displays'", [], |r| r.get(0))?;
         if old > 0 {

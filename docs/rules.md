@@ -273,7 +273,7 @@ else sees it in their own time.
 | Thing | Who sees or hears it |
 |---|---|
 | `say`, emotes, `meet` | Everyone on the same spot. Inside a room, that's just the people in the room. |
-| `shout` | Everyone within 10 steps. Up to 4 steps away they hear who; further off it's "someone". |
+| `shout` | Everyone within 10 steps. Up to 4 steps away they hear who; further off it's "someone". Inside a room: everyone in the room, and anyone standing right outside the building (or a step away), who hears it "from inside". A shout outdoors isn't heard indoors, and nothing said in one room reaches another. |
 | `hum`, `sing`, `whistle` | The spot, plus "someone" heard 1 or 2 steps away |
 | `chat` (or `@all`) | Everyone on the island |
 | `@Poppy …` | Only Poppy. If she's away, it waits as mail until she next arrives. |

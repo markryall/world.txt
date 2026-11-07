@@ -93,16 +93,20 @@ pub struct Home {
 /// side of it as the building's island, so that which island you're on (and
 /// everything that goes by where you're standing) still works inside.
 pub const ROOMS: i64 = 1_000_000;
+/// How far apart rooms are, so that nothing that goes by distance (a shout,
+/// a gramophone, a smell from the oven) carries from one room to the next.
+pub const ROOM_STRIDE: i64 = 1_000;
 
 /// Where the room inside building `id` (standing at bx, by) is.
 pub fn room_for(id: i64, bx: i64, by: i64) -> (i64, i64) {
     let side = |v: i64| if v.div_euclid(super::islands::REGION) >= 1 { 1 } else { -1 };
-    (side(bx) * (ROOMS + id), side(by) * ROOMS)
+    (side(bx) * (ROOMS + id * ROOM_STRIDE), side(by) * ROOMS)
 }
 
 /// Which building's room (x, y) is, if it's a room.
 pub fn room_of(x: i64, y: i64) -> Option<i64> {
-    (y.abs() == ROOMS && x.abs() > ROOMS).then(|| x.abs() - ROOMS)
+    let off = x.abs() - ROOMS;
+    (y.abs() == ROOMS && off > 0 && off % ROOM_STRIDE == 0).then_some(off / ROOM_STRIDE)
 }
 
 /// Off the map, where the rooms are.
@@ -899,6 +903,8 @@ mod tests {
         }
         assert_eq!(room_of(5, 5), None);
         assert_ne!(room_for(1, 5, 5), room_for(2, 5, 5), "every building has its own room");
+        let (a, b) = (room_for(1, 5, 5), room_for(2, 5, 5));
+        assert!((a.0 - b.0).abs() >= ROOM_STRIDE, "rooms are far enough apart that nothing carries between them");
     }
 
     /// `cargo test -- --nocapture print_island` to eyeball the generator.
