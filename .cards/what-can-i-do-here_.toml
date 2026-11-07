@@ -1,7 +1,26 @@
 name = "What can I do here?"
-status = "todo"
-description = "Design first. Each step, the world works out what's at your spot (a music box, a board, a cat, someone to wave at, a circle) and offers it as a few taps: 📖 read the board · 🐱 pat Biscuit · 👋 wave at Sam. They fill the chip row and change as you walk, so most of the time the keyboard stays down. Words in descriptions could be taps too, opening what you can do with that thing."
+status = "done"
+description = """
+Design first. Each step, the world works out what's at your spot (a music box, a board, a cat, someone to wave at, a circle) and offers it as a few taps: 📖 read the board · 🐱 pat Biscuit · 👋 wave at Sam. They fill the chip row and change as you walk, so most of the time the keyboard stays down. Words in descriptions could be taps too, opening what you can do with that thing.
+
+## Decisions
+
+- **For:** the everyday verbs for what's at your spot, one tap away (wander, gather, read, pat, play), not a menu of every command. Talking, making, naming, describing and anything unusual stay typed.
+- **The world decides** what's offered, not the page: each feature offers its own actions, knowing its rules (who can teach a box, what grows where, mutes, indoors). The browser just draws them.
+- **Phones and desktop:** on a phone it keeps the keyboard down; on desktop it's discovery.
+- **Secrets stay secret:** hint-discovered playful things (bottles, kites, sandcastles, skimming stones, the crab…) never appear as actions; only ordinary, practical verbs for things you can plainly see.
+- **Tappable words in descriptions** ("a music box" in the look text) is its own later card, not this one.
+- **Travels in `status`**, so it's always current (someone arrives, a cat wanders in, a board goes up) with no new timing.
+- **One chip row just above the command box, on every screen size** (where the phone chip row is now).
+- **About six, in order: people → creatures → things → the ground**, then a **more…** chip that lists the rest as taps in the log.
+- **Run or fill:** complete actions run in one tap (read the board); ones that need your words fill the box ready to finish (post on the board…, say to Sam…).
+- **Browser only for now:** the terminal and the AI residents don't get them (residents could be a later card if they seem lost).
+- **Today's chips:** the place-dependent ones (gather, plant, fish, read) become actions, showing only where they make sense; after the actions, a short tail that's always there: 💬 say…, 🎒 satchel, 👥 who, ❓ help. Journal, chat, map and look move into more….
+- **People:** one 👋 wave if anyone's here, plus 💬 Sam… (fills @Sam) for at most two people; the rest are in more… (and every name in the log is a tap anyway).
+- **First catalogue:** creatures (🐱 pat your companion, 🍓 feed a wild animal here); things (📖 read / 📌 post… a board, 🎶 play a music box and 🎼 teach… if it's yours, 🎵 play music / ⏹ stop a gramophone, ➕ add songs to a jukebox, 📻 tune… a radio, 🍳 cook… at a campfire or oven, 🚪 go in a building's door and 🚪 out indoors, 🔧 mend the lighthouse, ⛵ sail… at a dock, 🔗 meet at a meeting spot with a link); the ground (🧺 gather when there's something to find, 🎣 fish by water, 🌱 plant… where things grow). More as later cards.
+- **Sharing the row:** quick replies jump to the front while they last; humming circles stay in their own strip.
+- **more…** prints every action here into the log as taps: the extra people, things and ground, plus journal, chat, map and look."""
 created_at = "2026-11-07T22:48:24.952621Z"
-updated_at = "2026-11-07T22:48:24.952621Z"
+updated_at = "2026-11-07T23:42:15.275879Z"
 tags = ["phone"]
 blocked_by = ["Tappable lines"]

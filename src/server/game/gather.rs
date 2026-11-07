@@ -147,7 +147,7 @@ impl Game {
         }
     }
 
-    fn water_near(&self, x: i64, y: i64) -> Option<crate::server::terrain::Terrain> {
+    pub(super) fn water_near(&self, x: i64, y: i64) -> Option<crate::server::terrain::Terrain> {
         let here = self.world.terrain(x, y);
         if here.is_wet() {
             return Some(here);

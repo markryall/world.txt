@@ -21,6 +21,7 @@ mod inside;
 mod jukebox;
 mod lighthouse;
 mod meetings;
+mod actions;
 mod circle;
 mod songbook;
 mod music;
@@ -110,6 +111,9 @@ struct Player {
     /// What it sounded like in the last side panel they were sent, so a
     /// change (rain arriving, dusk and the crickets) sends a fresh one.
     sounds: std::cell::Cell<crate::protocol::Sounds>,
+    /// The actions their side panel last offered, so a find turning up or an
+    /// animal wandering in can freshen it.
+    actions: std::cell::RefCell<Vec<crate::protocol::Action>>,
     /// The radio this browser has been told it can hear: (how loud, stream).
     radios: HashMap<i64, (f32, String)>,
 }
@@ -371,6 +375,14 @@ impl Game {
                 p.sounds.set(sounds);
                 sounds
             },
+            // Residents type; only people's pages show these.
+            actions: if p.bot {
+                Vec::new()
+            } else {
+                let actions = self.actions_for(id);
+                p.actions.replace(actions.clone());
+                actions
+            },
         };
         let _ = p.tx.send(msg);
     }
@@ -534,7 +546,7 @@ impl Game {
             None => (self.zone_of(&user), self.world.db.zone(&user).is_some()),
         };
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone(), page: Some(super::page_version().to_string()) });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false), sounds: std::cell::Cell::new(crate::protocol::Sounds::default()), fun: play::Fun::wearing(self.world.db.wearing(&user)) });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false), sounds: std::cell::Cell::new(crate::protocol::Sounds::default()), actions: std::cell::RefCell::new(Vec::new()), fun: play::Fun::wearing(self.world.db.wearing(&user)) });
 
         self.send(
             id,
@@ -2158,6 +2170,13 @@ impl Game {
         self.events_tick();
         self.animals_tick();
         self.folk_tick();
+        // Finds come and go and animals wander by without anyone moving:
+        // freshen the side panels whose actions have changed.
+        for (&id, p) in &self.players {
+            if !p.bot && !p.status_due.get() && *p.actions.borrow() != self.actions_for(id) {
+                p.status_due.set(true);
+            }
+        }
 
         // Things doing their things, but only when someone's there to see.
         let mut acts: Vec<(i64, i64, i64, String)> = Vec::new();

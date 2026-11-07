@@ -98,7 +98,13 @@ passport), `cmd` (anything typed), `audio` (gramophone music), and `queue` /
   command box ready to finish (people's names fill `@Sam `). Clients that
   can't tap, like the terminal, just show the words.
 - `status`: the side panel. Place, weather, clock, a minimap (itself just
-  coloured lines), who's about, and any progress bars and status lights.
+  coloured lines), who's about, any progress bars and status lights, and
+  `actions`: what you could do where you're standing, most likely first
+  (people, creatures, things, the ground), each one a command to run or to
+  put in the box (`src/server/game/actions.rs`). Only plain, practical things
+  you can see; the playful secrets never turn up there. The world checks each
+  tick whether yours have changed (a find appearing, an animal wandering in),
+  and freshens the panel if so.
 - `board`: a noticeboard's notes, for the board view.
 - `circle`: a turn of the humming circle where you are (below).
 - `hint`: the current first-steps nudge.

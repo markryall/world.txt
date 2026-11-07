@@ -134,12 +134,16 @@
   #board form input { flex: 1; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 16px; outline: none; }
   #board form button { background: var(--yellow); color: var(--bg); border: 0; border-radius: 10px; padding: 0 14px; font: inherit; cursor: pointer; }
   @media (max-width: 720px) { #board { inset: 0; transform: none; width: auto; height: auto; border-radius: 0; } }
-  #chips { display: none; gap: 6px; overflow-x: auto; padding: 8px 12px 0; background: var(--panel);
+  #chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; background: var(--panel);
     border-top: 1px solid var(--line); scrollbar-width: none; }
   #chips::-webkit-scrollbar { display: none; }
   #chips button { flex: none; background: var(--line); color: var(--fg); border: 0; border-radius: 16px;
     font: inherit; font-size: 14px; height: 34px; padding: 0 12px; touch-action: manipulation; }
   #chips button:active { background: var(--magenta); color: var(--bg); }
+  #chips button:hover { outline: 1px solid var(--dim); }
+  #actions { display: contents; }
+  #actions button.fill { background: none; border: 1px dashed var(--dim); }
+  #chips .more { color: var(--dim); }
   #replies { display: contents; }
   #replies button { background: none; border: 1px solid var(--magenta); color: var(--magenta); }
   @media (max-width: 720px) {
@@ -194,11 +198,9 @@
 </div>
 <div id="chips">
   <span id="replies"></span>
-  <button data-prefill="say ">💬 say</button><button data-c="gather">🧺 gather</button>
-  <button data-c="satchel">🎒 satchel</button><button data-c="journal">📖 journal</button>
-  <button data-c="plant flowers">🌼 plant</button><button data-c="fish">🎣 fish</button>
-  <button data-prefill="chat ">📣 chat</button><button data-c="who">who</button>
-  <button data-c="read">📌 read</button><button data-c="map">🗺 map</button><button data-c="look">👀 look</button><button data-c="help">help</button>
+  <span id="actions"></span>
+  <button data-prefill="say ">💬 say…</button><button data-c="satchel">🎒 satchel</button>
+  <button data-c="who">👥 who</button><button data-c="help">❓ help</button>
 </div>
 <div id="gramo">
   <span id="gramo-msg">🎶 Choose some songs to play on the gramophone</span>
@@ -375,6 +377,7 @@ function status(m) {
     a.onclick = (e) => { e.preventDefault(); prefill('@' + name + ' '); };
     here.append(a);
   });
+  showActions(m.actions);
   people = m.people || [];
   showPeople();
   showBars(m.progress || [], m.lights || []);
@@ -1099,6 +1102,43 @@ document.addEventListener('keydown', (e) => {
   $('#cmd').focus({ preventScroll: true });
 });
 
+// ---- what can I do here? ------------------------------------------------------
+// The world says what you could do where you're standing, most likely first:
+// the first few are chips, and "more…" lists the lot in the log as taps.
+const ACTION_CHIPS = 6;
+const ALWAYS_MORE = [
+  { label: '📖 journal', run: 'journal' }, { label: '📣 chat…', fill: 'chat ' },
+  { label: '🗺 map', run: 'map' }, { label: '👀 look', run: 'look' },
+];
+let actionsHere = [];
+function showActions(actions) {
+  actionsHere = actions || [];
+  const chip = (a) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = a.label;
+    b.title = a.run || (a.fill ? 'type ' + a.fill.trim() + '…' : '');
+    if (a.fill) b.className = 'fill';
+    b.onclick = () => a.run ? send(a.run) : prefill(a.fill);
+    // Keep the keyboard where it is, like the other chips.
+    b.addEventListener('mousedown', (e) => { if (document.activeElement === cmdBox) e.preventDefault(); });
+    return b;
+  };
+  const chips = actionsHere.slice(0, ACTION_CHIPS).map(chip);
+  const more = chip({ label: 'more…', run: null, fill: null });
+  more.className = 'more';
+  more.title = 'everything you could do here';
+  more.onclick = showMore;
+  $('#actions').replaceChildren(...chips, more);
+}
+function showMore() {
+  const all = [...actionsHere, ...ALWAYS_MORE];
+  addLines([
+    [{ t: '✨ Here you could:', c: 'magenta' }],
+    ...all.map((a) => [{ t: '  ', c: 'plain' }, { t: a.label, c: 'pink', b: true, run: a.run, fill: a.fill }]),
+  ]);
+}
+
 // ---- a new version ---------------------------------------------------------
 // After an update the page reconnects by itself but is still the old page:
 // the world says which page it serves now, and if it isn't this one, offer
@@ -1128,7 +1168,7 @@ function offerReplies(line) {
   const direct = first === 1 && line[0].t.startsWith('✉');
   const replies = direct
     ? [['↩ reply', null, 'reply '], ['👋', `@${name} 👋`], ['😂', `@${name} 😂`], ['💖', `@${name} 💖`]]
-    : [[`👋 hi ${name}`, `say hi ${name}!`], ['😂', ':laughs'], ['👋 wave', `:waves at ${name}`], ['💖 thanks', `say thanks, ${name}!`]];
+    : [[`👋 hi ${name}`, `say hi ${name}!`], ['😂', ':laughs'], ['💖 thanks', `say thanks, ${name}!`]];
   const box = $('#replies');
   box.replaceChildren(...replies.map(([label, run, fill]) => {
     const b = document.createElement('button');

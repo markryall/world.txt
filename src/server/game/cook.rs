@@ -136,7 +136,7 @@ pub struct Cooking {
 
 impl Game {
     /// The campfire or oven here, if there is one: (thing id, which kind).
-    fn kitchen_here(&self, x: i64, y: i64) -> Option<(i64, &'static str)> {
+    pub(super) fn kitchen_here(&self, x: i64, y: i64) -> Option<(i64, &'static str)> {
         self.world.things.iter().filter(|t| t.x == x && t.y == y).find_map(|t| t.kind.as_deref().and_then(|k| [FIRE, OVEN].into_iter().find(|w| *w == k)).map(|k| (t.id, k)))
     }
 

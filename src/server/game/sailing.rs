@@ -16,7 +16,7 @@ pub struct Voyage {
 }
 
 impl Game {
-    fn dock_here(&self, x: i64, y: i64) -> bool {
+    pub(super) fn dock_here(&self, x: i64, y: i64) -> bool {
         self.world.things_at(x, y).any(|t| t.is_dock())
     }
 

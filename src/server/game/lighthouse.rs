@@ -95,7 +95,7 @@ impl Game {
         self.lighthouse_stage() >= STAGES.len()
     }
 
-    fn lighthouse_here(&self, x: i64, y: i64) -> bool {
+    pub(super) fn lighthouse_here(&self, x: i64, y: i64) -> bool {
         self.world.things_at(x, y).any(|t| t.kind.as_deref() == Some(KIND))
     }
 

@@ -22,6 +22,14 @@ own sections in that list and it's in the box, ready to fix a wrong note.
 And keep songs of your own: `learn lullaby E G C5 | G E C`, then `hum
 lullaby` or `hum along lullaby` (`learn` lists yours, `forget` lets one go).
 
+### What can I do here?
+A row of buttons above the box offers what you could do right where you
+are, and changes as you walk: wave and talk to whoever's here, pat your
+companion or befriend a wild animal, read the board, play the music box or
+the gramophone, cook, go in, sail, mend the lighthouse, gather, fish,
+plant… Tap instead of typing, on a phone or a computer. **more…** lists the
+lot.
+
 ### The island on your home screen
 Add to Home Screen on a phone gives the island its own icon (a little bit of
 map, with you on it) and opens it full screen, with no browser bars.
@@ -35,7 +43,7 @@ around the water. No more tap, tap, tap on the arrows. (Underneath it's
 In the browser, tap (or click) someone's name where they say, do, hum or
 shout something, or arrive, and the box is ready with `@Sam ` to message
 them. On a phone, when someone talks to you or arrives, a few quick replies
-(👋 hi, 😂, wave, thanks, or ↩ reply to a message) turn up in the buttons
+(👋 hi, 😂, thanks, or ↩ reply to a message) turn up in the buttons
 under the log for a minute, so the keyboard can stay down.
 
 ### Fixes

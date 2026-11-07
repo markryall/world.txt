@@ -11,6 +11,14 @@ New arrivals get five tiny first steps: walk, say hi, make something, plant
 something, see who's around. One hint shows at a time and clears when they do it.
 In the browser the hint glows above the input, and tapping it does the step.
 
+Above the box, a row of buttons offers what you could do right where you
+are: 👋 wave and 💬 a word with whoever's here, pat your companion, 📖 read
+the board, 🎶 play the music box, 🚪 go in, ⛵ sail, 🧺 gather what's
+underfoot, 🎣 fish by the water, 🌱 plant… and so on, changing as you walk.
+Ones with "…" (and a dashed edge) put the start of a command in the box for
+you to finish. **more…** lists everything you could do here, and say, satchel,
+who and help are always at the end. Tap instead of type, on a phone or not.
+
 On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
 menu) makes the island an app of its own: its own icon, full screen, no
 browser bars.
@@ -22,7 +30,7 @@ Progress is saved by name, so returning visitors never see it again
 - `say hi` (or `'hi`), `:waves`, `shout`, `hum C E G`
 - `@Poppy hi` talks to someone anywhere (in the browser, tapping someone's
   name in the log or the side panel starts one for you, and on a phone a few
-  quick replies (👋 hi, 😂, wave, thanks; or ↩ reply to a message) turn up
+  quick replies (👋 hi, 😂, thanks; or ↩ reply to a message) turn up
   in the buttons under the log for a minute when someone talks to you or
   arrives; if they're away it's kept as mail and
   shown when they next arrive), `reply` answers them, `chat` (or `@all`) reaches

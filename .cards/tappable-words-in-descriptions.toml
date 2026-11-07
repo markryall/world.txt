@@ -1,0 +1,7 @@
+name = "Tappable words in descriptions"
+status = "todo"
+description = "Things named in the look text (a music box, the noticeboard, Biscuit the cat) become taps that offer what you can do with that thing, using the same actions the world works out for 'What can I do here?'."
+created_at = "2026-11-07T23:28:44.999077Z"
+updated_at = "2026-11-07T23:28:44.999077Z"
+tags = ["phone"]
+blocked_by = ["What can I do here?"]

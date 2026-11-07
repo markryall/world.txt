@@ -93,6 +93,17 @@ impl Line {
     }
 }
 
+/// Something you could do where you are: tapping it runs a command, or puts
+/// one in the box ready to finish.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Action {
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<String>,
+}
+
 /// One person's part in a turn of a humming circle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CirclePart {
@@ -264,6 +275,9 @@ pub enum ToClient {
         /// What it sounds like where you are.
         #[serde(default)]
         sounds: Sounds,
+        /// What you could do here, most likely first, for tapping.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        actions: Vec<Action>,
     },
     /// The current first-steps nudge, or none to clear it.
     Hint {
