@@ -21,6 +21,7 @@
   #log .ln.was { opacity: 0.7; }
   #side { background: var(--panel); border-left: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
   #place { color: var(--magenta); font-weight: bold; }
+  #me { color: var(--cyan); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* One line each, so a long place name never pushes the map about: anything
      too long ends in … (the whole of it shows on hover). */
   #place, #weather, #clock, #now { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; flex-shrink: 0; }
@@ -119,7 +120,7 @@
     #input { border-top: 0; }
     /* While typing, the keyboard needs the room: keep just the place name. */
     body.typing #map, body.typing #pad, body.typing #weather, body.typing #clock, body.typing #now,
-    body.typing #here, body.typing #sound { display: none; }
+    body.typing #here, body.typing #sound, body.typing #me { display: none; }
     body.typing #side { padding: 6px 12px; }
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     #side { order: -1; border-left: 0; border-bottom: 1px solid var(--line); flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; padding: 8px; gap: 8px 14px; }
@@ -139,6 +140,7 @@
   <div id="log" aria-live="polite"></div>
   <div id="side">
     <div class="info">
+      <div id="me" hidden></div>
       <div id="place">…</div>
       <div class="meta" id="weather"></div>
       <div class="meta" id="clock"></div>
@@ -212,8 +214,25 @@ const LOG = 'world.log';
 const LOG_KEEP = 300;
 let kept = [], keepTimer = null;
 
+// Whether the log is showing its newest lines. The log's box changes size
+// under it (the side panel filling in, the keyboard coming up), so it's
+// remembered from the last scroll rather than worked out afresh: otherwise a
+// shrinking box leaves the newest lines out of sight, and new ones land
+// unseen below them.
+let pinned = true, logBox = log.clientHeight;
+log.addEventListener('scroll', () => {
+  // A scroll that comes with the box changing size is the layout's doing
+  // (and arrives before the ResizeObserver hears of it), not the reader's.
+  if (log.clientHeight !== logBox) return;
+  pinned = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+});
+if (window.ResizeObserver) new ResizeObserver(() => {
+  logBox = log.clientHeight;
+  if (pinned) log.scrollTop = log.scrollHeight;
+}).observe(log);
+
 function addLines(lines, when, replay) {
-  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const stick = pinned || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   const at = when || Date.now();
   for (const line of lines) {
     const div = document.createElement('div');
@@ -488,6 +507,11 @@ function connect() {
       lostSaid = restarting = false;
       retries = 0;
       if (m.token) store('world.token', m.token);
+      // Who you are, in the side panel and the tab, so it's never a mystery.
+      $('#me').textContent = '☺ ' + m.nickname;
+      $('#me').title = 'you: ' + m.nickname + ' (' + m.user + ')';
+      $('#me').hidden = false;
+      document.title = m.nickname + ' · world.txt';
       // The invite or passport is used up: tidy it out of the address bar.
       invite = null;
       passport = null;

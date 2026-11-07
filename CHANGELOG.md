@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Humming along
+Hum together and actually stay in time. `hum along` starts a humming circle,
+and everyone who joins adds a part. The world counts everyone in and plays all
+the parts together at the start of every turn. A part can have sections
+(`|` between them) that go round in a loop, so a ground bass, a canon or a
+round all fit. Hit a wrong note? `hum along 2 …` fixes section 2 for next time
+round, and `hush` stops. Pachelbel's Canon and Frère Jacques are in
+[playing.md](docs/playing.md#humming-along) to try.
+
+### Fixes
+- **Who am I?** The browser shows your name at the top of the side panel and
+  in the tab, so with a few windows open you can tell whose is whose.
+- **The newest lines stay in view.** On a narrow screen the log could get
+  left partway up when the panel above it filled in, so what came next landed
+  out of sight. It stays at the bottom now, unless you've scrolled up to read.
+
 ## 0.7.0 (2026-11-07)
 
 ### Sounds of the island

@@ -21,6 +21,7 @@ mod inside;
 mod jukebox;
 mod lighthouse;
 mod meetings;
+mod circle;
 mod music;
 mod sounds;
 mod play;
@@ -143,6 +144,8 @@ struct Game {
     wild: Vec<companions::Wild>,
     /// Who last hummed where, for noticing a jam.
     last_hum: HashMap<(i64, i64), (String, std::time::Instant)>,
+    /// Humming circles, by spot.
+    circles: circle::Circles,
     /// Gramophones playing music from someone's browser, by thing id.
     spins: HashMap<i64, gramophone::Spin>,
     /// Radios and the stream each is tuned to, by thing id.
@@ -187,7 +190,7 @@ struct Game {
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), doorbells: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600), folk: Vec::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), circles: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), doorbells: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600), folk: Vec::new() };
     game.load_meetings();
     game.load_snowmen();
     game.load_progress();
@@ -204,12 +207,14 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
     let mut tick = tokio::time::interval(TICK);
     let mut stride = tokio::time::interval(Duration::from_millis(500));
     loop {
+        let turn = game.next_circle_turn();
         tokio::select! {
             ev = events.recv() => match ev {
                 Some(ev) => game.handle(ev),
                 None => break,
             },
             _ = tick.tick() => game.tick(),
+            _ = until(turn) => game.circles_turn(),
             _ = stride.tick() => {
                 game.step_travellers();
                 game.row_boats();
@@ -221,6 +226,14 @@ pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: toki
                 game.flush_status();
             }
         }
+    }
+}
+
+/// Wait until then, or for ever if there's no then.
+async fn until(at: Option<std::time::Instant>) {
+    match at {
+        Some(at) => tokio::time::sleep_until(at.into()).await,
+        None => std::future::pending().await,
     }
 }
 
@@ -700,7 +713,11 @@ impl Game {
             "call" if rest.starts_with("https://") || rest == "off" || (rest.is_empty() && self.meeting_here(id)) => return self.cmd_meet(id, rest),
             "meet" | "meeting" => return self.cmd_meet(id, rest),
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
+            "hum" | "sing" | "whistle" if rest == "along" || rest.starts_with("along ") => {
+                return self.cmd_hum_along(id, &verb, rest.trim_start_matches("along"));
+            }
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
+            "hush" | "shh" => return self.cmd_hush(id, rest),
             "who" => self.cmd_who(id),
             "time" | "clock" => self.cmd_time(id, rest),
             "sail" | "row" | "boat" => return self.cmd_sail(id, rest.trim_start_matches("to ")),
@@ -1627,6 +1644,8 @@ impl Game {
         self.world.nicks.insert(user.clone(), nick.clone());
         if let Some(p) = self.players.get_mut(&id) {
             p.name = nick.clone();
+            // So the browser shows the new name (no token: the device keeps its own).
+            let _ = p.tx.send(ToClient::Welcome { token: None, user: user.clone(), nickname: nick.clone() });
         }
         let (x, y) = (self.players[&id].x, self.players[&id].y);
         self.say1(id, Line::col(Col::Cyan, format!("✨ You're {nick} now. (Your username is still {user}.)")));
@@ -2435,6 +2454,7 @@ const HELP: &[HelpTopic] = &[
         listed: true,
         items: &[
             ("hum @100 C C G G A A G-", "a little tune: - holds a note longer, / makes it shorter, _ is a rest, @100 sets the tempo (hum together to jam!)"),
+            ("hum along @60 C E G | C5 G E C / hush", "hum in a circle, kept in time by the world: your part is a loop of sections (| starts the next); 'hum along 2 …' changes section 2, 'hum along' shows them"),
             ("make a music box / teach C E G / play", "a box that remembers your tune"),
             ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
             ("make a jukebox / add songs / jukebox", "everyone adds songs from their computer; it plays one each, taking turns"),

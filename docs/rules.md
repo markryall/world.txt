@@ -141,6 +141,7 @@ keeper coming in. Bans, kicks and mutes work on visitors too.
 | `ask` a question / `answer` | 200 / 60 characters |
 | An event's name | 80 characters |
 | A tune | A music box learns up to 48 notes and rests (anything that isn't a note is left out). A hum plays up to 64 in the browser. A note can be held up to 8 beats or cut to an eighth of one. Tempo 40 to 240 beats a minute, 120 if not given. |
+| A humming circle | One per spot, up to 8 people. A turn is at most 64 beats. Each person's part has up to 16 sections, each at most one turn long and 64 notes and rests. It plays at the circle's tempo, whatever tempo it gives. You leave the circle when you leave the spot, and it ends when nobody's left humming. |
 | Links on one gathering table, or one event | 3 |
 | One link | `https://` only, at most 300 characters, no spaces or quotes |
 
@@ -294,6 +295,7 @@ else sees it in their own time.
 | `say`, emotes, `meet` | Everyone on the same spot. Inside a room, that's just the people in the room. |
 | `shout` | Everyone within 10 steps. Up to 4 steps away they hear who; further off it's "someone". Inside a room: everyone in the room, and anyone standing right outside the building (or a step away), who hears it "from inside". A shout outdoors isn't heard indoors, and nothing said in one room reaches another. |
 | `hum`, `sing`, `whistle` | The spot, plus "someone" heard 1 or 2 steps away |
+| `hum along` | Every turn, the spot hears everyone's parts. People 1 or 2 steps away hear "people humming together nearby" once, when someone starts or joins. |
 | `chat` (or `@all`) | Everyone on the island |
 | `@Poppy …` | Only Poppy. If she's away, it waits as mail until she next arrives. |
 | Notes on a board | Anyone who reads the board. Followers hear about new ones from anywhere. |

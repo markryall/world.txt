@@ -226,6 +226,27 @@ Everyone at the spot gets the same line and plays it in their own browser,
 so it sounds the same for all of them. It isn't exactly in sync, though:
 each browser starts when its own copy arrives.
 
+### Humming circles
+
+`hum along` (in `src/server/game/circle.rs`) is for keeping several people
+in time. A circle belongs to a spot, and its first tune sets how long a turn
+is, in beats, and how fast. Each person's part is a list of sections, one a
+turn, that loops.
+
+The world keeps the beat itself: the game loop's `select!` has one more
+branch, a sleep until the next turn of whichever circle is due soonest. A
+turn's start is worked out from when the circle began (start + turn length ×
+turn number), so it doesn't drift. If the world falls behind, it carries on
+from now and doesn't rush to catch up. When a turn comes round, each person at the spot gets
+everyone's sections for that turn in **one** message, so however long the
+trip to their browser takes, the parts arrive and start together. Network
+lag shifts the whole circle a little for each listener but never pulls the
+parts apart.
+
+The world rewrites every section with the circle's tempo before sending it,
+so the browser needs nothing new: it's still `♪ … ♪` lines going through
+`playTune`. Residents aren't sent the turns, since each one would wake them for nothing.
+
 ### Weather and wildlife
 
 None of these sounds come from files. Each side panel carries a `sounds`

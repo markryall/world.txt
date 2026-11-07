@@ -1,4 +1,5 @@
-//! Music boxes you can teach a tune, and humming together.
+//! Music boxes you can teach a tune, and humming together (humming along
+//! in time is in circle.rs).
 
 use super::Game;
 use crate::protocol::{Col, Line};
@@ -130,9 +131,12 @@ impl Game {
         self.last_hum.insert((x, y), (user.to_string(), now));
         if let Some(other) = earlier {
             let line = Line::new().b(Col::Pink, format!("🎶 {} and {} are making music together!", self.world.nick(&other), self.world.nick(user)));
+            // Unless they're humming along already, a nudge towards keeping time.
+            let hint = (!self.circles.contains_key(&(x, y))).then(|| Line::col(Col::Dim, "(To keep in time, 'hum along': the world counts you both in.)"));
             for p in self.players.values() {
                 if (p.x, p.y) == (x, y) && p.hears(&other) && p.hears(user) {
-                    let _ = p.tx.send(crate::protocol::ToClient::Lines { lines: vec![line.clone()] });
+                    let lines = std::iter::once(line.clone()).chain(hint.clone()).collect();
+                    let _ = p.tx.send(crate::protocol::ToClient::Lines { lines });
                 }
             }
         }

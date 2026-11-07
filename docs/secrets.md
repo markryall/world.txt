@@ -171,7 +171,9 @@ the crab goes back to the shore.
 
 ## Making music together
 
-Two people `hum`ming at the same spot are told they're making music together.
+Two people `hum`ming at the same spot are told they're making music together,
+and (unless they're in a humming circle already) "(To keep in time, 'hum
+along': the world counts you both in.)". `hum along` is also in `help music`.
 A music box someone's taught a tune to plays it now and then when people are
 near.
 

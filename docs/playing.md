@@ -35,7 +35,8 @@ Progress is saved by name, so returning visitors never see it again
 - `make a frog that croaks when it rains`, `push frog north`, `unmake frog`
 - `make a music box`, then `teach C E G E C` (only its maker can) and `play`; it also
   plays now and then when people are near. Two people humming at the same spot
-  are told they're making music together. In the browser, tunes play as real notes.
+  are told they're making music together, and `hum along` keeps you in time
+  (see [Humming along](#humming-along)). In the browser, tunes play as real notes.
 - Tunes (for `hum`, `sing`, `whistle` and `teach`) are notes A to G, with `#`
   or `b` for sharp or flat and 2 to 6 for lower or higher (4 is the middle).
   A plain note is one beat. Each `-` holds it a beat longer (`G-` is two
@@ -81,6 +82,111 @@ where you are: rain, and thunder in a storm, the wind (strongest up on the
 hills and down on the beach), waves by the sea, birds in the woods by day,
 crickets in the grass at night, and the crackle of a campfire. Indoors you
 hear the rain on the roof.
+
+## Humming along
+
+Two people typing a hum at the same moment never quite land together. In a
+humming circle the world keeps the time: everyone's part plays at the start of
+each turn, together, so it doesn't matter when you typed it.
+
+- `hum along @110 D3- A2- B2- F#2- G2- D2- G2- A2-` starts a circle where you
+  stand. A turn lasts as long as that first tune (16 beats here) at its tempo,
+  and that's how the circle goes round from then on.
+- Everyone else `hum along`s a part of their own. It comes in at the next turn,
+  at the circle's tempo (whatever tempo you typed).
+- A part can have several **sections**, a turn each: `|` starts the next one,
+  and a tune longer than a turn is cut into sections for you. Your sections go
+  round and round in a loop until you `hush`, or walk off.
+- `hum along` with nothing after it shows the circle and your sections,
+  numbered. Hit a wrong note? `hum along 2 …` puts new notes in section 2, and
+  it plays the new way next time round. `hum along 5 …` past the end adds one,
+  `hush 2` takes section 2 out, and `hush` stops.
+- A short section is fine: the rest of its turn is quiet. A note can't run
+  over the end of a turn, though (you'll be told which section to fix), and
+  `_` rests fill a turn where you'd like to sit one out.
+- `sing along` and `whistle along` work too.
+
+### Pachelbel's Canon
+
+Pachelbel wrote it as one bass line going round and round (the *ground*)
+while three violins play the same tune, each starting two bars after the last.
+That's exactly a humming circle. The notes below are doubled in length from
+Pachelbel's score so they sit nicely at `@110`, and each section is one time
+round the ground: 16 beats, about 9 seconds.
+
+The bass starts the circle with the ground, and hums it for ever:
+
+```
+hum along @110 D3- A2- B2- F#2- G2- D2- G2- A2-
+```
+
+The tune is ten sections, one after another, each two of Pachelbel's bars
+(bars 3 to 22 of his violin part), and they get busier as they go:
+
+| Section | | Notes |
+|---|---|---|
+| 1 | slow | `F#5- E5- D5- C#5- B4- A4- B4- C#5-` |
+| 2 | slow | `D5- C#5- B4- A4- G4- F#4- G4- E4-` |
+| 3 | two notes to each bass note | `D4 F#4 A4 G4 F#4 D4 F#4 E4 D4 B3 D4 A4 G4 B4 A4 G4` |
+| 4 | two to each, leaping about | `F#4 D4 E4 C#5 D5 F#5 A5 A4 B4 G4 A4 F#4 D4 D5 D5. C#5/` |
+| 5 | the quick run everyone knows, in eighth notes (`/`) | `D5/ C#5/ D5/ D4/ C#4/ A4/ E4/ F#4/ D4/ D5/ C#5/ B4/ C#5/ F#5/ A5/ B5/ G5/ F#5/ E5/ G5/ F#5/ E5/ D5/ C#5/ B4/ A4/ G4/ F#4/ E4/ G4/ F#4/ E4/` |
+| 6 | more eighths, running up and down | `D4/ E4/ F#4/ G4/ A4/ E4/ A4/ G4/ F#4/ B4/ A4/ G4/ A4/ G4/ F#4/ E4/ D4/ B3/ B4/ C#5/ D5/ C#5/ B4/ A4/ G4/ F#4/ E4/ B4/ A4/ B4/ A4/ G4/` |
+| 7 | slower again, climbing high | `F#4 F#5 E5- _ D5 F#5- B5- A5- B5- C#6-` |
+| 8 | slower, with a rest to breathe | `D6 D5 C#5- _ B4 D5- D5-- D5 D5 G5 E5 A5` |
+| 9 | **the very fast part**: flourishes in sixteenths (`//`) | `A5/ F#5// G5// A5/ F#5// G5// A5// A4// B4// C#5// D5// E5// F#5// G5// F#5/ D5// E5// F#5/ F#4// G4// A4// B4// A4// G4// A4// F#4// G4// A4// G4/ B4// A4// G4/ F#4// E4// F#4// E4// D4// E4// F#4// G4// A4// B4// G4/ B4// A4// B4/ C#5// D5// A4// B4// C#5// D5// E5// F#5// G5// A5//` |
+| 10 | **the very fast part**, still going | `F#5/ D5// E5// F#5/ E5// D5// E5// C#5// D5// E5// F#5// E5// D5// C#5// D5/ B4// C#5// D5/ D4// E4// F#4// G4// F#4// E4// F#4// D5// C#5// D5// B4/ D5// C#5// B4/ A4// G4// A4// G4// F#4// G4// A4// B4// C#5// D5// B4/ D5// C#5// D5/ C#5// B4// C#5// D5// E5// D5// C#5// D5// B4// C#5//` |
+
+That's a lot to type in one go, and you don't have to: each `hum along` adds
+sections to the end of your part, so the first violin can start with
+
+```
+hum along F#5- E5- D5- C#5- B4- A4- B4- C#5- | D5- C#5- B4- A4- G4- F#4- G4- E4- | D4 F#4 A4 G4 F#4 D4 F#4 E4 D4 B3 D4 A4 G4 B4 A4 G4 | F#4 D4 E4 C#5 D5 F#5 A5 A4 B4 G4 A4 F#4 D4 D5 D5. C#5/
+```
+
+and then add `hum along <section 5> | <section 6>` and the rest while those
+play. Keep ahead of yourself, though: after your last section your part goes
+back round to the first.
+
+The second violin types the very same sections once the first violin is
+playing (any time during a turn is fine: they come in at the next one), and
+the third the same after that. Each comes in a section behind the last, so
+every violin plays over the one before it: the canon Pachelbel wrote. And
+round it goes, for as long as you like.
+
+Pachelbel goes on for many more bars than these, if you'd like to add them as
+sections 11 and on. At this doubled-up scale his sixteenth notes are eighths
+(`/`) and his thirty-second notes sixteenths (`//`), and a section can hold
+up to 64 notes. (These notes are from Pachelbel's score as set by the Mutopia
+Project from IMSLP, with every note held twice as long.)
+
+### A round: Frère Jacques
+
+In a round everyone hums the same tune and comes in a bit later. Each
+section of Frère Jacques is two bars (8 beats), so the first section sets the
+turn:
+
+```
+hum along @120 C D E C C D E C | E F G- E F G- | G/ A/ G/ F/ E C G/ A/ G/ F/ E C | C G3 C- C G3 C-
+```
+
+Then a second person types the same thing, and a third, and a fourth, each
+any time after the one before has come in. Four voices, each a section
+apart, all going round.
+
+### Fixing a mistake
+
+Say Sam's section 2 has a sour F in it. `hum along` shows it:
+
+```
+🎶 The circle here goes round every 16 beats at @110.
+Your part (section 3 is next):
+   1  F#5- E5- D5- C#5- B4- A4- B4- C#5-
+   2  D5- C#5- B4- A4- G4- F4- G4- E4-
+   3  D4 F#4 A4 G4 F#4 D4 F#4 E4 D4 B3 D4 A4 G4 B4 A4 G4
+```
+
+and `hum along 2 D5- C#5- B4- A4- G4- F#4- G4- E4-` fixes it for next time
+round, with nobody missing a beat.
 
 ## Homes
 
