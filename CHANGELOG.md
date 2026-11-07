@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-11-07)
 
 ### Going inside
 Every finished building has a room: `go in`, and `out` again. Describe it in
