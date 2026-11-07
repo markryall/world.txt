@@ -1,8 +1,8 @@
 name = "Circle chips: join, hush, my part"
-status = "todo"
-description = "While a circle's going where you stand, the chips under the log offer 🎶 join (the songbook), ✋ hush and 📋 my part, so nobody needs the keyboard to take part."
+status = "done"
+description = "While a circle's going where you stand, the now-playing strip offers 🎶 join (the songbook) while you're listening and ✋ hush once you're in, and 🎶 shows the circle and your part, so nobody needs the keyboard to take part. (In the strip rather than the phone-only chip row, so it works on any screen.)"
 created_at = "2026-11-07T22:48:24.943714Z"
-updated_at = "2026-11-07T22:48:24.943714Z"
+updated_at = "2026-11-07T22:57:12.684347Z"
 tags = [
     "phone",
     "music",

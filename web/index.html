@@ -83,7 +83,10 @@
   /* Now playing: a humming circle where you are. */
   #circle { display: none; position: relative; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--line); font-size: 14px; overflow: hidden; }
   #circle.on { display: flex; }
-  #circle-me { background: none; border: 0; padding: 0 2px; font-size: 18px; cursor: pointer; }
+  #circle-me { background: none; border: 0; padding: 0 2px; font-size: 18px; cursor: pointer; color: var(--pink); font-family: inherit; white-space: nowrap; }
+  #circle-me.join { font-size: 14px; border: 1px solid var(--pink); border-radius: 999px; padding: 3px 10px; }
+  #circle-hush { margin-left: auto; background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+  #circle-hush[hidden] { display: none; }
   #circle-parts { display: flex; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
   #circle-parts .part { color: var(--cyan); cursor: pointer; white-space: nowrap; }
   #circle-parts .part.you { color: var(--pink); font-weight: bold; cursor: default; }
@@ -191,6 +194,7 @@
 <div id="circle" aria-live="off">
   <button id="circle-me" type="button" title="the circle, and your part">🎶</button>
   <span id="circle-parts"></span>
+  <button id="circle-hush" type="button" title="stop humming along">✋ hush</button>
   <span id="circle-beat"></span>
 </div>
 <form id="input" autocomplete="off">
@@ -1099,6 +1103,12 @@ function circleTurn(m) {
     if (!p.you) { el.title = 'type @' + p.name + '…'; el.onclick = () => prefill('@' + p.name + ' '); }
     return el;
   }));
+  // In it: hush. Just listening: join (the songbook, and the circle).
+  const mine = m.parts.some((p) => p.you);
+  $('#circle-me').textContent = mine ? '🎶' : '🎶 join';
+  $('#circle-me').classList.toggle('join', !mine);
+  $('#circle-me').title = mine ? 'the circle, and your part' : 'join in: songs to hum along with';
+  $('#circle-hush').hidden = !mine;
   strip.classList.add('on');
   // The beat going round: a line sweeping across the turn.
   const beat = $('#circle-beat');
@@ -1110,6 +1120,7 @@ function circleTurn(m) {
   circleGone = setTimeout(() => strip.classList.remove('on'), m.ms * 1.6 + 1000);
 }
 $('#circle-me').onclick = () => send('hum along');
+$('#circle-hush').onclick = () => send('hush');
 
 // ---- sound: hums become notes, rain sounds like rain --------------------
 
