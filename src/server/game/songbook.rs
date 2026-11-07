@@ -84,7 +84,7 @@ pub static SONGS: &[Song] = &[
 ];
 
 /// Lower case, without accents or punctuation, one space between words.
-fn plain(s: &str) -> String {
+pub fn plain(s: &str) -> String {
     let s: String = s
         .to_lowercase()
         .chars()
@@ -136,6 +136,115 @@ pub fn command(song: &Song, part: &SongPart) -> String {
     if song.parts.len() == 1 { format!("hum along {name}") } else { format!("hum along {name} {}", part.name) }
 }
 
+/// The most songs one person can keep.
+pub const MAX_SONGS: usize = 24;
+/// The longest a song's name can be.
+pub const MAX_NAME: usize = 40;
+
+/// `learn twinkle C C G G A A G-`: the name (the words before the notes)
+/// and the tune, tidied, keeping its sections.
+pub fn name_and_tune(rest: &str) -> (String, String) {
+    let words: Vec<&str> = rest.split_whitespace().collect();
+    let at = words
+        .iter()
+        .position(|w| w.starts_with('|') || super::music::clean_word(w.trim_end_matches(',')).is_some())
+        .unwrap_or(words.len());
+    let name = words[..at].join(" ");
+    let tune = words[at..]
+        .join(" ")
+        .split('|')
+        .map(super::music::clean_tune_long)
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" | ");
+    (name, tune)
+}
+
+/// What a song name asks for.
+pub enum Asked {
+    /// A tune to hum.
+    Tune(String),
+    /// A songbook song with parts to choose from.
+    Choose(&'static Song),
+}
+
+impl super::Game {
+    /// A song of yours, or from the songbook, by name; `None` if it's notes.
+    pub(super) fn song_asked(&self, user: &str, asked: &str) -> Option<Asked> {
+        let want = plain(asked);
+        if let Some((_, tune)) = self.world.db.songs(user).ok()?.into_iter().find(|(n, _)| plain(n) == want) {
+            return Some(Asked::Tune(tune));
+        }
+        match find(asked)? {
+            Found::Part(part) => Some(Asked::Tune((part.tune)())),
+            Found::Song(song) => Some(Asked::Choose(song)),
+        }
+    }
+
+    /// `learn twinkle C C G G A A G-`: keep a tune to hum by name. Bare,
+    /// list yours.
+    pub(super) fn cmd_learn(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        use crate::protocol::{Col, Line};
+        let user = self.user(id);
+        let mine = self.world.db.songs(&user)?;
+        if rest.trim().is_empty() {
+            let mut lines = vec![Line::col(Col::Pink, if mine.is_empty() {
+                "🎶 You haven't learned any songs yet. 'learn twinkle C C G G A A G-' keeps one, to hum again by name."
+            } else {
+                "🎶 Your songs (tap one to hum along with it):"
+            })];
+            for (name, tune) in &mine {
+                lines.push(Line::new().t("  ").run(Col::Pink, name, format!("hum along {name}")).c(Col::Dim, format!("  {tune}")));
+            }
+            if !mine.is_empty() {
+                lines.push(Line::col(Col::Dim, "  ('forget twinkle' lets one go)"));
+            }
+            self.send(id, lines);
+            return Ok(());
+        }
+        let (name, tune) = name_and_tune(rest);
+        let msg = if name.is_empty() {
+            "Learn it as what? Give it a name before the notes: 'learn twinkle C C G G A A G-'.".to_string()
+        } else if tune.is_empty() {
+            format!("Learn which notes as {name}? e.g. 'learn {name} C C G G A A G-'.")
+        } else if name.chars().count() > MAX_NAME {
+            format!("That's a long name! {MAX_NAME} letters at most.")
+        } else if find(&name).is_some() {
+            format!("{name} is in the songbook already: 'hum along {name}'. Call yours something else?")
+        } else if tune.len() > 4000 {
+            "That's a very long song! Try it in two.".to_string()
+        } else {
+            let same = mine.iter().find(|(n, _)| plain(n) == plain(&name)).map(|(n, _)| n.clone());
+            if same.is_none() && mine.len() >= MAX_SONGS {
+                format!("You know {MAX_SONGS} songs already: 'forget' one first.")
+            } else {
+                let name = same.unwrap_or(name);
+                self.world.db.learn_song(&user, &name, &tune)?;
+                self.say1(id, Line::new().c(Col::Pink, "🎶 You learn ").run(Col::Pink, &name, format!("hum along {name}")).c(Col::Pink, format!(". 'hum along {name}' (or 'hum {name}') hums it.")));
+                return Ok(());
+            }
+        };
+        self.say1(id, Line::plain(msg));
+        Ok(())
+    }
+
+    /// `forget twinkle`.
+    pub(super) fn cmd_forget(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
+        use crate::protocol::{Col, Line};
+        let user = self.user(id);
+        let want = plain(rest);
+        let found = self.world.db.songs(&user)?.into_iter().find(|(n, _)| plain(n) == want);
+        match found {
+            Some((name, _)) => {
+                self.world.db.forget_song(&user, &name)?;
+                self.say1(id, Line::col(Col::Pink, format!("🎶 You let {name} drift out of your head.")));
+            }
+            None => self.say1(id, Line::plain("You don't know a song called that. 'learn' lists yours.")),
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +270,15 @@ mod tests {
         assert_eq!(part("C E G"), "-");
         assert_eq!(part("canonical"), "-");
         assert_eq!(part("ode"), "Ode to Joy: tune");
+    }
+
+    #[test]
+    fn learning_reads_the_name_before_the_notes() {
+        assert_eq!(name_and_tune("twinkle C C G G A A G-"), ("twinkle".into(), "C C G G A A G-".into()));
+        assert_eq!(name_and_tune("ode to joy @120 E E F G"), ("ode to joy".into(), "@120 E E F G".into()));
+        assert_eq!(name_and_tune("my round C D | E F"), ("my round".into(), "C D | E F".into()));
+        assert_eq!(name_and_tune("lullaby"), ("lullaby".into(), "".into()));
+        assert_eq!(name_and_tune("C E G"), ("".into(), "C E G".into()));
     }
 
     #[test]

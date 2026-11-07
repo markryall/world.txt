@@ -16,7 +16,7 @@
 
 use super::Game;
 use super::music::clean_word;
-use super::songbook::{self, Found, SONGS, Song};
+use super::songbook::{self, Asked, SONGS, Song};
 use crate::protocol::{CirclePart, Col, Line, ToClient};
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
@@ -348,12 +348,12 @@ impl Game {
         }
         // A song from the songbook, or notes.
         let from_book;
-        let tune = match songbook::find(tune) {
-            Some(Found::Part(part)) => {
-                from_book = (part.tune)();
+        let tune = match self.song_asked(&user, tune) {
+            Some(Asked::Tune(t)) => {
+                from_book = t;
                 from_book.as_str()
             }
-            Some(Found::Song(song)) => {
+            Some(Asked::Choose(song)) => {
                 let mut lines = vec![Line::col(Col::Pink, format!("🎶 Which part of {}?", song.title))];
                 lines.extend(song_lines(song));
                 self.send(id, lines);
@@ -433,7 +433,7 @@ impl Game {
     fn show_part(&self, id: u64, x: i64, y: i64) {
         let Some(c) = self.circles.get(&(x, y)) else {
             let mut lines = vec![Line::col(Col::Pink, "🎶 Hum along with what? Start a humming circle with a song (tap one), or your own notes: 'hum along @60 C E G C5'. Others join in with parts of their own.")];
-            lines.extend(songbook_lines());
+            lines.extend(self.songbook_lines(id));
             self.send(id, lines);
             return;
         };
@@ -441,7 +441,7 @@ impl Game {
         match c.part(id) {
             None => {
                 lines.push(Line::col(Col::Dim, "Join in with a part of your own (it comes in at the next turn): a song, or 'hum along <notes>'."));
-                lines.extend(songbook_lines());
+                lines.extend(self.songbook_lines(id));
             }
             Some(p) => {
                 lines.push(Line::col(Col::Dim, format!("Your part (section {} is next):", p.next_up())));
@@ -491,11 +491,24 @@ impl Game {
     }
 }
 
-/// The songbook, a song a line, each part a tap.
-fn songbook_lines() -> Vec<Line> {
-    let mut lines: Vec<Line> = SONGS.iter().flat_map(song_lines).collect();
-    lines.push(Line::col(Col::Dim, "  (or type it: hum along canon bass, hum along frère jacques, hum along twinkle…)"));
-    lines
+impl Game {
+    /// The songbook, a song a line, each part a tap, then your own songs.
+    fn songbook_lines(&self, id: u64) -> Vec<Line> {
+        let mut lines: Vec<Line> = SONGS.iter().flat_map(song_lines).collect();
+        let mine = self.world.db.songs(&self.user(id)).unwrap_or_default();
+        if !mine.is_empty() {
+            let mut line = Line::new().t("  ").c(Col::Pink, "Yours: ");
+            for (i, (name, _)) in mine.iter().enumerate() {
+                if i > 0 {
+                    line = line.c(Col::Dim, " · ");
+                }
+                line = line.run(Col::Pink, name, format!("hum along {name}"));
+            }
+            lines.push(line);
+        }
+        lines.push(Line::col(Col::Dim, "  (or type it: hum along canon bass, hum along frère jacques; 'learn' keeps songs of your own)"));
+        lines
+    }
 }
 
 /// One song's parts as taps: "Pachelbel's Canon: bass (the ground…) · tune (…)".

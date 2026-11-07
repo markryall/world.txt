@@ -286,6 +286,13 @@ impl Db {
                  PRIMARY KEY (player, feature))",
             [],
         )?;
+        // Tunes people have learned, to hum again by name.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS songs (
+                 player TEXT NOT NULL, name TEXT NOT NULL, tune TEXT NOT NULL,
+                 PRIMARY KEY (player, name))",
+            [],
+        )?;
         // Things people chose to tell the keepers: suggestions, and reports.
         conn.execute(
             "CREATE TABLE IF NOT EXISTS feedback (
@@ -387,6 +394,7 @@ impl Db {
             ("mutes", "muted"),
             ("event_going", "player"),
             ("event_skips", "player"),
+            ("songs", "player"),
         ] {
             tx.execute(&format!("UPDATE OR IGNORE {table} SET {col} = ?2 WHERE {col} = ?1"), [old, new])?;
             tx.execute(&format!("DELETE FROM {table} WHERE {col} = ?1"), [old])?;
@@ -673,6 +681,28 @@ impl Db {
     pub fn discoveries(&self) -> anyhow::Result<Vec<(String, String)>> {
         let mut stmt = self.conn.prepare("SELECT player, feature FROM discoveries ORDER BY at")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Keep a tune under a name (replacing one of that name).
+    pub fn learn_song(&self, player: &str, name: &str, tune: &str) -> anyhow::Result<()> {
+        self.conn.execute(
+            "INSERT INTO songs (player, name, tune) VALUES (?1, ?2, ?3)
+             ON CONFLICT (player, name) DO UPDATE SET tune = excluded.tune",
+            params![player, name, tune],
+        )?;
+        Ok(())
+    }
+
+    /// Whether there was a song of that name to forget.
+    pub fn forget_song(&self, player: &str, name: &str) -> anyhow::Result<bool> {
+        Ok(self.conn.execute("DELETE FROM songs WHERE player = ?1 AND name = ?2", params![player, name])? > 0)
+    }
+
+    /// Someone's songs, (name, tune), by name.
+    pub fn songs(&self, player: &str) -> anyhow::Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT name, tune FROM songs WHERE player = ?1 ORDER BY name")?;
+        let rows = stmt.query_map([player], |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
@@ -1465,6 +1495,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn songs_are_kept_replaced_and_forgotten() {
+        let db = Db::open(":memory:").unwrap();
+        db.learn_song("Sam", "twinkle", "C C G G").unwrap();
+        db.learn_song("Sam", "lullaby", "E G").unwrap();
+        db.learn_song("Sam", "twinkle", "C C G G A A G-").unwrap();
+        let songs = db.songs("Sam").unwrap();
+        assert_eq!(songs, vec![("lullaby".into(), "E G".into()), ("twinkle".into(), "C C G G A A G-".into())]);
+        assert!(db.forget_song("Sam", "lullaby").unwrap());
+        assert!(!db.forget_song("Sam", "lullaby").unwrap());
+        assert!(db.songs("Poppy").unwrap().is_empty());
+    }
+
+    #[test]
     fn folding_an_old_account_moves_its_things_and_removes_it() {
         let db = Db::open(":memory:").unwrap();
         // An old account (username is a plain name) and a new one nicknamed the same.
@@ -1476,8 +1519,10 @@ mod tests {
         db.satchel_add("sunny-otter-42", "daisy", 1).unwrap();
         db.journal_add("Poppy", "frog").unwrap();
         db.send_mail("Poppy", "Sam", "hi", 5).unwrap();
+        db.learn_song("Poppy", "twinkle", "C C G G").unwrap();
 
         db.fold_account("Poppy", "sunny-otter-42").unwrap();
+        assert_eq!(db.songs("sunny-otter-42").unwrap(), vec![("twinkle".to_string(), "C C G G".to_string())]);
 
         assert_eq!(db.matching_users("Poppy").unwrap(), vec!["sunny-otter-42"]);
         assert_eq!(db.satchel("sunny-otter-42").unwrap(), vec![("daisy".to_string(), 3)]);

@@ -60,6 +60,15 @@ pub fn clean_word(w: &str) -> Option<String> {
     Some(out)
 }
 
+/// Keep only the playable words of a tune, however long (a learned song;
+/// sections are split before this).
+pub fn clean_tune_long(raw: &str) -> String {
+    let words: Vec<String> = raw.split(|c: char| c.is_whitespace() || c == ',').filter_map(clean_word).collect();
+    let tempo = words.iter().rev().find(|w| w.starts_with('@')).cloned();
+    let notes = words.into_iter().filter(|w| !w.starts_with('@'));
+    tempo.into_iter().chain(notes).collect::<Vec<_>>().join(" ")
+}
+
 /// Keep only the playable words of a tune, so it's something the browser can
 /// actually play.
 pub fn clean_tune(raw: &str) -> String {

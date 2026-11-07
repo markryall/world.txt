@@ -141,6 +141,7 @@ keeper coming in. Bans, kicks and mutes work on visitors too.
 | `ask` a question / `answer` | 200 / 60 characters |
 | An event's name | 80 characters |
 | A tune | A music box learns up to 48 notes and rests (anything that isn't a note is left out). A hum plays up to 64 in the browser. A note can be held up to 8 beats or cut to an eighth of one. Tempo 40 to 240 beats a minute, 120 if not given. |
+| Songs you `learn` | 24 each, with names of up to 40 letters, and none named like a songbook song |
 | A humming circle | One per spot, up to 8 people. A turn is at most 64 beats. Each person's part has up to 16 sections, each at most one turn long and 64 notes and rests. It plays at the circle's tempo, whatever tempo it gives. You leave the circle when you leave the spot, and it ends when nobody's left humming. |
 | Links on one gathering table, or one event | 3 |
 | One link | `https://` only, at most 300 characters, no spaces or quotes |

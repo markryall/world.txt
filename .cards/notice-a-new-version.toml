@@ -1,0 +1,7 @@
+name = "Notice a new version"
+status = "todo"
+description = "After a deploy, open browsers reconnect by themselves but keep running the old page, so new things (like the now-playing strip or tappable names) don't show until someone happens to reload. The world tells the page which version of the page it's serving when it says welcome; if it's not the one that's open, offer a gentle 'the island's had an update ✨ tap to reload' (the log comes back after a reload, so nothing's lost)."
+created_at = "2026-11-07T23:03:41.331319Z"
+updated_at = "2026-11-07T23:03:41.331319Z"
+tags = ["phone"]
+priority = "high"

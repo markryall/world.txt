@@ -19,6 +19,8 @@ No need to type the notes: `hum along canon bass`, `hum along canon tune`,
 Little Lamb. Plain `hum along` lists them, and in the browser you just tap
 one, so joining Pachelbel's Canon from a phone is two taps. Tap one of your
 own sections in that list and it's in the box, ready to fix a wrong note.
+And keep songs of your own: `learn lullaby E G C5 | G E C`, then `hum
+lullaby` or `hum along lullaby` (`learn` lists yours, `forget` lets one go).
 
 ### The island on your home screen
 Add to Home Screen on a phone gives the island its own icon (a little bit of

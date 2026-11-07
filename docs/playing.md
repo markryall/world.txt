@@ -103,6 +103,9 @@ each turn, together, so it doesn't matter when you typed it.
   tune`, `hum along frère jacques`, and Twinkle, Ode to Joy, Jingle Bells and
   Mary Had a Little Lamb. Plain `hum along` lists them, and in the browser
   you just tap one.
+- Keep songs of your own: `learn lullaby @90 E G C5 | G E C`, then `hum along
+  lullaby` (or just `hum lullaby`). They're in your songbook too, under
+  Yours. `learn` lists them, and `forget lullaby` lets one go.
 - `hum along @110 D3- A2- B2- F#2- G2- D2- G2- A2-` starts a circle where you
   stand. A turn lasts as long as that first tune (16 beats here) at its tempo,
   and that's how the circle goes round from then on.

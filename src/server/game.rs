@@ -723,6 +723,8 @@ impl Game {
             }
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "hush" | "shh" => return self.cmd_hush(id, rest),
+            "learn" => return self.cmd_learn(id, rest),
+            "forget" | "unlearn" => return self.cmd_forget(id, rest),
             "who" => self.cmd_who(id),
             "time" | "clock" => self.cmd_time(id, rest),
             "sail" | "row" | "boat" => return self.cmd_sail(id, rest.trim_start_matches("to ")),
@@ -1018,6 +1020,12 @@ impl Game {
     fn cmd_hum(&mut self, id: u64, verb: &str, tune: &str) -> anyhow::Result<()> {
         let Some(p) = self.players.get(&id) else { return Ok(()) };
         let (x, y, name, user) = (p.x, p.y, p.name.clone(), p.user.clone());
+        // A song by name: one of yours, or from the songbook.
+        let tune = match self.song_asked(&user, tune) {
+            Some(songbook::Asked::Tune(t)) => t,
+            Some(songbook::Asked::Choose(song)) => (song.parts[0].tune)(),
+            None => tune.to_string(),
+        };
         let tune = if tune.is_empty() { "a little tune".to_string() } else { format!("♪ {tune} ♪") };
         let verbs = match verb {
             "sing" => "sings",
@@ -2461,6 +2469,7 @@ const HELP: &[HelpTopic] = &[
             ("hum @100 C C G G A A G-", "a little tune: - holds a note longer, / makes it shorter, _ is a rest, @100 sets the tempo (hum together to jam!)"),
             ("hum along @60 C E G | C5 G E C / hush", "hum in a circle, kept in time by the world: your part is a loop of sections (| starts the next); 'hum along 2 …' changes section 2, 'hum along' shows them"),
             ("hum along canon bass", "or hum a song from the songbook: plain 'hum along' lists them (Pachelbel's Canon, Frère Jacques, Twinkle…)"),
+            ("learn lullaby E G C5 / forget lullaby", "keep a song of your own, to hum (or hum along with) by name; 'learn' lists yours"),
             ("make a music box / teach C E G / play", "a box that remembers your tune"),
             ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
             ("make a jukebox / add songs / jukebox", "everyone adds songs from their computer; it plays one each, taking turns"),
