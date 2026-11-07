@@ -1,8 +1,8 @@
 name = "Now playing for humming circles"
-status = "todo"
+status = "done"
 description = "Every turn of a humming circle writes a three-line wall of notes per person into the log; on a phone it's the whole screen every few seconds and anything anyone says scrolls away. In the browser, show a little now-playing strip above the input instead (who's humming, which section of how many, the beat going round), updated in place each turn, and keep the log for the human bits: joins, hushes, fixes and chat. The terminal gets one short line a turn."
 created_at = "2026-11-07T22:48:24.927767Z"
-updated_at = "2026-11-07T22:48:24.927767Z"
+updated_at = "2026-11-07T22:52:53.557513Z"
 tags = [
     "phone",
     "music",

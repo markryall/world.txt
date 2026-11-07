@@ -16,7 +16,7 @@
 
 use super::Game;
 use super::music::clean_word;
-use crate::protocol::{Col, Line, ToClient};
+use crate::protocol::{CirclePart, Col, Line, ToClient};
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use std::time::{Duration, Instant};
@@ -72,7 +72,6 @@ pub struct Part {
     pub id: u64,
     pub user: String,
     pub name: String,
-    pub verb: &'static str,
     /// Tunes ready to send, tempo first.
     sections: Vec<String>,
     /// The section that plays next.
@@ -95,7 +94,6 @@ pub struct Heard {
     pub id: u64,
     pub user: String,
     pub name: String,
-    pub verb: &'static str,
     pub tune: String,
     /// Which section, and how many there are.
     pub section: (usize, usize),
@@ -171,12 +169,12 @@ impl Circle {
     /// end, or from section `from` (counting from 1) on, replacing what's
     /// there. Says which sections they went in as, or `None` if there's no
     /// room.
-    pub fn set(&mut self, id: u64, user: &str, name: &str, verb: &'static str, from: Option<usize>, new: Vec<String>) -> Option<RangeInclusive<usize>> {
+    pub fn set(&mut self, id: u64, user: &str, name: &str, from: Option<usize>, new: Vec<String>) -> Option<RangeInclusive<usize>> {
         let i = match self.parts.iter().position(|p| p.id == id) {
             Some(i) => i,
             None if self.parts.len() >= MAX_PARTS => return None,
             None => {
-                self.parts.push(Part { id, user: user.to_string(), name: name.to_string(), verb, sections: Vec::new(), at: 0 });
+                self.parts.push(Part { id, user: user.to_string(), name: name.to_string(), sections: Vec::new(), at: 0 });
                 self.parts.len() - 1
             }
         };
@@ -188,7 +186,6 @@ impl Circle {
             }
             return None;
         }
-        p.verb = verb;
         let n = new.len();
         for (k, s) in new.into_iter().enumerate() {
             match p.sections.get_mut(from + k) {
@@ -250,7 +247,7 @@ impl Circle {
         let mut heard = Vec::new();
         for p in &mut self.parts {
             let n = p.sections.len();
-            heard.push(Heard { id: p.id, user: p.user.clone(), name: p.name.clone(), verb: p.verb, tune: p.sections[p.at].clone(), section: (p.at + 1, n) });
+            heard.push(Heard { id: p.id, user: p.user.clone(), name: p.name.clone(), tune: p.sections[p.at].clone(), section: (p.at + 1, n) });
             p.at = (p.at + 1) % n;
         }
         let len = self.turn_length().as_secs_f64();
@@ -300,31 +297,24 @@ impl Game {
             for id in gone {
                 if let Some(p) = players.get(&id) {
                     let _ = p.tx.send(ToClient::Lines { lines: vec![Line::col(Col::Pink, "🎶 You leave the humming circle behind.")] });
+                    let _ = p.tx.send(ToClient::Circle { ms: 0, parts: Vec::new() });
                 }
             }
+            let ms = c.turn_length().as_millis() as u64;
             for (&pid, p) in players {
                 // Residents don't need the tune, and every turn would wake them.
                 if (p.x, p.y) != (x, y) || p.bot {
                     continue;
                 }
-                let lines: Vec<Line> = heard
+                // The parts, not lines of notes: the browser shows who's humming
+                // in a strip and plays the tunes, so the log stays readable.
+                let parts: Vec<CirclePart> = heard
                     .iter()
                     .filter(|h| p.hears(&h.user))
-                    .map(|h| {
-                        let which = match h.section {
-                            (_, 1) => String::new(),
-                            (k, n) => format!("({k}/{n}) "),
-                        };
-                        let tune = format!("♪ {} ♪", h.tune);
-                        if h.id == pid {
-                            Line::new().c(Col::Dim, format!("You {} along {which}", plain_verb(h.verb))).c(Col::Pink, tune)
-                        } else {
-                            Line::new().who(&h.name).c(Col::Dim, format!(" {} along {which}", h.verb)).c(Col::Pink, tune)
-                        }
-                    })
+                    .map(|h| CirclePart { name: h.name.clone(), you: h.id == pid, section: h.section.0, of: h.section.1, tune: h.tune.clone() })
                     .collect();
-                if !lines.is_empty() {
-                    let _ = p.tx.send(ToClient::Lines { lines });
+                if !parts.is_empty() {
+                    let _ = p.tx.send(ToClient::Circle { ms, parts });
                 }
             }
             if c.is_empty() {
@@ -332,21 +322,24 @@ impl Game {
             }
         }
         for (x, y) in ended {
-            self.circles.remove(&(x, y));
+            self.end_circle(x, y);
             self.tell_here(x, y, 0, Line::col(Col::Pink, "🎶 The humming circle comes gently to an end."));
+        }
+    }
+
+    /// A circle's over: everyone at its spot stops showing it.
+    fn end_circle(&mut self, x: i64, y: i64) {
+        self.circles.remove(&(x, y));
+        for p in self.players.values().filter(|p| (p.x, p.y) == (x, y)) {
+            let _ = p.tx.send(ToClient::Circle { ms: 0, parts: Vec::new() });
         }
     }
 
     /// `hum along [section] <tune>`: start a circle here, or add to (or
     /// change) your part in the one that's going. Bare, it shows your part.
-    pub(super) fn cmd_hum_along(&mut self, id: u64, verb: &str, rest: &str) -> anyhow::Result<()> {
+    pub(super) fn cmd_hum_along(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
         let Some(p) = self.players.get(&id) else { return Ok(()) };
         let (x, y, name, user) = (p.x, p.y, p.name.clone(), p.user.clone());
-        let verbs = match verb {
-            "sing" => "sings",
-            "whistle" => "whistles",
-            _ => "hums",
-        };
         let (from, tune) = section_and_tune(rest);
         if tune.is_empty() {
             self.show_part(id, x, y);
@@ -379,7 +372,7 @@ impl Game {
         };
         let had = c.sections_of(id);
         let joining = c.part(id).is_none();
-        let Some(placed) = c.set(id, &user, &name, verbs, from, sections) else {
+        let Some(placed) = c.set(id, &user, &name, from, sections) else {
             let msg = if joining {
                 format!("🎶 The circle's full: {MAX_PARTS} people are humming in it already.")
             } else {
@@ -464,7 +457,7 @@ impl Game {
         }
         c.hush(id);
         if c.is_empty() {
-            self.circles.remove(&(x, y));
+            self.end_circle(x, y);
             self.say1(id, Line::col(Col::Pink, "🎶 You let the last note fade, and the humming circle comes gently to an end."));
             self.tell_here_from(x, y, id, &user, Line::col(Col::Pink, format!("🎶 {name} lets the last note fade, and the humming circle comes gently to an end.")));
         } else {
@@ -472,14 +465,6 @@ impl Game {
             self.tell_here_from(x, y, id, &user, Line::col(Col::Pink, format!("🎶 {name} hushes.")));
         }
         Ok(())
-    }
-}
-
-fn plain_verb(verbs: &str) -> &'static str {
-    match verbs {
-        "sings" => "sing",
-        "whistles" => "whistle",
-        _ => "hum",
     }
 }
 
@@ -545,12 +530,12 @@ mod tests {
         let t0 = Instant::now();
         let mut c = Circle::new(t0, FRERE).unwrap();
         let len = c.turn_length();
-        assert_eq!(c.set(1, "a", "A", "hums", None, c.split(FRERE).unwrap()), Some(1..=4));
+        assert_eq!(c.set(1, "a", "A", None, c.split(FRERE).unwrap()), Some(1..=4));
         assert_eq!(c.due(), t0);
         let section = |c: &mut Circle, k: u32| c.play(t0 + len * k, |_| true).0.iter().map(|h| h.section).collect::<Vec<_>>();
         assert_eq!(section(&mut c, 0), vec![(1, 4)]);
         // The round: the second voice comes in a turn later.
-        c.set(2, "b", "B", "sings", None, c.split(FRERE).unwrap());
+        c.set(2, "b", "B", None, c.split(FRERE).unwrap());
         assert_eq!(section(&mut c, 1), vec![(2, 4), (1, 4)]);
         assert_eq!(section(&mut c, 2), vec![(3, 4), (2, 4)]);
         assert_eq!(section(&mut c, 3), vec![(4, 4), (3, 4)]);
@@ -563,14 +548,14 @@ mod tests {
         let t0 = Instant::now();
         let mut c = Circle::new(t0, GROUND).unwrap();
         let s = |c: &Circle, t: &str| c.split(t).unwrap();
-        c.set(1, "a", "A", "hums", None, s(&c, "C | D | E"));
+        c.set(1, "a", "A", None, s(&c, "C | D | E"));
         // Oops, section 2 should have been an F.
-        assert_eq!(c.set(1, "a", "A", "hums", Some(2), s(&c, "F")), Some(2..=2));
+        assert_eq!(c.set(1, "a", "A", Some(2), s(&c, "F")), Some(2..=2));
         assert_eq!(c.part(1).unwrap().sections(), ["@110 C", "@110 F", "@110 E"]);
         // From section 3 on, running over the end adds more.
-        assert_eq!(c.set(1, "a", "A", "hums", Some(3), s(&c, "G | A")), Some(3..=4));
+        assert_eq!(c.set(1, "a", "A", Some(3), s(&c, "G | A")), Some(3..=4));
         // A number past the end just adds.
-        assert_eq!(c.set(1, "a", "A", "hums", Some(9), s(&c, "B")), Some(5..=5));
+        assert_eq!(c.set(1, "a", "A", Some(9), s(&c, "B")), Some(5..=5));
         assert_eq!(c.part(1).unwrap().sections(), ["@110 C", "@110 F", "@110 G", "@110 A", "@110 B"]);
 
         c.play(t0, |_| true);
@@ -589,8 +574,8 @@ mod tests {
     fn people_who_wander_off_or_hush_leave_the_circle() {
         let t0 = Instant::now();
         let mut c = Circle::new(t0, GROUND).unwrap();
-        c.set(1, "a", "A", "hums", None, vec!["@110 C".into()]);
-        c.set(2, "b", "B", "hums", None, vec!["@110 E".into()]);
+        c.set(1, "a", "A", None, vec!["@110 C".into()]);
+        c.set(2, "b", "B", None, vec!["@110 E".into()]);
         let (heard, gone) = c.play(t0, |id| id == 1);
         assert_eq!((heard.len(), gone), (1, vec![2]));
         assert!(c.hush(1) && !c.hush(1) && c.is_empty());
@@ -601,7 +586,7 @@ mod tests {
         let t0 = Instant::now();
         let mut c = Circle::new(t0, GROUND).unwrap();
         let len = c.turn_length();
-        c.set(1, "a", "A", "hums", None, vec!["@110 C".into()]);
+        c.set(1, "a", "A", None, vec!["@110 C".into()]);
         c.play(t0 + len * 5 + len / 2, |_| true);
         assert_eq!(c.due(), t0 + len * 6);
     }
@@ -611,14 +596,14 @@ mod tests {
         let mut c = circle(GROUND);
         let one = || vec!["@110 C".to_string()];
         for _ in 0..MAX_SECTIONS {
-            assert!(c.set(1, "a", "A", "hums", None, one()).is_some());
+            assert!(c.set(1, "a", "A", None, one()).is_some());
         }
-        assert_eq!(c.set(1, "a", "A", "hums", None, one()), None);
-        assert!(c.set(1, "a", "A", "hums", Some(16), one()).is_some(), "but changing one is fine");
+        assert_eq!(c.set(1, "a", "A", None, one()), None);
+        assert!(c.set(1, "a", "A", Some(16), one()).is_some(), "but changing one is fine");
         for id in 2..=MAX_PARTS as u64 {
-            assert!(c.set(id, "x", "X", "hums", None, one()).is_some());
+            assert!(c.set(id, "x", "X", None, one()).is_some());
         }
-        assert_eq!(c.set(99, "y", "Y", "hums", None, one()), None);
+        assert_eq!(c.set(99, "y", "Y", None, one()), None);
         assert!(c.part(99).is_none());
     }
 

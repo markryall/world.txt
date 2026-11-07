@@ -98,6 +98,10 @@ each turn, together, so it doesn't matter when you typed it.
 - A part can have several **sections**, a turn each: `|` starts the next one,
   and a tune longer than a turn is cut into sections for you. Your sections go
   round and round in a loop until you `hush`, or walk off.
+- In the browser, a strip above the box shows who's humming and which
+  section they're on, with a line sweeping across each turn (tap 🎶 for the
+  circle and your part, or a name to message them). The notes play without
+  filling the log.
 - `hum along` with nothing after it shows the circle and your sections,
   numbered. Hit a wrong note? `hum along 2 …` puts new notes in section 2, and
   it plays the new way next time round. `hum along 5 …` past the end adds one,

@@ -69,6 +69,11 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                                 st.here = here;
                             }
                             Ok(ToClient::Hint { text, .. }) => st.hint = text,
+                            // No sound here: one short line a turn says who's humming.
+                            Ok(ToClient::Circle { parts, .. }) if !parts.is_empty() => {
+                                st.log.push(crate::protocol::circle_line(&parts));
+                            }
+                            Ok(ToClient::Circle { .. }) => {}
                             Ok(ToClient::Travel { url }) => st.log.push(crate::protocol::Line::new()
                                 .c(crate::protocol::Col::Blue, "⛵ Visiting other worlds happens in a browser: open ")
                                 .b(crate::protocol::Col::Yellow, url)),

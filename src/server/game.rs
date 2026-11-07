@@ -714,7 +714,7 @@ impl Game {
             "meet" | "meeting" => return self.cmd_meet(id, rest),
             "shout" | "yell" | "call" => return self.cmd_shout(id, rest),
             "hum" | "sing" | "whistle" if rest == "along" || rest.starts_with("along ") => {
-                return self.cmd_hum_along(id, &verb, rest.trim_start_matches("along"));
+                return self.cmd_hum_along(id, rest.trim_start_matches("along"));
             }
             "hum" | "sing" | "whistle" => return self.cmd_hum(id, &verb, rest),
             "hush" | "shh" => return self.cmd_hush(id, rest),

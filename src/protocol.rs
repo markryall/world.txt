@@ -87,6 +87,35 @@ impl Line {
     }
 }
 
+/// One person's part in a turn of a humming circle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CirclePart {
+    pub name: String,
+    /// It's your own part.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub you: bool,
+    /// Which of their sections is playing, counting from 1, and how many
+    /// they have.
+    pub section: usize,
+    pub of: usize,
+    /// The tune to play, tempo first (`@110 D3- A2- …`).
+    pub tune: String,
+}
+
+/// A turn of a humming circle as one line, for clients without a strip to
+/// show it in: "🎶 Poppy · Sam 9/10 · you 8/10".
+pub fn circle_line(parts: &[CirclePart]) -> Line {
+    let mut line = Line::new().c(Col::Pink, "🎶");
+    for (i, p) in parts.iter().enumerate() {
+        line = line.c(Col::Dim, if i == 0 { " " } else { " · " });
+        line = if p.you { line.b(Col::Pink, "you") } else { line.c(Col::Cyan, &p.name) };
+        if p.of > 1 {
+            line = line.c(Col::Dim, format!(" {}/{}", p.section, p.of));
+        }
+    }
+    line
+}
+
 /// Someone else out in the world, for the side panel's list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Person {
@@ -197,6 +226,14 @@ pub enum BoardMode {
 pub enum ToClient {
     /// Lines appended to the scrolling log.
     Lines { lines: Vec<Line> },
+    /// A turn of the humming circle where you are: every part to play now,
+    /// together, and who's humming what. No parts means there's no circle
+    /// here any more (it ended, or you've walked away).
+    Circle {
+        /// How long this turn lasts, in milliseconds.
+        ms: u64,
+        parts: Vec<CirclePart>,
+    },
     /// The world is restarting (a redeploy): reconnect in a moment.
     Restarting,
     /// The side panel: minimap and status.
@@ -373,6 +410,15 @@ mod tests {
         assert!(json.contains(r#""fill":"@Sam ""#) && json.contains(r#""run":"hum along canon tune""#), "{json}");
         let back: Line = serde_json::from_str(r#"[{"t":"hi","c":"pink"}]"#).unwrap();
         assert!(back.0[0].run.is_none() && back.0[0].fill.is_none());
+    }
+
+    #[test]
+    fn a_circle_turn_reads_as_one_line() {
+        use super::{CirclePart, circle_line};
+        let part = |name: &str, you, section, of| CirclePart { name: name.into(), you, section, of, tune: "@110 C".into() };
+        let line = circle_line(&[part("Poppy", false, 1, 1), part("Sam", false, 9, 10), part("Kiri", true, 8, 10)]);
+        let text: String = line.0.iter().map(|s| s.t.as_str()).collect();
+        assert_eq!(text, "🎶 Poppy · Sam 9/10 · you 8/10");
     }
 
     #[test]

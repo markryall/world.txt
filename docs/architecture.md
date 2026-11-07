@@ -100,6 +100,7 @@ passport), `cmd` (anything typed), `audio` (gramophone music), and `queue` /
 - `status`: the side panel. Place, weather, clock, a minimap (itself just
   coloured lines), who's about, and any progress bars and status lights.
 - `board`: a noticeboard's notes, for the board view.
+- `circle`: a turn of the humming circle where you are (below).
 - `hint`: the current first-steps nudge.
 - `welcome`, `bye`, `restarting`, `travel`: signing in, being turned away, a
   redeploy in progress, going to another world.
@@ -240,15 +241,20 @@ The world keeps the beat itself: the game loop's `select!` has one more
 branch, a sleep until the next turn of whichever circle is due soonest. A
 turn's start is worked out from when the circle began (start + turn length ×
 turn number), so it doesn't drift. If the world falls behind, it carries on
-from now and doesn't rush to catch up. When a turn comes round, each person at the spot gets
-everyone's sections for that turn in **one** message, so however long the
-trip to their browser takes, the parts arrive and start together. Network
-lag shifts the whole circle a little for each listener but never pulls the
-parts apart.
+from now and doesn't rush to catch up. When a turn comes round, each person at the spot gets a `circle` message
+with everyone's sections for that turn (minus anyone they've muted), so
+however long the trip to their browser takes, the parts arrive and start
+together. Network lag shifts the whole circle a little for each listener but
+never pulls the parts apart. The browser plays them all and shows who's
+humming, and which section of how many, in a strip above the command box,
+with a line sweeping across the turn, so the notes never fill the log. The
+terminal prints one short line a turn. An empty `circle` means it's over
+(or you've walked away); the browser also lets the strip go if no turn comes
+for a while.
 
 The world rewrites every section with the circle's tempo before sending it,
-so the browser needs nothing new: it's still `♪ … ♪` lines going through
-`playTune`. Residents aren't sent the turns, since each one would wake them for nothing.
+and the browser plays it with the same `playTune` as any other tune.
+Residents aren't sent the turns, since each one would wake them for nothing.
 
 ### Weather and wildlife
 

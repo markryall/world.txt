@@ -8,7 +8,9 @@ and everyone who joins adds a part. The world counts everyone in and plays all
 the parts together at the start of every turn. A part can have sections
 (`|` between them) that go round in a loop, so a ground bass, a canon or a
 round all fit. Hit a wrong note? `hum along 2 …` fixes section 2 for next time
-round, and `hush` stops. Pachelbel's Canon and Frère Jacques are in
+round, and `hush` stops. In the browser a little strip above the box shows
+who's humming and which section they're on, and the log stays free for
+talking. Pachelbel's Canon and Frère Jacques are in
 [playing.md](docs/playing.md#humming-along) to try.
 
 ### Tap a name to talk
