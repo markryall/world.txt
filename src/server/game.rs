@@ -22,6 +22,7 @@ mod jukebox;
 mod lighthouse;
 mod meetings;
 mod music;
+mod sounds;
 mod play;
 mod progress;
 mod lights;
@@ -104,6 +105,9 @@ struct Player {
     fun: play::Fun,
     /// Their side panel is out of date, and goes with the next stride.
     status_due: std::cell::Cell<bool>,
+    /// What it sounded like in the last side panel they were sent, so a
+    /// change (rain arriving, dusk and the crickets) sends a fresh one.
+    sounds: std::cell::Cell<crate::protocol::Sounds>,
     /// The radio this browser has been told it can hear: (how loud, stream).
     radios: HashMap<i64, (f32, String)>,
 }
@@ -348,6 +352,11 @@ impl Game {
             people: self.people_for(id),
             progress: [self.build_bars_for(id), self.bars_for(id)].concat(),
             lights: self.lights_for(id),
+            sounds: {
+                let sounds = self.sounds_at(p.x, p.y);
+                p.sounds.set(sounds);
+                sounds
+            },
         };
         let _ = p.tx.send(msg);
     }
@@ -511,7 +520,7 @@ impl Game {
             None => (self.zone_of(&user), self.world.db.zone(&user).is_some()),
         };
         let _ = tx.send(ToClient::Welcome { token: new_token, user: user.clone(), nickname: name.clone() });
-        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false), fun: play::Fun::wearing(self.world.db.wearing(&user)) });
+        self.players.insert(id, Player { name: name.clone(), user: user.clone(), x, y, tx, sky, bot, reply_to: None, tutorial, fishing: None, reading: None, muted, key_hash, travel: None, walk_to: None, heading: None, join_after: None, voyage: None, tz, tz_known, companion, last_ambient: None, ambient_quiet: 0, radios: HashMap::new(), seen_acts: HashMap::new(), status_due: std::cell::Cell::new(false), sounds: std::cell::Cell::new(crate::protocol::Sounds::default()), fun: play::Fun::wearing(self.world.db.wearing(&user)) });
 
         self.send(
             id,
@@ -2088,6 +2097,9 @@ impl Game {
         for id in ids {
             let Some(p) = self.players.get(&id) else { continue };
             let (x, y) = (p.x, p.y);
+            if !p.bot && self.sounds_at(x, y) != p.sounds.get() {
+                p.status_due.set(true);
+            }
             let sky = self.world.weather.sky_at(x, y);
             if sky != p.sky {
                 if let Some(msg) = sky_change(p.sky, sky, Clock::season()) {

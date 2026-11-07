@@ -203,7 +203,7 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const log = $('#log');
-let ws, sky = '', audio, soundOn = false, rain;
+let ws, sky = '', audio, soundOn = false, heard = {};
 const typed = []; let hist = 0;
 
 // The recent log is kept on this device (per world), so a refresh or a
@@ -318,7 +318,9 @@ function status(m) {
     map.appendChild(paintLine(line.map(textStyle)));
   });
   sky = m.weather;
-  updateRain();
+  // An older world says only the weather: rain's all it can tell us.
+  heard = m.sounds || { rain: /\brain\b/.test(sky) ? 1 : /drizzle/.test(sky) ? 0.4 : 0 };
+  updateSounds();
 }
 
 // ---- signing in ----------------------------------------------------------
@@ -1027,7 +1029,7 @@ $('#sound').onclick = () => {
   $('#sound').textContent = soundOn ? '🔊 sound on' : '🔇 sound off';
   if (soundOn && !audio) audio = new (window.AudioContext || window.webkitAudioContext)();
   if (audio) audio.resume();
-  updateRain();
+  updateSounds();
   for (const el of Object.values(radios)) soundOn ? playRadio(el) : el.pause();
   if (!soundOn) for (const t of Object.keys(listening)) unhear(t);
 };
@@ -1077,22 +1079,159 @@ function playTune(text) {
   }
 }
 
-function updateRain() {
-  if (!audio) return;
-  const level = !soundOn ? 0 : /\brain\b/.test(sky) ? 0.12 : /drizzle/.test(sky) ? 0.05 : 0;
-  if (!rain) {
-    const len = audio.sampleRate * 2, buf = audio.createBuffer(1, len, audio.sampleRate);
-    const d = buf.getChannelData(0);
+// ---- sounds of the island ------------------------------------------------
+// The world says how much of each sound there is where you're standing, from
+// 0 to 1 (src/server/game/sounds.rs). Everything is made here, from noise and
+// little oscillators: no sound files. Rain, wind and waves are beds of noise
+// that keep running, shaped by filters and swells; thunder, birds, crickets
+// and the crackle of a fire are little one-off sounds, now and then.
+
+// How loud each is at its loudest. Gentle: these sit under everything else.
+const PEAK = { rain: 0.12, wind: 0.07, waves: 0.09, hearth: 0.025, thunder: 0.35, birds: 0.035, crickets: 0.012, fire: 0.1 };
+const amb = {};
+let noiseBuf = null;
+
+function noise() {
+  if (!noiseBuf) {
+    const len = audio.sampleRate * 2;
+    noiseBuf = audio.createBuffer(1, len, audio.sampleRate);
+    const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    const src = audio.createBufferSource(); src.buffer = buf; src.loop = true;
-    const filter = audio.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1400;
-    const gain = audio.createGain(); gain.gain.value = 0;
-    src.connect(filter).connect(gain).connect(audio.destination);
-    src.start();
-    rain = gain;
   }
-  rain.gain.setTargetAtTime(level, audio.currentTime, 1.5);
+  const src = audio.createBufferSource();
+  src.buffer = noiseBuf;
+  src.loop = true;
+  return src;
 }
+
+function filter(type, freq, q) {
+  const f = audio.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = freq;
+  if (q) f.Q.value = q;
+  return f;
+}
+
+// A bed: noise through a filter into its own volume, running for good.
+function bed(name, f) {
+  if (amb[name]) return amb[name];
+  const gain = audio.createGain();
+  gain.gain.value = 0;
+  const src = noise();
+  src.connect(f).connect(gain).connect(audio.destination);
+  // Each starts somewhere different in the noise, so beds don't echo each other.
+  src.start(0, Math.random() * 2);
+  return (amb[name] = { gain, f, level: 0, next: 0 });
+}
+
+function one(name) {
+  return (amb[name] = amb[name] || { level: 0, next: 0 });
+}
+
+function updateSounds() {
+  if (!audio) return;
+  const on = soundOn ? 1 : 0, t = audio.currentTime;
+  const level = (k) => on * Math.max(0, Math.min(1, heard[k] || 0));
+  bed('rain', filter('lowpass', 1400)).gain.gain.setTargetAtTime(level('rain') * PEAK.rain, t, 1.5);
+  bed('hearth', filter('lowpass', 400)).gain.gain.setTargetAtTime(level('fire') * PEAK.hearth, t, 1);
+  for (const [k, f] of [['wind', () => filter('bandpass', 500, 0.7)], ['waves', () => filter('lowpass', 700)]]) {
+    const b = amb[k] || bed(k, f());
+    b.level = level(k);
+    if (!b.level) { b.gain.gain.cancelScheduledValues(t); b.gain.gain.setTargetAtTime(0, t, 1.5); b.next = 0; }
+  }
+  for (const k of ['thunder', 'birds', 'crickets', 'fire']) {
+    const o = one(k);
+    o.level = level(k);
+    if (!o.level) o.next = 0;
+  }
+}
+
+// A short shaped puff of noise, for crackles and thunder.
+function burst(type, freq, q, peak, attack, decay, when) {
+  const src = noise(), f = filter(type, freq, q), g = audio.createGain();
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(peak, when + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + attack + decay);
+  src.connect(f).connect(g).connect(audio.destination);
+  src.start(when, Math.random() * 1.5);
+  src.stop(when + attack + decay + 0.05);
+}
+
+// Far off, low, and rolling on a little after.
+function rumble(level, t) {
+  burst('lowpass', 110 + Math.random() * 90, 0.7, PEAK.thunder * level, 0.4, 3.5 + Math.random() * 2, t);
+  burst('lowpass', 80 + Math.random() * 40, 0.7, PEAK.thunder * level * 0.6, 0.8, 2.5, t + 0.6 + Math.random());
+}
+
+// A little bird: two to five quick rising notes.
+function chirps(level, t) {
+  const base = 2200 + Math.random() * 1800, n = 2 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < n; i++) {
+    const o = audio.createOscillator(), g = audio.createGain(), len = 0.05 + Math.random() * 0.07;
+    o.type = 'sine';
+    o.frequency.setValueAtTime(base * (0.9 + Math.random() * 0.3), t);
+    o.frequency.exponentialRampToValueAtTime(base * (1.2 + Math.random() * 0.4), t + len);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(PEAK.birds * level, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g).connect(audio.destination);
+    o.start(t); o.stop(t + len + 0.02);
+    t += len + 0.03 + Math.random() * 0.08;
+  }
+}
+
+// A cricket: three quick pulses, high and thin.
+function cricket(level, t) {
+  const f = 4200 + Math.random() * 600;
+  for (let i = 0; i < 3; i++) {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = 'sine';
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(PEAK.crickets * level, t + 0.004);
+    g.gain.linearRampToValueAtTime(0, t + 0.02);
+    o.connect(g).connect(audio.destination);
+    o.start(t); o.stop(t + 0.03);
+    t += 0.045;
+  }
+}
+
+// Four times a second: gusts, waves, and whatever's due to chirp or pop.
+setInterval(() => {
+  if (!audio || !soundOn) return;
+  const t = audio.currentTime;
+  const w = amb.wind;
+  if (w?.level && t >= w.next) {
+    // A gust: the wind swells or drops, and its pitch drifts.
+    w.gain.gain.setTargetAtTime(w.level * PEAK.wind * (0.35 + Math.random() * 0.65), t, 1.2);
+    w.f.frequency.setTargetAtTime(300 + Math.random() * 600, t, 1.5);
+    w.next = t + 2 + Math.random() * 3;
+  }
+  const v = amb.waves;
+  if (v?.level && t >= v.next) {
+    // A wave rolls in, breaks, and draws back over the sand.
+    const g = v.level * PEAK.waves * (0.6 + Math.random() * 0.4), p = v.gain.gain, fr = v.f.frequency;
+    const rise = 2 + Math.random(), fall = 4 + Math.random() * 2;
+    p.cancelScheduledValues(t); p.setValueAtTime(p.value, t);
+    p.linearRampToValueAtTime(g, t + rise);
+    p.linearRampToValueAtTime(g * 0.15, t + rise + fall);
+    fr.cancelScheduledValues(t); fr.setValueAtTime(fr.value, t);
+    fr.linearRampToValueAtTime(1000, t + rise);
+    fr.linearRampToValueAtTime(350, t + rise + fall);
+    v.next = t + rise + fall + Math.random() * 2;
+  }
+  // The one-off sounds: the first thunder waits a while; the rest start soon.
+  const due = (k, gap, play) => {
+    const o = amb[k];
+    if (!o?.level || t < o.next) return;
+    if (o.next || k !== 'thunder') play(o.level, t + 0.05);
+    o.next = t + gap(o.level);
+  };
+  due('thunder', () => 20 + Math.random() * 40, rumble);
+  due('birds', (l) => (1.5 + Math.random() * 5) / l, chirps);
+  due('crickets', () => 0.7 + Math.random() * 0.6, cricket);
+  due('fire', () => 0.04 + Math.random() * 0.3, (l, at) => burst('bandpass', 1000 + Math.random() * 3000, 1.5, (0.3 + Math.random() * 0.7) * PEAK.fire * l, 0.002, 0.02 + Math.random() * 0.05, at));
+}, 250);
 </script>
 </body>
 </html>

@@ -189,7 +189,7 @@ the terminal, everything still reads perfectly well as text.
 | What | What travels | What the browser does |
 |---|---|---|
 | Hums, songs, music boxes, folk whistling | A line containing `♪ … ♪` | Reads the notes and plays them on a little synthesiser |
-| Rain | The weather word in the side panel | Shapes noise to sound like rain |
+| Weather and wildlife | Levels from 0 to 1 in the side panel | Makes rain, wind, waves, thunder, birds, crickets and fire from noise and oscillators |
 | Gramophones and jukeboxes | Compressed audio, relayed through the world | Decodes it and plays it at a volume for how near you are |
 | Radios | A web address and a volume | Streams straight from the station |
 
@@ -226,14 +226,50 @@ Everyone at the spot gets the same line and plays it in their own browser,
 so it sounds the same for all of them. It isn't exactly in sync, though:
 each browser starts when its own copy arrives.
 
-### Rain
+### Weather and wildlife
 
-There are no sound files for weather. The browser fills a two-second buffer
-with random noise, loops it, and runs it through a low-pass filter at
-1400 Hz, which softens the hiss into a patter. The weather in the side panel
-sets the volume (louder for rain, quieter for drizzle, silent otherwise),
-and changes glide in over a second or two so a shower arrives and leaves
-gently.
+None of these sounds come from files. Each side panel carries a `sounds`
+set (`src/server/game/sounds.rs`): rain, thunder, wind, waves, birds,
+crickets and fire, each from 0 to 1, worked out from where you're standing.
+
+- **Rain** comes from the cloud overhead (snow is silent).
+- **Thunder** comes in a proper storm, when the cloud is heavier still.
+- **Wind** depends on the wind speed and how exposed you are: full on hills,
+  sand and water, less in the woods.
+- **Waves** are full right by the sea and fainter two steps back.
+- **Birds** sing by day, most in the woods.
+- **Crickets** come out at dusk and night, in the grass, but not in winter
+  or wet weather.
+- **Fire** crackles beside a campfire.
+
+Indoors, the rain drums on the roof at a third of the volume, the wind is
+only just there, and the wildlife is shut out. Levels are rounded to
+quarters, so a fresh side panel only goes out when you'd actually hear the
+difference. The world also checks every tick whether what someone would
+hear has changed (a shower arriving, dusk bringing the crickets out), and
+sends a new panel when it has.
+
+The browser shares a single two-second buffer of random noise between
+everything, and builds two kinds of sound from it:
+
+- **Beds** keep running underneath, each through its own filter and volume.
+  Rain is noise through a 1400 Hz low-pass filter, which softens the hiss
+  into a patter. Wind goes through a band-pass filter: every few seconds a
+  gust picks a new volume and the filter's pitch drifts, so it sighs and
+  gusts. Waves go through a low-pass filter that opens as each wave rolls in
+  over two or three seconds and closes again as it draws back over four to
+  six. A soft low hiss sits under a fire.
+- **One-offs** are booked when they're due, about four times a second.
+  Thunder is two long, low puffs of noise, the second rolling in just
+  after, every 20 to 60 seconds, and never the moment the storm arrives. A
+  bird is two to five quick sine-wave notes, each rising in pitch, coming
+  more often the more birds there are. A cricket is three tiny pulses at
+  about 4.5kHz, every second or so. A fire's crackle is a burst of noise a
+  few hundredths of a second long through a band-pass filter at a random
+  pitch, several times a second.
+
+Every volume glides rather than jumps, so a shower arrives and leaves
+gently, and turning the sound off fades it all out.
 
 ### Gramophones
 

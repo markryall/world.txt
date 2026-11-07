@@ -99,6 +99,21 @@ impl Bar {
     }
 }
 
+/// What a spot sounds like, for clients that make sound: each from 0
+/// (silent) to 1. The browser makes them all itself (web/index.html,
+/// "Sounds of the island"); nothing here is audio.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Sounds {
+    pub rain: f32,
+    pub thunder: f32,
+    pub wind: f32,
+    pub waves: f32,
+    pub birds: f32,
+    pub crickets: f32,
+    pub fire: f32,
+}
+
 /// Something outside that's up or down (a build, a website), for the side panel.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Light {
@@ -177,6 +192,9 @@ pub enum ToClient {
         /// Up-or-down lights on noticeboards you follow or are near.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         lights: Vec<Light>,
+        /// What it sounds like where you are.
+        #[serde(default)]
+        sounds: Sounds,
     },
     /// The current first-steps nudge, or none to clear it.
     Hint {

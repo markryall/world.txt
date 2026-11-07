@@ -76,6 +76,12 @@ A few old tunes to start with:
 
 Clouds drift across the island on the wind, and a whole day passes in 24 minutes.
 
+In the browser, with the sound on (🔇 above the map), the island sounds like
+where you are: rain, and thunder in a storm, the wind (strongest up on the
+hills and down on the beach), waves by the sea, birds in the woods by day,
+crickets in the grass at night, and the crackle of a campfire. Indoors you
+hear the rain on the roof.
+
 ## Homes
 
 `claim` makes the 3x3 patch around you your home (one each, not too close to

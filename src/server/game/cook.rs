@@ -9,7 +9,7 @@ use crate::protocol::{Col, Line};
 use crate::server::nature::{self, Kind};
 use std::time::{Duration, Instant};
 
-const FIRE: &str = "campfire";
+pub const FIRE: &str = "campfire";
 const OVEN: &str = "oven";
 /// How far a cooking smell drifts, in steps.
 const SMELL: i64 = 6;

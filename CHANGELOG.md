@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Sounds of the island
+Rain's not alone any more. With the sound on, you'll hear the wind gust
+(strongest on the hills and the beach), waves roll in by the sea, thunder
+rumble in a storm, birds in the woods by day, crickets in the grass at
+night, and a campfire crackling. Indoors, the rain drums on the roof.
+
 ### Island folk
 Someone new might row in to your island: a beachcomber, a painter, a
 lamplighter, a fiddler… They potter about for a while, keep island hours,

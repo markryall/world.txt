@@ -122,6 +122,9 @@ pub struct Festival {
     pub greeting: &'static str,
 }
 
+/// Heavy enough to thunder.
+pub const STORMY: f64 = 0.9;
+
 pub struct Clock;
 
 impl Clock {
@@ -246,15 +249,7 @@ impl Weather {
         if super::world::in_room_space(x, y) {
             return Sky::Clear;
         }
-        let (px, py) = (x as f64, y as f64);
-        let k = self
-            .clouds
-            .iter()
-            .map(|c| {
-                let d = ((c.x - px).powi(2) + (c.y - py).powi(2)).sqrt();
-                c.strength * (1.0 - d / c.r).max(0.0)
-            })
-            .fold(0.0, f64::max);
+        let k = self.wetness(x, y);
         if k > 0.55 {
             Sky::Rain
         } else if k > 0.3 {
@@ -264,6 +259,19 @@ impl Weather {
         } else {
             Sky::Clear
         }
+    }
+
+    /// How heavy the cloud is over (x, y): 0 for clear sky, past 0.55 it's
+    /// raining, and past [`STORMY`] it's a proper storm.
+    pub fn wetness(&self, x: i64, y: i64) -> f64 {
+        let (px, py) = (x as f64, y as f64);
+        self.clouds
+            .iter()
+            .map(|c| {
+                let d = ((c.x - px).powi(2) + (c.y - py).powi(2)).sqrt();
+                c.strength * (1.0 - d / c.r).max(0.0)
+            })
+            .fold(0.0, f64::max)
     }
 
     pub fn wind_label(&self) -> &'static str {
