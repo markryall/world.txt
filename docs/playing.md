@@ -115,6 +115,9 @@ each turn, together, so it doesn't matter when you typed it.
   over the end of a turn, though (you'll be told which section to fix), and
   `_` rests fill a turn where you'd like to sit one out.
 - `sing along` and `whistle along` work too.
+- On a phone, the sound stops while the screen's locked or you're in another
+  app. The world keeps the beat without you, so when you come back your part
+  comes in again on the next turn, right in time.
 
 ### Pachelbel's Canon
 
