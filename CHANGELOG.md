@@ -22,6 +22,8 @@ One per room.
   and anything else asks which.
 - **`paint home lilac` works from anywhere,** as it always meant to, even while
   you're visiting someone else's home.
+- **Muting someone hides their humming** too, and any "making music together"
+  that involves them.
 
 ## 0.5.0 (2026-11-07)
 

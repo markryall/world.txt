@@ -951,7 +951,7 @@ impl Game {
 
     fn cmd_hum(&mut self, id: u64, verb: &str, tune: &str) -> anyhow::Result<()> {
         let Some(p) = self.players.get(&id) else { return Ok(()) };
-        let (x, y, name) = (p.x, p.y, p.name.clone());
+        let (x, y, name, user) = (p.x, p.y, p.name.clone(), p.user.clone());
         let tune = if tune.is_empty() { "a little tune".to_string() } else { format!("♪ {tune} ♪") };
         let verbs = match verb {
             "sing" => "sings",
@@ -959,16 +959,17 @@ impl Game {
             _ => "hums",
         };
         self.say1(id, Line::new().c(Col::Dim, format!("You {verb} ")).c(Col::Pink, &tune));
-        self.tell_here_from(x, y, id, &name, Line::new().b(Col::Cyan, &name).c(Col::Dim, format!(" {verbs} ")).c(Col::Pink, &tune));
+        // Mutes are kept by username, so it's the username that's checked.
+        self.tell_here_from(x, y, id, &user, Line::new().b(Col::Cyan, &name).c(Col::Dim, format!(" {verbs} ")).c(Col::Pink, &tune));
         for (&pid, o) in &self.players {
             let d = (o.x - x).abs().max((o.y - y).abs());
-            if pid != id && (1..=2).contains(&d) && o.hears(&name) {
+            if pid != id && (1..=2).contains(&d) && o.hears(&user) {
                 let _ = o.tx.send(ToClient::Lines {
                     lines: vec![Line::col(Col::Pink, format!("♪ You hear someone {verbs} nearby."))],
                 });
             }
         }
-        self.notice_jam(x, y, &name);
+        self.notice_jam(x, y, &user);
         Ok(())
     }
 

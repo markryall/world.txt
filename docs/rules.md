@@ -291,6 +291,8 @@ No command, keeper or otherwise, shows anyone else's private messages or mail.
 don't get:
 
 - what Sam says, emotes, shouts or chats;
+- Sam humming, singing or whistling, or word that Sam's making music with
+  someone;
 - Sam's private messages (Sam is shown them as sent; they're just never
   delivered), or any mail Sam left while you were away;
 - word of Sam's new noticeboard notes as they're posted;

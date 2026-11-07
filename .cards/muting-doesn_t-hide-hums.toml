@@ -1,8 +1,8 @@
 name = "Muting doesn't hide hums"
-status = "todo"
+status = "done"
 description = "cmd_hum passes the nickname to tell_here_from / hears(), but mutes are stored by username, so a muted person's humming still comes through."
 created_at = "2026-11-07T00:35:30.423745Z"
-updated_at = "2026-11-07T00:35:30.423745Z"
+updated_at = "2026-11-07T00:43:25.994175Z"
 tags = [
     "bug",
     "safety",

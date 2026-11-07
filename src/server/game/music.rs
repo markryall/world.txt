@@ -91,12 +91,19 @@ impl Game {
 
     /// Called after someone hums: two people humming at the same spot close
     /// together are jamming.
-    pub(super) fn notice_jam(&mut self, x: i64, y: i64, name: &str) {
+    /// `user` is a username, so whoever's muted either of them doesn't hear
+    /// about it.
+    pub(super) fn notice_jam(&mut self, x: i64, y: i64, user: &str) {
         let now = Instant::now();
-        let earlier = self.last_hum.get(&(x, y)).filter(|(who, at)| who != name && now.duration_since(*at) < JAM_WINDOW).map(|(w, _)| w.clone());
-        self.last_hum.insert((x, y), (name.to_string(), now));
+        let earlier = self.last_hum.get(&(x, y)).filter(|(who, at)| who != user && now.duration_since(*at) < JAM_WINDOW).map(|(w, _)| w.clone());
+        self.last_hum.insert((x, y), (user.to_string(), now));
         if let Some(other) = earlier {
-            self.tell_here(x, y, u64::MAX, Line::new().b(Col::Pink, format!("🎶 {other} and {name} are making music together!")));
+            let line = Line::new().b(Col::Pink, format!("🎶 {} and {} are making music together!", self.world.nick(&other), self.world.nick(user)));
+            for p in self.players.values() {
+                if (p.x, p.y) == (x, y) && p.hears(&other) && p.hears(user) {
+                    let _ = p.tx.send(crate::protocol::ToClient::Lines { lines: vec![line.clone()] });
+                }
+            }
         }
     }
 }
