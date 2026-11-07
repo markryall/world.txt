@@ -32,7 +32,9 @@ around the water. No more tap, tap, tap on the arrows. (Underneath it's
 ### Tap a name to talk
 In the browser, tap (or click) someone's name where they say, do, hum or
 shout something, or arrive, and the box is ready with `@Sam ` to message
-them.
+them. On a phone, when someone talks to you or arrives, a few quick replies
+(👋 hi, 😂, wave, thanks, or ↩ reply to a message) turn up in the buttons
+under the log for a minute, so the keyboard can stay down.
 
 ### Fixes
 - **Who am I?** The browser shows your name at the top of the side panel and

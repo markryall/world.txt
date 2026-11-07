@@ -21,7 +21,10 @@ Progress is saved by name, so returning visitors never see it again
   scale: you, friends, homes, boards, and numbered named places
 - `say hi` (or `'hi`), `:waves`, `shout`, `hum C E G`
 - `@Poppy hi` talks to someone anywhere (in the browser, tapping someone's
-  name in the log or the side panel starts one for you; if they're away it's kept as mail and
+  name in the log or the side panel starts one for you, and on a phone a few
+  quick replies (👋 hi, 😂, wave, thanks; or ↩ reply to a message) turn up
+  in the buttons under the log for a minute when someone talks to you or
+  arrives; if they're away it's kept as mail and
   shown when they next arrive), `reply` answers them, `chat` (or `@all`) reaches
   everyone, `find Poppy` tells you which way to walk, and `join Poppy` walks you
   there automatically (around the water, rowing across if they're on another

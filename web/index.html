@@ -137,6 +137,8 @@
   #chips button { flex: none; background: var(--line); color: var(--fg); border: 0; border-radius: 16px;
     font: inherit; font-size: 14px; height: 34px; padding: 0 12px; touch-action: manipulation; }
   #chips button:active { background: var(--magenta); color: var(--bg); }
+  #replies { display: contents; }
+  #replies button { background: none; border: 1px solid var(--magenta); color: var(--magenta); }
   @media (max-width: 720px) {
     #chips { display: flex; }
     #input { border-top: 0; }
@@ -188,6 +190,7 @@
   <span id="hint-text"></span><span class="go">try it</span><span class="skip" id="hint-skip">skip</span>
 </div>
 <div id="chips">
+  <span id="replies"></span>
   <button data-prefill="say ">💬 say</button><button data-c="gather">🧺 gather</button>
   <button data-c="satchel">🎒 satchel</button><button data-c="journal">📖 journal</button>
   <button data-c="plant flowers">🌼 plant</button><button data-c="fish">🎣 fish</button>
@@ -273,6 +276,7 @@ function addLines(lines, when, replay) {
     log.appendChild(div);
     if (replay) continue;
     kept.push([at, line]);
+    offerReplies(line);
     const tune = line.map((s) => s.t).join('').match(/♪ (.+) ♪/);
     if (tune) playTune(tune[1]);
   }
@@ -556,6 +560,7 @@ function connect() {
       $('#me').hidden = false;
       // Your name in front of the world's own title.
       document.title = m.nickname + ' · ' + pageTitle;
+      myName = m.nickname;
       // The invite or passport is used up: tidy it out of the address bar.
       invite = null;
       passport = null;
@@ -1089,6 +1094,37 @@ document.addEventListener('keydown', (e) => {
   if (e.key === ' ' && document.activeElement?.closest('button, [role=button]')) return;
   $('#cmd').focus({ preventScroll: true });
 });
+
+// ---- quick replies -----------------------------------------------------------
+// When someone says or does something where you are (or arrives, or sends you
+// a message), the chips offer a few quick answers for a minute, so a phone's
+// keyboard only comes up for a real conversation. Who it was is the name the
+// line starts with (the world makes it a tap).
+let myName = null, repliesGone = null;
+function offerReplies(line) {
+  const first = line.findIndex((s) => s.fill && s.fill.startsWith('@'));
+  if (first < 0 || first > 1) return;
+  const name = line[first].t;
+  if (name === myName) return;
+  const direct = first === 1 && line[0].t.startsWith('✉');
+  const replies = direct
+    ? [['↩ reply', null, 'reply '], ['👋', `@${name} 👋`], ['😂', `@${name} 😂`], ['💖', `@${name} 💖`]]
+    : [[`👋 hi ${name}`, `say hi ${name}!`], ['😂', ':laughs'], ['👋 wave', `:waves at ${name}`], ['💖 thanks', `say thanks, ${name}!`]];
+  const box = $('#replies');
+  box.replaceChildren(...replies.map(([label, run, fill]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.title = run || fill;
+    b.onclick = () => { fill ? prefill(fill) : send(run); if (run) box.replaceChildren(); };
+    // Like the other chips, keep the keyboard where it is.
+    b.addEventListener('mousedown', (e) => { if (document.activeElement === cmdBox) e.preventDefault(); });
+    return b;
+  }));
+  $('#chips').scrollLeft = 0;
+  clearTimeout(repliesGone);
+  repliesGone = setTimeout(() => box.replaceChildren(), 60000);
+}
 
 // ---- tap the map to walk ----------------------------------------------------
 // The map is cells of one glyph and a space, centred on you: tapping one

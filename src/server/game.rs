@@ -1128,7 +1128,7 @@ impl Game {
         if !self.players[&tid].hears(&from_user) {
             return Ok(()); // muted: quietly not delivered
         }
-        self.say1(tid, Line::new().b(Col::Pink, format!("✉ {from}")).c(Col::Pink, " says to you: ").c(Col::White, msg));
+        self.say1(tid, Line::new().b(Col::Pink, "✉ ").who(&from).c(Col::Pink, " says to you: ").c(Col::White, msg));
         if let Some(t) = self.players.get_mut(&tid) {
             t.reply_to = Some(from_user);
         }
