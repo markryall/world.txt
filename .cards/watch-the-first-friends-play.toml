@@ -1,10 +1,10 @@
 name = "Watch the first friends play"
-status = "inprogress"
+status = "done"
 description = """
 The first real people are invited to a hosted world. Notice where they get stuck in the first five minutes (journal, mail, what they try that doesn't work) and turn that into cards.
 
 Decided (2026-11-07): no analytics on what people say. Three pieces instead: suggest (to keepers), report (someone being unkind, in the reporter's own words), and discoveries (who has tried which feature, and when; no content). All written up in docs/rules.md."""
 created_at = "2026-11-03T00:03:18Z"
-updated_at = "2026-11-07T01:12:41.604855Z"
+updated_at = "2026-11-07T11:41:01.097753Z"
 tags = ["belonging"]
 priority = "medium"
