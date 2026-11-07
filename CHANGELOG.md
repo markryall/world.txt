@@ -7,6 +7,11 @@
 keepers, who read them with `suggestions`. Only what you choose to send them
 is ever seen.
 
+### Reports
+If someone's being unkind, `report Sam …` tells the keepers what's been
+happening, in your own words. Keepers read them with `reports`. They see only
+what you wrote, never your conversations.
+
 ### Music indoors
 A gramophone, radio or jukebox inside a building plays just to the people in
 that room. It can go right next to one outdoors, and outdoor music stays out.

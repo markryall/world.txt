@@ -1,0 +1,10 @@
+name = "Reports for the keepers"
+status = "done"
+description = "report Sam … tells the keepers someone's being unkind, in the reporter's own words; keepers read them with reports. Nothing anyone said is shown, only what the reporter wrote."
+created_at = "2026-11-07T01:15:20.039010Z"
+updated_at = "2026-11-07T01:15:20.039010Z"
+tags = [
+    "feedback",
+    "safety",
+]
+priority = "medium"

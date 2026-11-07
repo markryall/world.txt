@@ -40,7 +40,10 @@ something; everyone else is told whose it is. Unmaking tucks a thing away rather
 than deleting it, so `undo` brings back the last thing you unmade (within a day),
 noticeboards with all their notes. Island keepers can tidy up anyone's things.
 
-**Keeping it kind.** `mute Sam` means you stop hearing Sam's talk, emotes,
+**Keeping it kind.** If someone's being unkind, `report Sam …` tells the
+keepers what's been happening, in your own words: only the keepers see it
+(`reports`), Sam isn't told, and nobody ever sees your conversations, only what
+you wrote in the report. `mute Sam` means you stop hearing Sam's talk, emotes,
 shouts, private messages, chat and board notes, or any music Sam plays on a
 gramophone or jukebox. It's remembered, and Sam isn't told (`unmute Sam`,
 `mutes`). Keepers can also `stop music` on anyone's gramophone, `skip` anyone's
