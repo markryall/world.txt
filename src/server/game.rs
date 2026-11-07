@@ -1327,6 +1327,12 @@ impl Game {
             self.say1(id, Line::plain("Name this place what? e.g. 'name The Willow Bank'"));
             return Ok(());
         }
+        // Where everyone arrives keeps its name, unless a keeper changes it.
+        if (x, y) == self.world.spawn_point() && !self.is_keeper(&self.user(id)) {
+            let here = self.world.place_title(x, y);
+            self.say1(id, Line::plain(format!("{here} is everyone's: it's where newcomers arrive, so it keeps its name. (Only a keeper can change it.)")));
+            return Ok(());
+        }
         let name: String = name.chars().take(40).collect();
         self.world.set_name(x, y, Some(name.clone()))?;
         self.say1(id, Line::new().c(Col::Green, "This place will be known as ").b(Col::Magenta, &name).c(Col::Green, "."));

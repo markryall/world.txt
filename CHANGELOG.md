@@ -26,6 +26,8 @@ One per room.
   that involves them.
 - **Muting someone hides their noticeboard notes** when you `read` a board,
   not just as they're posted, old notes included.
+- **The Village Green keeps its name.** Only keepers can rename the spot
+  where everyone arrives.
 
 ## 0.5.0 (2026-11-07)
 
