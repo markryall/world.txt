@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-11-07)
 
 ### Suggestions
 `suggest …` leaves an idea, or something that muddled you, for the island's
