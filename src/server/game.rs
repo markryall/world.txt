@@ -703,6 +703,10 @@ impl Game {
             "going" | "rsvp" | "attend" => return self.cmd_going(id, rest, true),
             "not" if rest.starts_with("going") => return self.cmd_going(id, rest.trim_start_matches("going"), false),
             "cancel" => return self.cmd_cancel_event(id, rest),
+            "go" | "walk" if travel::offset(rest).is_some() => {
+                let (dx, dy) = travel::offset(rest).expect("just checked");
+                return self.cmd_go_by(id, dx, dy);
+            }
             "go" | "walk" => match DIRS.iter().find(|d| d.0 == rest || d.1 == rest) {
                 Some(&(_, _, dx, dy)) => return self.walk(id, dx, dy),
                 None if rest.trim_start_matches("to ").trim() == "home" => return self.cmd_home(id),

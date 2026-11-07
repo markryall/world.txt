@@ -27,7 +27,7 @@
   /* One line each, so a long place name never pushes the map about: anything
      too long ends in … (the whole of it shows on hover). */
   #place, #weather, #clock, #now { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; flex-shrink: 0; }
-  #map { font-size: 16px; line-height: 1.15; white-space: pre; text-align: center; padding: 6px 0; }
+  #map { font-size: 16px; line-height: 1.15; white-space: pre; text-align: center; padding: 6px 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .meta { color: var(--dim); font-size: 13px; }
   #pad { display: grid; grid-template-columns: repeat(3, 52px); gap: 6px; justify-content: center; }
   #pad button, .quick button {
@@ -367,6 +367,7 @@ function status(m) {
     if (i) map.appendChild(document.createTextNode('\n'));
     map.appendChild(paintLine(line.map(textStyle)));
   });
+  mapSize = [m.map.length, m.map[0] ? m.map[0].reduce((n, s) => n + s.t.length, 0) : 0];
   sky = m.weather;
   // An older world says only the weather: rain's all it can tell us.
   heard = m.sounds || { rain: /\brain\b/.test(sky) ? 1 : /drizzle/.test(sky) ? 0.4 : 0 };
@@ -1076,6 +1077,35 @@ document.addEventListener('keydown', (e) => {
   // Space on a focused button presses it.
   if (e.key === ' ' && document.activeElement?.closest('button, [role=button]')) return;
   $('#cmd').focus({ preventScroll: true });
+});
+
+// ---- tap the map to walk ----------------------------------------------------
+// The map is cells of one glyph and a space, centred on you: tapping one
+// sends how far away it is (go +3 -2), and the world walks you there.
+let mapSize = [0, 0];
+$('#map').addEventListener('click', (e) => {
+  const map = $('#map');
+  let node, offset;
+  if (document.caretPositionFromPoint) {
+    const p = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (p) { node = p.offsetNode; offset = p.offset; }
+  } else if (document.caretRangeFromPoint) {
+    const r = document.caretRangeFromPoint(e.clientX, e.clientY);
+    if (r) { node = r.startContainer; offset = r.startOffset; }
+  }
+  if (!node || !map.contains(node)) return;
+  // How far into the map's text the tap landed.
+  let at = 0;
+  const walk = document.createTreeWalker(map, NodeFilter.SHOW_TEXT);
+  for (let t = walk.nextNode(); t && t !== node; t = walk.nextNode()) at += t.length;
+  const before = map.textContent.slice(0, at + offset);
+  const row = (before.match(/\n/g) || []).length;
+  const col = Math.floor((before.length - before.lastIndexOf('\n') - 1) / 2);
+  const [rows, width] = mapSize;
+  const cols = Math.ceil(width / 2);
+  if (!rows || row >= rows || col >= cols) return;
+  const dx = col - (cols - 1) / 2, dy = row - (rows - 1) / 2;
+  if (dx || dy) send(`go ${dx > 0 ? '+' : ''}${dx} ${dy > 0 ? '+' : ''}${dy}`);
 });
 
 // ---- humming circles ------------------------------------------------------

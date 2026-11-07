@@ -21,7 +21,9 @@ Progress is saved by name, so returning visitors never see it again
   shown when they next arrive), `reply` answers them, `chat` (or `@all`) reaches
   everyone, `find Poppy` tells you which way to walk, and `join Poppy` walks you
   there automatically (around the water, rowing across if they're on another
-  island, following if they move; `stop` to stop).
+  island, following if they move; `stop` to stop). In the browser, tap a spot
+  on the map to walk there the same way (it sends `go +3 -2`: three east, two
+  north, as far as the map shows).
   `places` lists every named spot and home on every island, and `go to The
   Greenhouse` (or `go 3`, or part of the name; "to" is optional) walks you
   there, down to the dock and rowing across first if it's on another island.

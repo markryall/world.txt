@@ -3,8 +3,19 @@
 
 use super::Game;
 use crate::protocol::{Col, Line};
-use crate::server::world::{DIRS, SIZE, in_bounds};
+use crate::server::world::{DIRS, MINIMAP_REACH, SIZE, in_bounds, room_of};
 use std::collections::VecDeque;
+
+/// `+3 -2` (or `3 -2`): so far east and south, as tapping the map sends it.
+pub fn offset(rest: &str) -> Option<(i64, i64)> {
+    let mut words = rest.split_whitespace();
+    let (a, b) = (words.next()?, words.next()?);
+    if words.next().is_some() {
+        return None;
+    }
+    let num = |w: &str| w.strip_prefix('+').unwrap_or(w).parse::<i64>().ok();
+    Some((num(a)?, num(b)?))
+}
 
 impl Game {
     /// The first step on a shortest walkable path from `from` to `to`.
@@ -30,6 +41,33 @@ impl Game {
             }
         }
         None
+    }
+
+    /// `go +3 -2`: walk to the spot that far east (and south) of here, a
+    /// step at a time. It's what tapping the map sends, so it reaches as far
+    /// as the map shows.
+    pub(super) fn cmd_go_by(&mut self, id: u64, dx: i64, dy: i64) -> anyhow::Result<()> {
+        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
+        if room_of(x, y).is_some() {
+            self.say1(id, Line::plain("Indoors, just walk: n, s, e, w, or out."));
+            return Ok(());
+        }
+        let (rw, rh) = MINIMAP_REACH;
+        if dx.abs() > rw || dy.abs() > rh {
+            self.say1(id, Line::plain("That's further than you can see from here. Try 'go <place>' or 'join <Name>'."));
+            return Ok(());
+        }
+        if (dx, dy) == (0, 0) {
+            self.say1(id, Line::plain("You're already here. 🙂"));
+            return Ok(());
+        }
+        let (tx, ty) = (x + dx, y + dy);
+        if !in_bounds(tx, ty) || !self.world.terrain(tx, ty).walkable() {
+            self.say1(id, Line::plain("You can't walk there."));
+            return Ok(());
+        }
+        let name = self.world.place_title(tx, ty);
+        self.set_off(id, tx, ty, &name, None)
     }
 
     pub(super) fn cmd_join(&mut self, id: u64, who: &str) -> anyhow::Result<()> {
@@ -255,6 +293,17 @@ fn pick_place(places: &[(i64, i64, String, &'static crate::server::islands::Isla
 mod tests {
     use super::*;
     use crate::server::islands::ISLANDS;
+
+    #[test]
+    fn map_taps_are_offsets() {
+        assert_eq!(offset("+3 -2"), Some((3, -2)));
+        assert_eq!(offset("-7 4"), Some((-7, 4)));
+        assert_eq!(offset("0 1"), Some((0, 1)));
+        assert_eq!(offset("north"), None);
+        assert_eq!(offset("to the dock"), None);
+        assert_eq!(offset("3"), None);
+        assert_eq!(offset("1 2 3"), None);
+    }
 
     #[test]
     fn finds_a_place_by_number_or_name() {

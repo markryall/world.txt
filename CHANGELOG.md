@@ -20,6 +20,11 @@ Little Lamb. Plain `hum along` lists them, and in the browser you just tap
 one, so joining Pachelbel's Canon from a phone is two taps. Tap one of your
 own sections in that list and it's in the box, ready to fix a wrong note.
 
+### Tap the map to walk
+Tap a spot on the map and you walk there, a step at a time, finding a way
+around the water. No more tap, tap, tap on the arrows. (Underneath it's
+`go +3 -2`, which works anywhere.)
+
 ### Tap a name to talk
 In the browser, tap (or click) someone's name where they say, do, hum or
 shout something, or arrive, and the box is ready with `@Sam ` to message
