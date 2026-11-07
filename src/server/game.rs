@@ -468,9 +468,11 @@ impl Game {
         let tutorial = if bot { tutorial::DONE } else { saved.map_or(0, |s| s.2) };
         let (x, y) = saved
             .map(|s| (s.0, s.1))
+            // A room whose building is gone (or anywhere else off the map) is
+            // nowhere to come back to: the village green it is.
             .filter(|&(x, y)| match crate::server::world::room_of(x, y) {
                 Some(_) => self.world.room_building(x, y).is_some(),
-                None => self.world.terrain(x, y).walkable(),
+                None => !crate::server::world::in_room_space(x, y) && self.world.terrain(x, y).walkable(),
             })
             .unwrap_or_else(|| self.world.spawn_point());
         let sky = self.world.weather.sky_at(x, y);
