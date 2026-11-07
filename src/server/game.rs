@@ -1457,7 +1457,7 @@ impl Game {
         }
         if music::is_music_box(&name) {
             self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &self.user(id), Some(music::music_kind()))?;
-            self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach C E G E C"));
+            self.say1(id, Line::new().c(Col::Pink, "🎶 You make ").b(Col::Pink, &name).c(Col::Pink, ". Teach it a tune: teach @100 C C G G A A G-"));
             self.tell_here(x, y, id, Line::col(Col::Pink, format!("🎶 {who} makes {name}.")));
             self.status_all();
             return Ok(());
@@ -2411,7 +2411,7 @@ const HELP: &[HelpTopic] = &[
         keepers: false,
         listed: true,
         items: &[
-            ("hum C E G", "a little tune (hum together to jam!)"),
+            ("hum @100 C C G G A A G-", "a little tune: - holds a note longer, / makes it shorter, _ is a rest, @100 sets the tempo (hum together to jam!)"),
             ("make a music box / teach C E G / play", "a box that remembers your tune"),
             ("make a gramophone / play music / stop music", "play songs from your computer to everyone nearby"),
             ("make a jukebox / add songs / jukebox", "everyone adds songs from their computer; it plays one each, taking turns"),

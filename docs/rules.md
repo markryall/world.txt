@@ -129,6 +129,7 @@ keeper coming in. Bans, kicks and mutes work on visitors too.
 | A suggestion (`suggest`) or a report (`report`) | 280 characters |
 | `ask` a question / `answer` | 200 / 60 characters |
 | An event's name | 80 characters |
+| A tune | A music box learns up to 48 notes and rests (anything that isn't a note is left out). A hum plays up to 64 in the browser. A note can be held up to 8 beats or cut to an eighth of one. Tempo 40 to 240 beats a minute, 120 if not given. |
 | Links on one gathering table, or one event | 3 |
 | One link | `https://` only, at most 300 characters, no spaces or quotes |
 

@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 
 const MUSIC_KIND: &str = "music";
 const JAM_WINDOW: Duration = Duration::from_secs(12);
-const MAX_NOTES: usize = 24;
+const MAX_NOTES: usize = 48;
+const MIN_TEMPO: u32 = 40;
+const MAX_TEMPO: u32 = 240;
 
 pub fn is_music_box(name: &str) -> bool {
     let n = name.to_lowercase();
@@ -17,25 +19,54 @@ pub fn music_kind() -> &'static str {
     MUSIC_KIND
 }
 
-/// Keep only playable notes (A–G, with # or b and an octave 2–6), so a tune
-/// is something the browser can actually play.
+/// One word of a tune, tidied: a note (A–G, with # or b and an octave 2–6)
+/// or a rest (`_`), then how long it lasts: each `-` holds it a beat longer,
+/// each `/` halves it, and a `.` makes it half as long again. Or the tempo,
+/// `@90`, in beats a minute. Anything else isn't music.
+///
+/// The browser reads tunes the same way (`parseTune` in web/index.html).
+pub fn clean_word(w: &str) -> Option<String> {
+    if let Some(n) = w.strip_prefix('@') {
+        let bpm: u32 = n.parse().ok()?;
+        return Some(format!("@{}", bpm.clamp(MIN_TEMPO, MAX_TEMPO)));
+    }
+    let mut c = w.chars().peekable();
+    let first = c.next()?;
+    let mut out = String::new();
+    if first == '_' {
+        out.push('_');
+    } else if "ABCDEFGabcdefg".contains(first) {
+        out.push(first.to_ascii_uppercase());
+        if let Some(&a) = c.peek().filter(|a| matches!(a, '#' | 'b')) {
+            out.push(a);
+            c.next();
+        }
+        if let Some(&o) = c.peek().filter(|o| ('2'..='6').contains(*o)) {
+            out.push(o);
+            c.next();
+        }
+    } else {
+        return None;
+    }
+    let rest: String = c.collect();
+    let holds = rest.chars().take_while(|&ch| ch == '-').count();
+    let halves = rest[holds..].chars().take_while(|&ch| ch == '/').count();
+    let dot = &rest[holds + halves..];
+    if !matches!(dot, "" | ".") || holds > 7 || halves > 3 {
+        return None;
+    }
+    out.push_str(&rest);
+    Some(out)
+}
+
+/// Keep only the playable words of a tune, so it's something the browser can
+/// actually play.
 pub fn clean_tune(raw: &str) -> String {
-    raw.split(|c: char| c.is_whitespace() || c == ',')
-        .filter(|w| {
-            let mut c = w.chars();
-            let Some(letter) = c.next() else { return false };
-            let rest: String = c.collect();
-            "ABCDEFGabcdefg".contains(letter)
-                && matches!(rest.as_str(), "" | "#" | "b" | "2" | "3" | "4" | "5" | "6" | "#2" | "#3" | "#4" | "#5" | "#6" | "b2" | "b3" | "b4" | "b5" | "b6")
-        })
-        .take(MAX_NOTES)
-        .map(|w| {
-            let mut c = w.chars();
-            let first = c.next().unwrap().to_ascii_uppercase();
-            format!("{first}{}", c.as_str())
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+    let words: Vec<String> = raw.split(|c: char| c.is_whitespace() || c == ',').filter_map(clean_word).collect();
+    // The tempo goes first (the last one given wins), then the notes.
+    let tempo = words.iter().rev().find(|w| w.starts_with('@')).cloned();
+    let notes = words.into_iter().filter(|w| !w.starts_with('@')).take(MAX_NOTES);
+    tempo.into_iter().chain(notes).collect::<Vec<_>>().join(" ")
 }
 
 impl Game {
@@ -61,7 +92,7 @@ impl Game {
         }
         let tune = clean_tune(rest);
         if tune.is_empty() {
-            self.say1(id, Line::plain("Teach it which notes? e.g. 'teach C E G E C' (A to G, with # or b, and 2–6 for higher or lower)"));
+            self.say1(id, Line::plain("Teach it which notes? e.g. 'teach @100 C C G G A A G-' (A to G, with # or b, 2–6 for higher or lower; - holds a note longer, / makes it shorter, _ is a rest, @100 is the tempo)"));
             return Ok(());
         }
         let t = &mut self.world.things[i];
@@ -115,6 +146,10 @@ mod tests {
     #[test]
     fn tunes_keep_only_playable_notes() {
         assert_eq!(clean_tune("c e g, E5 C# bb3 hello Z 7"), "C E G E5 C# Bb3");
+        assert_eq!(clean_tune("c- e/ g// a. b/. _ _- C#4---"), "C- E/ G// A. B/. _ _- C#4---");
+        assert_eq!(clean_tune("C D @90 E @300"), "@240 C D E");
+        assert_eq!(clean_tune("@20 C"), "@40 C");
+        assert_eq!(clean_tune("C-/- C.. C--------- @fast _x"), "");
         assert_eq!(clean_tune("la la la"), "");
         assert!(is_music_box("a tiny Music Box"));
     }

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Humming with rhythm
+Tunes can have long and short notes, rests and a tempo now, so real songs
+fit: `-` holds a note longer, `/` makes it shorter, `.` dots it, `_` is a
+rest and `@100` sets the tempo. `hum @100 C C G G A A G-`. Music boxes learn
+them too, and remember twice as many notes. Plain tunes play a little slower
+than before (120 beats a minute unless you say).
+
 ### Animals with lives of their own
 Wild animals wander about now instead of waiting where they turn up, and get
 on with their day when someone's watching. Some of them might even let you

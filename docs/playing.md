@@ -36,6 +36,24 @@ Progress is saved by name, so returning visitors never see it again
 - `make a music box`, then `teach C E G E C` (only its maker can) and `play`; it also
   plays now and then when people are near. Two people humming at the same spot
   are told they're making music together. In the browser, tunes play as real notes.
+- Tunes (for `hum`, `sing`, `whistle` and `teach`) are notes A to G, with `#`
+  or `b` for sharp or flat and 2 to 6 for lower or higher (4 is the middle).
+  A plain note is one beat. Each `-` holds it a beat longer (`G-` is two
+  beats, `G---` four), each `/` halves it (`C/` half a beat, `C//` a quarter),
+  and a `.` makes it half as long again (`E.`). `_` is a rest, and takes the
+  same marks. `@100` anywhere sets the tempo, in beats a minute (40 to 240;
+  120 if you don't say). So `hum @100 C C G G A A G- F F E E D D C-`. A music
+  box remembers up to 48 notes.
+
+A few old tunes to start with:
+
+| Tune | Hum it |
+|---|---|
+| Twinkle, Twinkle, Little Star | `hum @110 C C G G A A G- F F E E D D C-` |
+| Ode to Joy | `hum @120 E E F G G F E D C C D E E. D/ D- E E F G G F E D C C D E D. C/ C-` |
+| Jingle Bells | `hum @160 E E E- E E E- E G C. D/ E--- F F F. F/ F E E E/ E/ E D D E D- G-` |
+| Frère Jacques | `hum @120 C D E C C D E C E F G- E F G- G/ A/ G/ F/ E C G/ A/ G/ F/ E C C G3 C- C G3 C-` |
+| Mary Had a Little Lamb | `hum @120 E D C D E E E- D D D- E G G- E D C D E E E E D D E D C---` |
 - `make a gramophone`, stand by it and `play music`, then choose songs from your
   computer: everyone nearby hears them, loudest beside it and fading over five
   steps (`stop music` to stop). `make a jukebox` is a gramophone everyone can add

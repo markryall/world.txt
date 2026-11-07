@@ -1033,22 +1033,47 @@ $('#sound').onclick = () => {
 };
 
 const SEMI = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+// A tune, the way the server's clean_word reads one: notes A-G (with # or b,
+// and an octave 2-6) or _ for a rest; each - holds it a beat longer, each /
+// halves it, a . makes it half as long again; @90 is the tempo (beats a
+// minute). Anything else is just words, and isn't played.
+function parseTune(text) {
+  let bpm = 120;
+  const notes = [];
+  for (const w of text.split(/[\s,]+/)) {
+    const tempo = w.match(/^@(\d{1,3})$/);
+    if (tempo) { bpm = Math.min(240, Math.max(40, +tempo[1])); continue; }
+    const m = w.match(/^(?:([A-Ga-g])([#b]?)([2-6]?)|_)(-{0,7})(\/{0,3})(\.?)$/);
+    if (!m) continue;
+    const [, l, acc, oct, holds, halves, dot] = m;
+    const beats = (1 + holds.length) / 2 ** halves.length * (dot ? 1.5 : 1);
+    const midi = l ? 12 * ((+oct || 4) + 1) + SEMI[l.toLowerCase()] + (acc === '#' ? 1 : acc === 'b' ? -1 : 0) : null;
+    notes.push([midi, beats]);
+  }
+  return { bpm, notes };
+}
+
 function playTune(text) {
   if (!soundOn || !audio) return;
-  const notes = [...text.matchAll(/\b([a-gA-G])([#b]?)([2-6]?)\b/g)];
+  const { bpm, notes } = parseTune(text);
+  const beat = 60 / bpm;
   let t = audio.currentTime + 0.05;
-  for (const [, l, acc, oct] of notes.slice(0, 32)) {
-    const semi = SEMI[l.toLowerCase()] + (acc === '#' ? 1 : acc === 'b' ? -1 : 0);
-    const midi = 12 * ((+oct || 4) + 1) + semi;
-    const freq = 440 * Math.pow(2, (midi - 69) / 12);
-    const o = audio.createOscillator(), g = audio.createGain();
-    o.type = 'triangle'; o.frequency.value = freq;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.18, t + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
-    o.connect(g).connect(audio.destination);
-    o.start(t); o.stop(t + 0.5);
-    t += 0.3;
+  for (const [midi, beats] of notes.slice(0, 64)) {
+    const len = beats * beat;
+    if (midi !== null) {
+      // Held for (nearly) its whole length, then let go, so long notes sing
+      // and short ones stay crisp.
+      const ring = Math.max(0.08, len * 0.9);
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'triangle'; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+      g.gain.linearRampToValueAtTime(0.12, t + Math.max(0.03, ring));
+      g.gain.exponentialRampToValueAtTime(0.001, t + ring + 0.12);
+      o.connect(g).connect(audio.destination);
+      o.start(t); o.stop(t + ring + 0.15);
+    }
+    t += len;
   }
 }
 
