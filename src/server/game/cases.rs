@@ -215,6 +215,10 @@ impl Game {
             self.say1(id, Line::plain(line));
             return Ok(());
         };
+        if self.satchel_room(&user) == 0 {
+            self.say1(id, Line::plain("🧺 Your satchel is full! Give, place or release something first."));
+            return Ok(());
+        }
         self.world.db.display_add(thing, s.id, &user, -1)?;
         self.world.db.satchel_add(&user, s.id, 1)?;
         let a = nature::a(s.name);

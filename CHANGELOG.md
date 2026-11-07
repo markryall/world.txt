@@ -30,6 +30,9 @@ One per room.
   where everyone arrives.
 - **Buildings count towards the twelve things a spot can hold,** like
   anything else you make or place.
+- **A full satchel is full.** Being served, or taking a find out of a display
+  case, now needs room, and finished cooking gives you what fits and leaves the
+  rest by the fire for whoever comes by.
 
 ## 0.5.0 (2026-11-07)
 

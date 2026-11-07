@@ -178,6 +178,12 @@ impl Game {
         Ok(())
     }
 
+    /// How much room is left in someone's satchel.
+    pub(super) fn satchel_room(&self, user: &str) -> i64 {
+        let carried: i64 = self.world.db.satchel(user).map(|s| s.iter().map(|(_, n)| n).sum()).unwrap_or(0);
+        (SATCHEL_SIZE - carried).max(0)
+    }
+
     /// Put something in the satchel and the journal. False if there's no room.
     fn collect(&mut self, id: u64, s: &'static Species) -> anyhow::Result<bool> {
         let user = self.user(id);

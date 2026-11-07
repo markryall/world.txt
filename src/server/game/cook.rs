@@ -245,17 +245,34 @@ impl Game {
         for thing in done {
             let Some(c) = self.cooking.remove(&thing) else { continue };
             let Some(s) = nature::by_id(c.dish.makes) else { continue };
-            if let Some((x, y)) = self.world.things.iter().find(|t| t.id == thing).map(|t| (t.x, t.y)) {
+            let at = self.world.things.iter().find(|t| t.id == thing).map(|t| (t.x, t.y));
+            if let Some((x, y)) = at {
                 self.waft(x, y, Line::col(Col::Pink, c.dish.smells[2]));
             }
-            if self.world.db.satchel_add(&c.user, s.id, c.dish.serves).is_err() {
+            // What fits goes in the cook's satchel; the rest is left by the
+            // fire for whoever comes by.
+            let fits = self.satchel_room(&c.user).min(c.dish.serves);
+            let left = c.dish.serves - fits;
+            if fits > 0 && self.world.db.satchel_add(&c.user, s.id, fits).is_err() {
                 continue;
+            }
+            if let Some((x, y)) = at.filter(|_| left > 0) {
+                for _ in 0..left.min(12 - self.world.things_at(x, y).count() as i64).max(0) {
+                    let _ = self.world.add_thing(x, y, nature::a(s.name), Some(s.here.to_string()), crate::server::world::Trigger::Always, &c.user, None);
+                }
             }
             let first = self.world.db.journal_add(&c.user, s.id).unwrap_or(false);
             let cook = self.players.iter().find(|(_, p)| p.user == c.user).map(|(id, _)| *id);
             if let Some(id) = cook {
-                let some = if c.dish.serves == 1 { nature::a(s.name) } else { format!("{} × {}", c.dish.serves, s.name) };
-                self.say1(id, Line::col(Col::Green, format!("🍽 Ready! {some} in your satchel. eat it, or serve it to whoever's here.")));
+                let line = match (fits, left) {
+                    (_, 0) => {
+                        let some = if fits == 1 { nature::a(s.name) } else { format!("{fits} × {}", s.name) };
+                        format!("🍽 Ready! {some} in your satchel. eat it, or serve it to whoever's here.")
+                    }
+                    (0, _) => "🍽 Ready! Your satchel's too full to take any, so it's left by the fire for whoever comes by.".to_string(),
+                    _ => format!("🍽 Ready! {fits} × {} in your satchel, which is all that fits: the rest is left by the fire for whoever comes by.", s.name),
+                };
+                self.say1(id, Line::col(Col::Green, line));
                 if first {
                     self.say1(id, Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, crate::server::world::capitalise(s.name)));
                 }
@@ -292,10 +309,19 @@ impl Game {
             .iter()
             .filter(|(pid, p)| **pid != id && p.x == x && p.y == y && !p.bot)
             .map(|(pid, p)| (*pid, p.user.clone(), p.name.clone()))
-            .take(have as usize)
             .collect();
         if guests.is_empty() {
             self.say1(id, Line::plain("There's nobody here to serve. Eat it yourself, or save it for when friends come by!"));
+            return Ok(());
+        }
+        // Only whoever has room in their satchel can take a portion.
+        let (guests, full): (Vec<_>, Vec<_>) = guests.into_iter().partition(|(_, u, _)| self.satchel_room(u) > 0);
+        for (gid, _, _) in &full {
+            self.say1(*gid, Line::plain(format!("{who} offers you {}, but your satchel's too full to take it.", nature::a(s.name))));
+        }
+        let guests: Vec<_> = guests.into_iter().take(have as usize).collect();
+        if guests.is_empty() {
+            self.say1(id, Line::plain("Everyone here has a satchel too full to take any. Maybe later!"));
             return Ok(());
         }
         for (gid, guser, _) in &guests {

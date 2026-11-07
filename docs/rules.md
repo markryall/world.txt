@@ -135,7 +135,7 @@ says otherwise.
 
 | Thing | Limit |
 |---|---|
-| Satchel | 30 things. Gathering stops when it's full, and nobody can `give` you more. Cooking, being served, and finds coming back from a case can still take you past 30. |
+| Satchel | 30 things. When it's full you can't gather, be given or served anything, or take a find out of a case. Cooking gives you what fits and leaves the rest by the fire for whoever comes by. The one exception: when a display case is unmade, your finds always come back to you, even past 30, so nothing's lost. |
 | Things on one spot | 12. `make`, `place` and `build` refuse past that. |
 | One display case | 12 finds, whoever put them in. Fish need a tank, aquarium or bowl. Food can't go in. |
 | Buildings going up at once | 2 per person |
