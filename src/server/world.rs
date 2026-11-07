@@ -309,7 +309,10 @@ impl World {
         self.nicks.get(user).cloned().unwrap_or_else(|| user.to_string())
     }
 
+    /// The home (x, y) is part of. A room inside a building counts as part
+    /// of the home the building stands in, so the same people may change it.
     pub fn home_at(&self, x: i64, y: i64) -> Option<&Home> {
+        let (x, y) = if room_of(x, y).is_some() { self.room_building(x, y).map(|b| (b.x, b.y))? } else { (x, y) };
         self.homes.iter().find(|h| h.covers(x, y))
     }
 

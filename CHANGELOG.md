@@ -13,6 +13,9 @@ One per room.
   the next. They're far apart now (anything already in a room moves with it).
   A shout indoors fills the room and carries just outside the door; one from
   outside stays outside.
+- **Home rules carry indoors.** Inside a building at your home, you can now do
+  everything you can outdoors there: paint your guests' things, fill their
+  display cases, and set the links on their gathering tables.
 
 ## 0.5.0 (2026-11-07)
 

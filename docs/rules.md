@@ -20,7 +20,7 @@ the next section).
 | Visit a home | Anyone. |
 | `describe` a spot outdoors | Only at a home (its owner and guests), or a keeper anywhere. Elsewhere it's refused. |
 | `describe` a room inside a building | Whoever may change that room. |
-| Change a room inside a building (make, place, paint, describe…) | If the building stands at a home: that home's owner and guests. If not: whoever built it. Keepers always. |
+| Change a room inside a building (make, place, paint, describe…) | If the building stands at a home: that home's owner and guests. If not: whoever built it. Keepers always. A room counts as part of the home its building stands in, so everything a home's owner can do outdoors (painting guests' things, filling their cases, setting links on their tables) works inside too. |
 | Go into a finished building | Anyone. You can't go in until it's finished. |
 | Outdoor things inside a room | Refused: `dig`, `fill`, `plant`, `raise`, `path`, `name`, `claim`, `fish`, `sail`, kites, bottles, puddles, skimming, rolling stones, `lookout`, picnics, stargazing, umbrellas, snowmen and sandcastles. |
 | Rename a spot | Outside a home, anyone, even one someone else named. |
