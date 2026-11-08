@@ -47,6 +47,21 @@ pub fn issue_invite(db: &Db, user: &str) -> anyhow::Result<String> {
     Ok(token)
 }
 
+/// How to use a magic link, in a browser or a terminal, to go with it.
+pub fn how_to_join(url: Option<&str>, token: &str) -> Vec<String> {
+    let server = match url.map(|u| u.trim_end_matches('/')) {
+        Some(u) if u.starts_with("https://") => format!("wss://{}", &u["https://".len()..]),
+        Some(u) if u.starts_with("http://") => format!("ws://{}", &u["http://".len()..]),
+        Some(u) => u.to_string(),
+        None => "<world address>".to_string(),
+    };
+    vec![
+        "In a browser (phones too): just open the link.".to_string(),
+        format!("In a terminal (brew install markryall/tap/world-txt): world.txt play --server {server} --invite {token}"),
+        format!("  and after that, world.txt play --server {server} is all it takes."),
+    ]
+}
+
 /// The link to send. Without a known address, a placeholder the browser fills in.
 pub fn link(url: Option<&str>, token: &str) -> String {
     match url {
@@ -72,5 +87,19 @@ pub fn invite_state(expires: i64, used_at: Option<i64>, now: i64) -> String {
             let left = expires - now;
             if left < 86_400 { format!("waiting ({}h left)", (left / 3600).max(1)) } else { format!("waiting ({}d left)", left / 86_400) }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn says_how_to_join_from_a_terminal() {
+        let how = how_to_join(Some("https://world.example.com/"), "abc123").join("\n");
+        assert!(how.contains("world.txt play --server wss://world.example.com --invite abc123"), "{how}");
+        assert!(how.contains("open the link"));
+        assert!(how_to_join(Some("http://127.0.0.1:4040"), "x")[1].contains("--server ws://127.0.0.1:4040 "));
+        assert!(how_to_join(None, "x")[1].contains("--server <world address> "));
     }
 }

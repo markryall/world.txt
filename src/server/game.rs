@@ -1601,6 +1601,9 @@ impl Game {
             Line::new().t("   ").b(Col::Yellow, super::accounts::link(self.url.as_deref(), token)),
             Line::col(Col::Dim, "   Send it just to them: whoever opens it first becomes them."),
         ]
+        .into_iter()
+        .chain(super::accounts::how_to_join(self.url.as_deref(), token).into_iter().map(|l| Line::col(Col::Dim, format!("   {l}"))))
+        .collect()
     }
 
     /// Keepers: `invite Poppy` makes an account and a magic link for it.
@@ -1656,14 +1659,13 @@ impl Game {
             return Ok(());
         }
         let token = super::accounts::issue_invite(&self.world.db, me)?;
-        self.send(
-            id,
-            vec![
-                Line::new().b(Col::Magenta, "💌 A magic link for your new device").c(Col::Dim, format!(" (one use, within {} days):", super::accounts::INVITE_DAYS)),
-                Line::new().t("   ").b(Col::Yellow, super::accounts::link(self.url.as_deref(), &token)),
-                Line::col(Col::Dim, "   Open it on your phone, laptop or tablet, and you'll be you there too. Keep it to yourself: whoever opens it first becomes you."),
-            ],
-        );
+        let mut lines = vec![
+            Line::new().b(Col::Magenta, "💌 A magic link for your new device").c(Col::Dim, format!(" (one use, within {} days):", super::accounts::INVITE_DAYS)),
+            Line::new().t("   ").b(Col::Yellow, super::accounts::link(self.url.as_deref(), &token)),
+            Line::col(Col::Dim, "   Open it on your phone, laptop or tablet, and you'll be you there too. Keep it to yourself: whoever opens it first becomes you."),
+        ];
+        lines.extend(super::accounts::how_to_join(self.url.as_deref(), &token).into_iter().map(|l| Line::col(Col::Dim, format!("   {l}"))));
+        self.send(id, lines);
         Ok(())
     }
 

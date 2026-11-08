@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Links say how to join
+Every magic link (`invite Poppy` and `link me` in the world, `world.txt invite`
+and `world.txt link` on the server) now comes with how to use it: open it in a
+browser, or the exact `world.txt play --server wss://… --invite …` for a
+terminal, and the shorter command for every time after.
+
 ### Your own songs from the terminal
 `play music ~/Music/Rumours` at a gramophone, or `add songs` and some files at
 a jukebox, plays songs from your own computer for everyone nearby, just like

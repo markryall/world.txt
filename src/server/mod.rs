@@ -645,7 +645,9 @@ pub fn invite(db_path: &str, nickname: &str, keeper: bool, url: Option<&str>) ->
     if url.is_none() {
         println!("   (replace <world address> with how they reach the world, or pass --url / WORLD_URL)");
     }
-    println!("   In a terminal: world.txt play --invite {token}");
+    for l in accounts::how_to_join(url, &token) {
+        println!("   {l}");
+    }
     Ok(())
 }
 
@@ -656,6 +658,9 @@ pub fn link(db_path: &str, name: &str, url: Option<&str>) -> anyhow::Result<()> 
     let token = accounts::issue_invite(&db, &user)?;
     println!("💌 A new link for {} ({user}), one use, within {} days:", db.nickname(&user).unwrap_or_default(), accounts::INVITE_DAYS);
     println!("   {}", accounts::link(url, &token));
+    for l in accounts::how_to_join(url, &token) {
+        println!("   {l}");
+    }
     Ok(())
 }
 
