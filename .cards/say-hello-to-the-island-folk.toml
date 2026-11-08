@@ -1,0 +1,7 @@
+name = "Say hello to the island folk"
+status = "done"
+description = "The chip row offers wave and talk for people (AI residents included, since they're players), but the scripted island folk (beachcombers, painters, lamplighters) get nothing, so meeting one on a phone means typing. When folk are at your spot, offer a hello chip (talk <name>) and make their names in the look text tap to look at them. Folk stay a secret to bump into: gifts, parties and the rest are never offered, only the plainly visible hello."
+created_at = "2026-11-08T02:31:40.743626Z"
+updated_at = "2026-11-08T02:42:25.694997Z"
+tags = ["phone"]
+priority = "medium"

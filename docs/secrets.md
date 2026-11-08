@@ -147,6 +147,10 @@ days, then heads for the dock and rows off again.
 - They answer if you say hello, or say their name, or `talk to Bramble`.
   `look Bramble` looks at them, and `give daisy to Bramble` gives them
   something, which they keep. Asleep, only their name stirs them.
+  In the browser, someone standing with one who's awake gets a 👋 hello
+  button in the row above the box, and their name in the look text taps to
+  look at them. That's all the row offers: gifts, parties and the rest stay
+  for people to find.
 - They make small things that don't last (a painting drying on an easel, a
   lantern on a pole for the night, a tray of buns cooling on a stump) and
   tidy them away again after a few hours. One thing each at a time, eight

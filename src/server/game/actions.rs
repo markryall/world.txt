@@ -4,7 +4,7 @@
 //!
 //! Only ordinary, practical things you can plainly see: the playful ones
 //! people find through the scenery (see docs/secrets.md) never turn up here.
-//! People first, then creatures, then things, then the ground; the browser
+//! People (and the island folk) first, then creatures, then things, then the ground; the browser
 //! shows the first few and keeps the rest under "more…".
 
 use super::Game;
@@ -41,6 +41,9 @@ impl Game {
         for name in here.iter().take(PEOPLE) {
             out.push(fill(format!("💬 {name}…"), format!("@{name} ")));
         }
+
+        // The island folk, if any are about.
+        out.extend(self.folk_actions(id));
 
         // Creatures: your friend, or a wild one that might become one.
         if let Some((a, n)) = &me.companion

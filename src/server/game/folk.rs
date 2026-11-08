@@ -826,9 +826,20 @@ impl Game {
                 } else {
                     format!("the {}, is here", t.title)
                 };
-                let text = if f.asleep { format!("{} {} is {doing}.", t.icon, f.name) } else if doing.starts_with("here") { format!("{} {} is {doing}", t.icon, f.name) } else { format!("{} {}, {doing}.", t.icon, f.name) };
-                Line::col(Col::Cyan, text)
+                let rest = if f.asleep { format!(" is {doing}.") } else if doing.starts_with("here") { format!(" is {doing}") } else { format!(", {doing}.") };
+                Line::new().c(Col::Cyan, format!("{} ", t.icon)).run(Col::Cyan, &f.name, format!("look {}", f.name)).c(Col::Cyan, rest)
             })
+            .collect()
+    }
+
+    /// For the actions row: a hello for each of the folk here who's awake.
+    /// Only that: what else they're up for is there to be found.
+    pub(super) fn folk_actions(&self, id: u64) -> Vec<crate::protocol::Action> {
+        let Some(me) = self.players.get(&id) else { return vec![] };
+        self.folk
+            .iter()
+            .filter(|f| (f.x, f.y) == (me.x, me.y) && !f.asleep && me.hears(&f.name))
+            .map(|f| crate::protocol::Action { label: format!("👋 hello, {}", f.name), run: Some(format!("talk {}", f.name)), fill: None })
             .collect()
     }
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Say hello to the island folk
+Meet one of the island folk and the row above the box offers a 👋 hello, and
+their name in the look text taps to look at them. No typing needed to make a
+new friend on a phone.
+
 ### Backups off Fly
 `deploy/fly-backups <folder>` copies every Fly world's daily backups down to a
 folder of your own, skipping copies it already has and keeping the newest 30,
