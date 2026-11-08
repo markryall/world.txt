@@ -1,8 +1,14 @@
 name = "Hums and island sounds in the terminal"
-status = "todo"
-description = "Hums, humming circles and the island's ambient sounds (rain, wind, waves, birds, crickets, fire) are made by the browser itself from notes and levels. A small synth in the client renders them to PCM for the player. Bigger than the others; worth it only if the first two land well."
+status = "done"
+description = """
+Hums, humming circles and the island's ambient sounds (rain, wind, waves, birds, crickets, fire) are made by the browser itself from notes and levels. A small synth in the client renders them to PCM for the player. Bigger than the others; worth it only if the first two land well.
+
+
+
+## Done
+src/synth.rs ports the browser's synth (triangle notes, biquad-filtered noise beds, gusts, waves, thunder, birds, crickets, crackles) and streams raw PCM to one mpv a moment ahead of real time. Sound now starts off in the terminal, as in the browser: sound on / sound off / sound, or play --sound (which replaces --quiet). Tested with mpv's output off; not yet listened to by ear."""
 created_at = "2026-11-08T02:55:14.946870Z"
-updated_at = "2026-11-08T02:55:14.946870Z"
+updated_at = "2026-11-08T03:27:03.554633Z"
 tags = [
     "terminal",
     "music",

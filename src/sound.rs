@@ -1,9 +1,12 @@
-//! Music for the terminal client, through mpv: the radio's own stream, and
+//! Sound for the terminal client, through mpv: the radio's own stream, and
 //! gramophone or jukebox songs, which arrive as Opus packets (stereo, 48kHz,
 //! 20ms each, as the player's browser encodes them) and are wrapped in Ogg
 //! here so mpv can play them from its stdin. Volume follows you about over
-//! mpv's control socket. Without mpv on the PATH it's all quiet, and the
-//! first music nearby says how to hear it.
+//! mpv's control socket. Hums and the island's own sounds come from the
+//! synth (`src/synth.rs`).
+//!
+//! As in the browser, sound starts off: `sound on` turns it on. Music nearby
+//! while it's off says so, once; without mpv, it says how to get it.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -35,31 +38,79 @@ impl Drop for Playing {
 
 pub struct Sound {
     mpv: Option<PathBuf>,
+    on: bool,
     playing: HashMap<i64, Playing>,
+    /// Radios in earshot (address and loudness), so turning sound on can
+    /// start them.
+    radios: HashMap<i64, (String, f32)>,
+    synth: Option<crate::synth::Synth>,
+    /// The last levels of the island's sounds, for when the synth starts.
+    levels: crate::protocol::Sounds,
 }
 
 /// What happened, for the client to tell you.
 #[derive(Debug, PartialEq)]
 pub enum Heard {
     Playing,
+    /// Music nearby, but sound's off.
+    Off,
     /// Music nearby, but nothing to play it with.
     NoPlayer,
     Nothing,
 }
 
 impl Sound {
-    /// Look for mpv; `quiet` leaves the music be.
-    pub fn new(quiet: bool) -> Self {
-        Sound { mpv: if quiet { None } else { find("mpv") }, playing: HashMap::new() }
+    pub fn new() -> Self {
+        Sound { mpv: find("mpv"), on: false, playing: HashMap::new(), radios: HashMap::new(), synth: None, levels: Default::default() }
+    }
+
+    pub fn is_on(&self) -> bool {
+        self.on
+    }
+
+    /// `sound on` / `sound off`. Turning it on without mpv is an error saying
+    /// how to get it.
+    pub fn set_on(&mut self, on: bool) -> Result<(), String> {
+        if !on {
+            self.on = false;
+            self.playing.clear();
+            self.synth = None;
+            return Ok(());
+        }
+        let Some(mpv) = self.mpv.clone() else { return Err(format!("🔇 Sound needs mpv: {INSTALL}, then world.txt play again.")) };
+        self.on = true;
+        if self.synth.is_none() {
+            self.synth = crate::synth::Synth::start(&mpv);
+            if let Some(s) = &self.synth {
+                s.levels(self.levels);
+            }
+        }
+        let radios: Vec<(i64, String, f32)> = self.radios.iter().map(|(t, (u, g))| (*t, u.clone(), *g)).collect();
+        for (thing, url, gain) in radios {
+            self.radio(thing, Some(&url), gain);
+        }
+        Ok(())
+    }
+
+    fn heard(&self) -> Heard {
+        if self.mpv.is_none() {
+            Heard::NoPlayer
+        } else if !self.on {
+            Heard::Off
+        } else {
+            Heard::Playing
+        }
     }
 
     /// A radio in earshot (or, with no url, not any more).
     pub fn radio(&mut self, thing: i64, url: Option<&str>, gain: f32) -> Heard {
         let Some(url) = url else {
+            self.radios.remove(&thing);
             self.playing.remove(&thing);
             return Heard::Nothing;
         };
-        let Some(mpv) = self.mpv.clone() else { return Heard::NoPlayer };
+        self.radios.insert(thing, (url.to_string(), gain));
+        let (Some(mpv), true) = (self.mpv.clone(), self.on) else { return self.heard() };
         let volume = volume(gain);
         if let Some(p) = self.playing.get_mut(&thing).filter(|p| p.url.as_deref() == Some(url)) {
             set_volume(p, volume);
@@ -74,7 +125,7 @@ impl Sound {
 
     /// Frames from a gramophone (or jukebox) in earshot.
     pub fn audio(&mut self, thing: i64, frames: &[String], gain: f32) -> Heard {
-        let Some(mpv) = self.mpv.clone() else { return Heard::NoPlayer };
+        let (Some(mpv), true) = (self.mpv.clone(), self.on) else { return self.heard() };
         let volume = volume(gain);
         let p = match self.playing.entry(thing) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
@@ -102,6 +153,21 @@ impl Sound {
     /// That gramophone's stopped.
     pub fn end(&mut self, thing: i64) {
         self.playing.remove(&thing);
+    }
+
+    /// A hum, or a turn of a humming circle.
+    pub fn tune(&self, text: &str) {
+        if let Some(s) = &self.synth {
+            s.tune(text);
+        }
+    }
+
+    /// How much rain, wind, birdsong… there is where you stand.
+    pub fn levels(&mut self, l: crate::protocol::Sounds) {
+        self.levels = l;
+        if let Some(s) = &self.synth {
+            s.levels(l);
+        }
     }
 }
 

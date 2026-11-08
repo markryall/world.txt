@@ -67,7 +67,7 @@ impl State {
     }
 }
 
-pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::Result<()> {
+pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow::Result<()> {
     if invite.is_none() && crate::identity::load_token("player", server).is_none() {
         anyhow::bail!(
             "world.txt is invite-only 💌 Ask an island keeper for a magic link, then: world.txt play --invite <link or code>"
@@ -82,8 +82,11 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
     let mut terminal = ratatui::init();
     let mut events = EventStream::new();
     let mut st = State::default();
-    let mut sound = crate::sound::Sound::new(quiet);
-    let mut told_install = false;
+    let mut sound = crate::sound::Sound::new();
+    let mut told_sound = false;
+    if sound_on && let Err(e) = sound.set_on(true) {
+        st.log.push(Line::col(Col::Pink, e));
+    }
     let (mut records, mut played) = crate::records::Records::new();
     let mut deck = Deck::default();
 
@@ -95,11 +98,17 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
                     Some(Ok(Message::Text(t))) => {
                         match serde_json::from_str::<ToClient>(t.as_str()) {
                             Ok(ToClient::Lines { lines }) => {
+                                for l in &lines {
+                                    if let Some(tune) = hummed(l) {
+                                        sound.tune(tune);
+                                    }
+                                }
                                 st.log.extend(lines);
                                 let excess = st.log.len().saturating_sub(2000);
                                 st.log.drain(..excess);
                             }
-                            Ok(ToClient::Status { place, weather, clock, map, here, progress, lights, actions, .. }) => {
+                            Ok(ToClient::Status { place, weather, clock, map, here, progress, lights, actions, sounds, .. }) => {
+                                sound.levels(sounds);
                                 st.set_actions(actions);
                                 st.progress = progress;
                                 st.lights = lights;
@@ -112,6 +121,9 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
                             Ok(ToClient::Hint { text, .. }) => st.hint = text,
                             // No sound here: one short line a turn says who's humming.
                             Ok(ToClient::Circle { parts, .. }) if !parts.is_empty() => {
+                                for p in &parts {
+                                    sound.tune(&p.tune);
+                                }
                                 st.log.push(crate::protocol::circle_line(&parts));
                             }
                             Ok(ToClient::Circle { .. }) => {}
@@ -135,11 +147,11 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
                             // Music in earshot, through mpv if there is one.
                             Ok(ToClient::Radio { thing, url, gain }) => {
                                 let heard = sound.radio(thing, url.as_deref(), gain);
-                                tell_install(&mut st, &mut told_install, heard, "📻 There's a radio playing nearby.");
+                                tell_sound(&mut st, &mut told_sound, heard, "📻 There's a radio playing nearby.");
                             }
                             Ok(ToClient::Audio { thing, frames, gain, .. }) => {
                                 let heard = sound.audio(thing, &frames, gain);
-                                tell_install(&mut st, &mut told_install, heard, "🎶 There's music playing nearby.");
+                                tell_sound(&mut st, &mut told_sound, heard, "🎶 There's music playing nearby.");
                             }
                             Ok(ToClient::AudioEnd { thing }) => sound.end(thing),
                             // Playing your own songs: you're the record player.
@@ -216,6 +228,16 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
                                 let to_world = match local(&text) {
                                     Some(Local::PlayMusic(paths)) => deck.play_music(&paths, &mut records, &mut st),
                                     Some(Local::AddSongs(paths)) => deck.add_songs(&paths, &records, &mut st),
+                                    Some(Local::Sound(on)) => {
+                                        let on = on.unwrap_or(!sound.is_on());
+                                        let said = match sound.set_on(on) {
+                                            Ok(()) if on => "🔊 Sound on: music, hums and the island's own sounds. 'sound off' to stop.".to_string(),
+                                            Ok(()) => "🔇 Sound off.".to_string(),
+                                            Err(e) => e,
+                                        };
+                                        st.log.push(Line::col(Col::Pink, said));
+                                        None
+                                    }
                                     None => Some(ToServer::Cmd { text }),
                                 };
                                 let Some(to_world) = to_world else { continue };
@@ -260,10 +282,18 @@ enum Local {
     PlayMusic(String),
     /// add songs a.mp3 b.mp3
     AddSongs(String),
+    /// sound on, sound off, or just sound to flip it.
+    Sound(Option<bool>),
 }
 
 fn local(text: &str) -> Option<Local> {
     let t = text.trim();
+    match t.to_lowercase().as_str() {
+        "sound" => return Some(Local::Sound(None)),
+        "sound on" => return Some(Local::Sound(Some(true))),
+        "sound off" => return Some(Local::Sound(Some(false))),
+        _ => {}
+    }
     let (verb, rest) = t.split_once(char::is_whitespace)?;
     let (what, paths) = rest.trim_start().split_once(char::is_whitespace)?;
     let (verb, what, paths) = (verb.to_lowercase(), what.to_lowercase(), paths.trim().to_string());
@@ -341,12 +371,23 @@ impl Deck {
 }
 
 /// The first music you can't hear says how you could.
-fn tell_install(st: &mut State, told: &mut bool, heard: crate::sound::Heard, what: &str) {
-    if heard != crate::sound::Heard::NoPlayer || *told {
+fn tell_sound(st: &mut State, told: &mut bool, heard: crate::sound::Heard, what: &str) {
+    use crate::sound::Heard;
+    if *told || !matches!(heard, Heard::Off | Heard::NoPlayer) {
         return;
     }
     *told = true;
-    st.log.push(Line::new().c(Col::Pink, format!("{what} To hear it here: ")).b(Col::Pink, crate::sound::INSTALL).c(Col::Pink, ", then world.txt play again."));
+    st.log.push(match heard {
+        Heard::Off => Line::new().c(Col::Pink, format!("{what} Type ")).b(Col::Pink, "sound on").c(Col::Pink, " to hear it."),
+        _ => Line::new().c(Col::Pink, format!("{what} To hear it here: ")).b(Col::Pink, crate::sound::INSTALL).c(Col::Pink, ", then world.txt play again."),
+    });
+}
+
+/// A hum's tune, from the ♪ … ♪ in a line (as the browser finds it).
+fn hummed(l: &Line) -> Option<&str> {
+    let text = l.0.iter().find(|s| s.t.contains('♪'))?;
+    let inner = text.t.split_once("♪ ")?.1;
+    inner.rsplit_once(" ♪").map(|(t, _)| t)
 }
 
 fn draw(f: &mut Frame, st: &mut State) {
@@ -534,6 +575,17 @@ mod tests {
         assert_eq!(local("add songs"), None);
         assert_eq!(local("add Sam to picnic"), None);
         assert_eq!(local("play"), None);
+        assert_eq!(local("Sound On"), Some(Local::Sound(Some(true))));
+        assert_eq!(local("sound"), Some(Local::Sound(None)));
+        assert_eq!(local("sound of the sea"), None);
+    }
+
+    #[test]
+    fn hums_are_found_in_lines() {
+        let l = Line::new().b(Col::Cyan, "Sam").c(Col::Dim, " hums ").c(Col::Pink, "♪ @90 C E G- ♪");
+        assert_eq!(hummed(&l), Some("@90 C E G-"));
+        assert_eq!(hummed(&Line::col(Col::Pink, "♪ You hear someone hums nearby.")), None);
+        assert_eq!(hummed(&Line::plain("hello")), None);
     }
 
     #[test]

@@ -395,7 +395,12 @@ for something else to drive instead, such as a Claude Code session
   real time to Opus in Ogg, and the packets inside go to the world as a
   browser's would. `play music <paths>` and `add songs <paths>` are caught in
   the client, so the world only ever sees `play music`, `add songs` and the
-  songs' titles. Hums and the island's own sounds stay browser-only.
+  songs' titles. Hums and the island's own sounds come from a little synth
+  (`src/synth.rs`), the browser's own recipe redone in Rust: triangle-wave
+  notes, filtered noise for rain, wind and waves, and the one-off chirps,
+  crackles and rumbles, written as raw samples to one more mpv that stays
+  open, a moment ahead of real time. Sound starts off, as in the browser
+  (`sound on` in the client).
 
 ## Running a world
 

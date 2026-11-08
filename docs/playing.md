@@ -26,11 +26,12 @@ could (Tab)**. Tab puts the first one in the box and goes on to the next each
 time it's pressed (Shift+Tab goes back), so Enter does it, or finish one that
 needs more. Tab never touches something you've typed.
 
-The terminal client plays music too, through [mpv](https://mpv.io): radios,
-and gramophone and jukebox songs, getting louder as you walk up to them, just
-like in a browser. `brew install mpv` (or `apt install mpv`) and it's there;
-`world.txt play --quiet` keeps things silent anyway. Hums and the island's own
-sounds are still browser-only.
+The terminal client has sound too, through [mpv](https://mpv.io) (`brew
+install mpv`, or `apt install mpv`): radios, gramophone and jukebox songs
+(louder as you walk up to them), hums and humming circles, and the island's own
+rain, wind, waves, birds, crickets, fires and thunder, all as in a browser.
+Like the browser, it starts off: type `sound on` to hear it, `sound off` to
+stop (or just `sound` to flip it), or start with `world.txt play --sound`.
 
 You can play your own songs from the terminal too, with
 [ffmpeg](https://ffmpeg.org) (which `brew install mpv` brings along):

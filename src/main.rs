@@ -8,6 +8,7 @@ mod records;
 mod server;
 mod service;
 mod sound;
+mod synth;
 
 use clap::{Parser, Subcommand};
 
@@ -59,9 +60,10 @@ enum Cmd {
         /// An invite (the part after #invite= in a magic link), the first time.
         #[arg(long)]
         invite: Option<String>,
-        /// No music, even with mpv about.
+        /// Start with sound on (music, hums and the island's sounds, through
+        /// mpv); otherwise it's off until you type `sound on`.
         #[arg(long)]
-        quiet: bool,
+        sound: bool,
     },
     /// Bring an AI island resident to life (uses Claude Haiku 5.5).
     Agent {
@@ -218,7 +220,7 @@ async fn main() -> anyhow::Result<()> {
             }
             Ok(())
         }
-        Cmd::Play { server, invite, quiet } => client::run(&server, invite, quiet).await,
+        Cmd::Play { server, invite, sound } => client::run(&server, invite, sound).await,
         Cmd::Agent { name, persona, server, daily_usd, state_dir, dry_run, invite } => {
             let persona = persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());
             agent::run(agent::Options { name, persona, server, daily_usd, state_dir, dry_run, invite }).await
