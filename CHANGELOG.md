@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (2026-11-08)
 
 ### Links say how to join
 Every magic link (`invite Poppy` and `link me` in the world, `world.txt invite`
