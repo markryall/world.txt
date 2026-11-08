@@ -9,10 +9,10 @@
 
 use super::Game;
 use super::companions;
-use super::{builds, gramophone};
+use super::{builds, cook, gramophone, jukebox, meetings, music, radio};
 use crate::protocol::Action;
 use crate::server::terrain::Terrain;
-use crate::server::world::room_of;
+use crate::server::world::{Thing, room_of};
 
 /// At most this many people get a chip of their own.
 const PEOPLE: usize = 2;
@@ -52,47 +52,16 @@ impl Game {
             out.push(run(format!("🍓 befriend the {}", w.animal.name), format!("befriend {}", w.animal.name)));
         }
 
-        // Things.
-        let things: Vec<_> = self.world.things_at(x, y).collect();
-        if things.iter().any(|t| t.is_board()) {
-            out.push(run("📖 read", "read"));
-            out.push(fill("📌 post…", "post "));
-        }
-        if let Some(i) = self.music_box_here(x, y) {
-            out.push(run("🎶 play", "play"));
-            if self.world.things[i].maker == me.user {
-                out.push(fill("🎼 teach…", "teach "));
+        // Things, each offering its own (once each: two boards, one read).
+        for t in self.world.things_at(x, y) {
+            for a in self.thing_actions(id, t) {
+                if !out.contains(&a) {
+                    out.push(a);
+                }
             }
-        }
-        if let Some(g) = things.iter().find(|t| t.kind.as_deref() == Some(gramophone::kind())) {
-            if self.spins.contains_key(&g.id) {
-                out.push(run("⏹ stop music", "stop music"));
-            } else {
-                out.push(run("🎵 play music", "play music"));
-            }
-        }
-        if self.has_jukebox_here(id) {
-            out.push(run("➕ add songs", "add songs"));
-        }
-        if self.has_radio_here(id) {
-            out.push(fill("📻 tune…", "tune "));
-        }
-        if self.kitchen_here(x, y).is_some() {
-            out.push(run("🍳 cook", "cook"));
         }
         if self.in_room(id) {
             out.push(run("🚪 out", "out"));
-        } else if things.iter().any(|t| t.kind.as_deref() == Some(builds::KIND) && self.built(t.id)) {
-            out.push(run("🚪 go in", "enter"));
-        }
-        if self.lighthouse_here(x, y) && !self.lighthouse_lit() {
-            out.push(run("🔧 mend", "mend"));
-        }
-        if self.dock_here(x, y) {
-            out.push(run("⛵ sail", "sail"));
-        }
-        if self.meeting_here(id) {
-            out.push(run("🔗 meet", "meet"));
         }
 
         // The ground.
@@ -106,6 +75,49 @@ impl Game {
             if !matches!(self.world.terrain(x, y), Terrain::Water | Terrain::Pond | Terrain::DeepWater | Terrain::Stone) {
                 out.push(fill("🌱 plant…", "plant "));
             }
+        }
+        out
+    }
+
+    /// What you could do with one thing where you stand: for the row, and
+    /// for the end of looking at it.
+    pub(super) fn thing_actions(&self, id: u64, t: &Thing) -> Vec<Action> {
+        let Some(me) = self.players.get(&id) else { return vec![] };
+        let kind = t.kind.as_deref().unwrap_or("");
+        let mut out = Vec::new();
+        if t.is_board() {
+            out.push(run("📖 read", "read"));
+            out.push(fill("📌 post…", "post "));
+        }
+        if kind == music::music_kind() {
+            out.push(run("🎶 play", "play"));
+            if t.maker == me.user {
+                out.push(fill("🎼 teach…", "teach "));
+            }
+        }
+        if kind == gramophone::kind() {
+            out.push(if self.spins.contains_key(&t.id) { run("⏹ stop music", "stop music") } else { run("🎵 play music", "play music") });
+        }
+        if kind == jukebox::kind() {
+            out.push(run("➕ add songs", "add songs"));
+        }
+        if kind == radio::kind() {
+            out.push(fill("📻 tune…", "tune "));
+        }
+        if kind == cook::FIRE || kind == cook::OVEN {
+            out.push(run("🍳 cook", "cook"));
+        }
+        if kind == builds::KIND && self.built(t.id) && !self.in_room(id) {
+            out.push(run("🚪 go in", "enter"));
+        }
+        if t.is_lighthouse() && !self.lighthouse_lit() {
+            out.push(run("🔧 mend", "mend"));
+        }
+        if t.is_dock() {
+            out.push(run("⛵ sail", "sail"));
+        }
+        if kind == meetings::kind() {
+            out.push(run("🔗 meet", "meet"));
         }
         out
     }

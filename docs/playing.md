@@ -18,6 +18,8 @@ underfoot, 🎣 fish by the water, 🌱 plant… and so on, changing as you walk
 Ones with "…" (and a dashed edge) put the start of a command in the box for
 you to finish. **more…** lists everything you could do here, and say, satchel,
 who and help are always at the end. Tap instead of type, on a phone or not.
+The look text has taps too: a thing's name looks at it and ends with what
+you could do with it, and a person's name gets a message started.
 
 On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
 menu) makes the island an app of its own: its own icon, full screen, no

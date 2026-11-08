@@ -620,7 +620,13 @@ impl World {
                     line = line.c(Col::Yellow, sep);
                 }
                 let name = if i == 0 { capitalise(&t.name) } else { t.name.clone() };
+                let from = line.0.len();
                 line = paint::painted(line, &name, t.paint.as_deref(), Col::Yellow);
+                // Tap a thing to look at it (and see what you could do with it).
+                let look = format!("look {}", strip_article(&t.name));
+                for span in &mut line.0[from..] {
+                    span.run = Some(look.clone());
+                }
                 if let Some(p) = &t.paint {
                     line = line.c(Col::Dim, format!(" (painted {p})"));
                 }
@@ -629,10 +635,20 @@ impl World {
         }
         if !others.is_empty() {
             let verb = if others.len() == 1 { "is" } else { "are" };
-            out.push(Line::new().c(Col::Cyan, "☺ ").b(Col::Cyan, join_and(others)).c(
-                Col::Cyan,
-                format!(" {verb} here."),
-            ));
+            // Each name a tap, to say something to them.
+            let mut line = Line::new().c(Col::Cyan, "☺ ");
+            for (i, name) in others.iter().enumerate() {
+                if i > 0 {
+                    let sep = match (others.len(), i == others.len() - 1) {
+                        (2, _) => " and ",
+                        (_, true) => ", and ",
+                        _ => ", ",
+                    };
+                    line = line.c(Col::Cyan, sep);
+                }
+                line = line.who(name);
+            }
+            out.push(line.c(Col::Cyan, format!(" {verb} here.")));
         }
     }
 

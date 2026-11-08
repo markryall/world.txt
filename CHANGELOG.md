@@ -28,7 +28,8 @@ are, and changes as you walk: wave and talk to whoever's here, pat your
 companion or befriend a wild animal, read the board, play the music box or
 the gramophone, cook, go in, sail, mend the lighthouse, gather, fish,
 plant… Tap instead of typing, on a phone or a computer. **more…** lists the
-lot.
+lot. In the look text, tap a thing's name to look at it and see what you
+could do with it, or a person's name to say something to them.
 
 ### The island on your home screen
 Add to Home Screen on a phone gives the island its own icon (a little bit of

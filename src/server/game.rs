@@ -1302,6 +1302,22 @@ impl Game {
                     lines.push(Line::plain(format!("It {a} {when}.")));
                 }
                 lines.push(Line::col(Col::Dim, format!("Made by {}.", self.world.nick(&t.maker))));
+                // What you could do with it, as taps.
+                let actions = self.thing_actions(id, t);
+                if !actions.is_empty() {
+                    let mut line = Line::new().c(Col::Dim, "You could: ");
+                    for (k, a) in actions.into_iter().enumerate() {
+                        if k > 0 {
+                            line = line.c(Col::Dim, " · ");
+                        }
+                        line = match (a.run, a.fill) {
+                            (Some(cmd), _) => line.run(Col::Pink, a.label, cmd),
+                            (None, Some(f)) => line.fill(Col::Pink, a.label, f),
+                            (None, None) => line,
+                        };
+                    }
+                    lines.push(line);
+                }
                 self.send(id, lines);
             }
             None => self.say1(id, Line::plain(format!("You don't see any {what} here."))),
