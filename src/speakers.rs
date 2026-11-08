@@ -66,7 +66,13 @@ impl Speakers {
     /// player does, for `played`.
     pub fn new(on: bool, again: &'static str) -> (Self, mpsc::UnboundedReceiver<Played>, Vec<Out>) {
         let (records, played) = Records::new();
-        let mut s = Speakers { sound: Sound::new(), records, deck: Deck::default(), told: false, again };
+        let mut s = Speakers {
+            sound: Sound::new(),
+            records,
+            deck: Deck::default(),
+            told: false,
+            again,
+        };
         let mut out = Vec::new();
         if on {
             s.set_sound(Some(true), &mut out, false);
@@ -78,9 +84,15 @@ impl Speakers {
         let on = on.unwrap_or(!self.sound.is_on());
         match self.sound.set_on(on) {
             Ok(()) if !say_ok => {}
-            Ok(()) if on => out.push(pink("🔊 Sound on: music, hums and the island's own sounds. 'sound off' to stop.")),
+            Ok(()) if on => out.push(pink(
+                "🔊 Sound on: music, hums and the island's own sounds. 'sound off' to stop.",
+            )),
             Ok(()) => out.push(pink("🔇 Sound off.")),
-            Err(_) => out.push(pink(format!("🔇 Sound needs mpv: {}, then {}.", crate::sound::INSTALL, self.again))),
+            Err(_) => out.push(pink(format!(
+                "🔇 Sound needs mpv: {}, then {}.",
+                crate::sound::INSTALL,
+                self.again
+            ))),
         }
     }
 
@@ -120,7 +132,12 @@ impl Speakers {
                 let heard = self.sound.radio(*thing, url.as_deref(), *gain);
                 self.tell(heard, "📻 There's a radio playing nearby.", &mut out);
             }
-            ToClient::Audio { thing, frames, gain, .. } => {
+            ToClient::Audio {
+                thing,
+                frames,
+                gain,
+                ..
+            } => {
                 let heard = self.sound.audio(*thing, frames, *gain);
                 self.tell(heard, "🎶 There's music playing nearby.", &mut out);
             }
@@ -140,13 +157,22 @@ impl Speakers {
             ToClient::JukeAdd { thing } => {
                 self.deck.jukebox = Some(*thing);
                 match self.deck.want_queue.take() {
-                    Some(songs) => out.push(Out::Send(ToServer::Queue { thing: *thing, songs })),
-                    None => out.push(pink(format!("📀 Which songs? add songs <files or a folder> (up to {})", crate::records::JUKEBOX_MAX))),
+                    Some(songs) => out.push(Out::Send(ToServer::Queue {
+                        thing: *thing,
+                        songs,
+                    })),
+                    None => out.push(pink(format!(
+                        "📀 Which songs? add songs <files or a folder> (up to {})",
+                        crate::records::JUKEBOX_MAX
+                    ))),
                 }
             }
             ToClient::JukeTurn { thing, key } => match self.deck.queued.remove(key) {
                 Some(path) => self.records.jukebox(path, *thing, key.clone()),
-                None => out.push(Out::Send(ToServer::TrackDone { thing: *thing, key: key.clone() })),
+                None => out.push(Out::Send(ToServer::TrackDone {
+                    thing: *thing,
+                    key: key.clone(),
+                })),
             },
             ToClient::JukeStop { .. } => self.records.stop(),
             _ => {}
@@ -159,7 +185,10 @@ impl Speakers {
         vec![match p {
             Played::Track { title } => pink(format!("🎶 Playing {title}")),
             Played::Note(text) => pink(text),
-            Played::Frames { frames, title } => Out::Send(ToServer::Audio { frames, title: Some(title) }),
+            Played::Frames { frames, title } => Out::Send(ToServer::Audio {
+                frames,
+                title: Some(title),
+            }),
             Played::Done { thing, key } => Out::Send(ToServer::TrackDone { thing, key }),
         }]
     }
@@ -171,7 +200,10 @@ impl Speakers {
         }
         self.told = true;
         out.push(Out::Say(match heard {
-            Heard::Off => Line::new().c(Col::Pink, format!("{what} Type ")).b(Col::Pink, "sound on").c(Col::Pink, " to hear it."),
+            Heard::Off => Line::new()
+                .c(Col::Pink, format!("{what} Type "))
+                .b(Col::Pink, "sound on")
+                .c(Col::Pink, " to hear it."),
             _ => Line::new()
                 .c(Col::Pink, format!("{what} To hear it here: "))
                 .b(Col::Pink, crate::sound::INSTALL)
@@ -187,13 +219,17 @@ impl Speakers {
             return None;
         }
         self.deck.want_play = Some(files);
-        Some(ToServer::Cmd { text: "play music".into() })
+        Some(ToServer::Cmd {
+            text: "play music".into(),
+        })
     }
 
     /// `add songs <songs>`: only their titles go to the world.
     fn add_songs(&mut self, paths: &str, out: &mut Vec<Out>) -> Option<ToServer> {
         let files = self.songs(paths, crate::records::JUKEBOX_MAX, out)?;
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
         let songs: Vec<Song> = files
             .into_iter()
             .enumerate()
@@ -208,14 +244,20 @@ impl Speakers {
             Some(thing) => Some(ToServer::Queue { thing, songs }),
             None => {
                 self.deck.want_queue = Some(songs);
-                Some(ToServer::Cmd { text: "add songs".into() })
+                Some(ToServer::Cmd {
+                    text: "add songs".into(),
+                })
             }
         }
     }
 
     fn songs(&self, paths: &str, max: usize, out: &mut Vec<Out>) -> Option<Vec<PathBuf>> {
         if !self.records.can_play() {
-            out.push(pink(format!("🎶 To play songs from here: {}, then {}.", crate::records::INSTALL, self.again)));
+            out.push(pink(format!(
+                "🎶 To play songs from here: {}, then {}.",
+                crate::records::INSTALL,
+                self.again
+            )));
             return None;
         }
         match crate::records::songs(paths, max) {
@@ -238,7 +280,11 @@ fn local(text: &str) -> Option<Local> {
     }
     let (verb, rest) = t.split_once(char::is_whitespace)?;
     let (what, paths) = rest.trim_start().split_once(char::is_whitespace)?;
-    let (verb, what, paths) = (verb.to_lowercase(), what.to_lowercase(), paths.trim().to_string());
+    let (verb, what, paths) = (
+        verb.to_lowercase(),
+        what.to_lowercase(),
+        paths.trim().to_string(),
+    );
     if paths.is_empty() {
         return None;
     }
@@ -306,9 +352,18 @@ mod tests {
 
     #[test]
     fn songs_from_here_stay_here() {
-        assert_eq!(local("play music ~/Music/Rumours"), Some(Local::PlayMusic("~/Music/Rumours".into())));
-        assert_eq!(local("Play  songs a.mp3 b.mp3"), Some(Local::PlayMusic("a.mp3 b.mp3".into())));
-        assert_eq!(local("add songs ~/Music/A\\ Little\\ Tune.mp3"), Some(Local::AddSongs("~/Music/A\\ Little\\ Tune.mp3".into())));
+        assert_eq!(
+            local("play music ~/Music/Rumours"),
+            Some(Local::PlayMusic("~/Music/Rumours".into()))
+        );
+        assert_eq!(
+            local("Play  songs a.mp3 b.mp3"),
+            Some(Local::PlayMusic("a.mp3 b.mp3".into()))
+        );
+        assert_eq!(
+            local("add songs ~/Music/A\\ Little\\ Tune.mp3"),
+            Some(Local::AddSongs("~/Music/A\\ Little\\ Tune.mp3".into()))
+        );
         assert_eq!(local("play music"), None, "plain, it's for the world");
         assert_eq!(local("add songs"), None);
         assert_eq!(local("add Sam to picnic"), None);
@@ -320,23 +375,39 @@ mod tests {
 
     #[test]
     fn hums_are_found_in_lines() {
-        let l = Line::new().b(Col::Cyan, "Sam").c(Col::Dim, " hums ").c(Col::Pink, "♪ @90 C E G- ♪");
+        let l = Line::new()
+            .b(Col::Cyan, "Sam")
+            .c(Col::Dim, " hums ")
+            .c(Col::Pink, "♪ @90 C E G- ♪");
         assert_eq!(hummed(&l), Some("@90 C E G-"));
-        assert_eq!(hummed(&Line::col(Col::Pink, "♪ You hear someone hums nearby.")), None);
+        assert_eq!(
+            hummed(&Line::col(Col::Pink, "♪ You hear someone hums nearby.")),
+            None
+        );
         assert_eq!(hummed(&Line::plain("hello")), None);
     }
 
     #[tokio::test]
     async fn a_jukebox_turn_we_cant_play_goes_straight_back() {
         let (mut s, _played, _) = Speakers::new(false, "again");
-        let out = s.heard(&ToClient::JukeTurn { thing: 7, key: "k".into() });
-        assert!(matches!(&out[..], [Out::Send(ToServer::TrackDone { thing: 7, key })] if key == "k"), "{out:?}");
+        let out = s.heard(&ToClient::JukeTurn {
+            thing: 7,
+            key: "k".into(),
+        });
+        assert!(
+            matches!(&out[..], [Out::Send(ToServer::TrackDone { thing: 7, key })] if key == "k"),
+            "{out:?}"
+        );
     }
 
     #[tokio::test]
     async fn music_nearby_says_once_how_to_hear_it() {
         let (mut s, _played, _) = Speakers::new(false, "again");
-        let radio = ToClient::Radio { thing: 1, url: Some("https://radio.example/stream".into()), gain: 0.5 };
+        let radio = ToClient::Radio {
+            thing: 1,
+            url: Some("https://radio.example/stream".into()),
+            gain: 0.5,
+        };
         assert_eq!(s.heard(&radio).len(), 1);
         assert!(s.heard(&radio).is_empty());
     }

@@ -31,20 +31,57 @@ impl Game {
             .map(|d| (x + d.2, y + d.3))
             .filter(|&(sx, sy)| {
                 let t = self.world.terrain(sx, sy);
-                t.walkable() && !t.is_wet() && self.world.home_at(sx, sy).is_none() && self.world.things_at(sx, sy).count() < 6
+                t.walkable()
+                    && !t.is_wet()
+                    && self.world.home_at(sx, sy).is_none()
+                    && self.world.things_at(sx, sy).count() < 6
             })
             .collect();
-        let way = |(sx, sy): (i64, i64)| DIRS.iter().find(|d| (x + d.2, y + d.3) == (sx, sy)).map_or("nearby", |d| d.1);
+        let way = |(sx, sy): (i64, i64)| {
+            DIRS.iter()
+                .find(|d| (x + d.2, y + d.3) == (sx, sy))
+                .map_or("nearby", |d| d.1)
+        };
         let mut free = spots.into_iter();
         let mut around = Vec::new();
-        if let Some((bx, by)) = free.by_ref().find(|&(sx, sy)| !self.world.things_at(sx, sy).any(|t| t.is_board())) {
-            self.world.add_thing(bx, by, "the village noticeboard".into(), None, Trigger::Always, BY, Some(super::boards::board_kind()))?;
-            around.push(format!("the village noticeboard just to the {}", way((bx, by))));
+        if let Some((bx, by)) = free
+            .by_ref()
+            .find(|&(sx, sy)| !self.world.things_at(sx, sy).any(|t| t.is_board()))
+        {
+            self.world.add_thing(
+                bx,
+                by,
+                "the village noticeboard".into(),
+                None,
+                Trigger::Always,
+                BY,
+                Some(super::boards::board_kind()),
+            )?;
+            around.push(format!(
+                "the village noticeboard just to the {}",
+                way((bx, by))
+            ));
         }
         let meeting = super::meetings::kind();
-        if let Some((tx, ty)) = free.find(|&(sx, sy)| !self.world.things_at(sx, sy).any(|t| t.kind.as_deref() == Some(meeting))) {
-            self.world.add_thing(tx, ty, "a long table for gatherings".into(), None, Trigger::Always, BY, Some(meeting))?;
-            around.push(format!("a long table for gatherings to the {}", way((tx, ty))));
+        if let Some((tx, ty)) = free.find(|&(sx, sy)| {
+            !self
+                .world
+                .things_at(sx, sy)
+                .any(|t| t.kind.as_deref() == Some(meeting))
+        }) {
+            self.world.add_thing(
+                tx,
+                ty,
+                "a long table for gatherings".into(),
+                None,
+                Trigger::Always,
+                BY,
+                Some(meeting),
+            )?;
+            around.push(format!(
+                "a long table for gatherings to the {}",
+                way((tx, ty))
+            ));
         }
         if !self.world.descriptions.contains_key(&(x, y)) {
             let mut text = "A village green, the grass worn into soft paths by everyone passing through. The Island Journal stands in the middle".to_string();
@@ -52,7 +89,8 @@ impl Game {
                 text.push_str(&format!(", with {}", super::cases::and_list(&around)));
             }
             text.push('.');
-            self.world.set_description(x, y, Some(text), BY, super::boards::now())?;
+            self.world
+                .set_description(x, y, Some(text), BY, super::boards::now())?;
         }
         self.world.db.set_meta(DONE, "1")?;
         println!("🌳 laid out the village green");

@@ -78,7 +78,15 @@ impl Game {
             .iter()
             .map(|f| {
                 let s = f.species;
-                Line::col(Col::Pink, format!("{} {} {}.", s.kind.icon(), capitalise(&nature::a(s.name)), s.here))
+                Line::col(
+                    Col::Pink,
+                    format!(
+                        "{} {} {}.",
+                        s.kind.icon(),
+                        capitalise(&nature::a(s.name)),
+                        s.here
+                    ),
+                )
             })
             .collect();
         if !out.is_empty() {
@@ -95,40 +103,84 @@ impl Game {
         let phase = Clock::phase();
 
         // New finds appear near wandering people.
-        let spots: Vec<(u64, i64, i64)> =
-            self.players.iter().filter(|(_, p)| !p.bot).map(|(&id, p)| (id, p.x, p.y)).collect();
+        let spots: Vec<(u64, i64, i64)> = self
+            .players
+            .iter()
+            .filter(|(_, p)| !p.bot)
+            .map(|(&id, p)| (id, p.x, p.y))
+            .collect();
         for (id, px, py) in spots {
-            let nearby = self.finds.iter().filter(|f| (f.x - px).abs() <= SPAWN_RX && (f.y - py).abs() <= SPAWN_RY).count();
-            if self.finds.len() >= MAX_FINDS || nearby >= NEARBY_MAX || !self.rng.chance(SPAWN_CHANCE) {
+            let nearby = self
+                .finds
+                .iter()
+                .filter(|f| (f.x - px).abs() <= SPAWN_RX && (f.y - py).abs() <= SPAWN_RY)
+                .count();
+            if self.finds.len() >= MAX_FINDS
+                || nearby >= NEARBY_MAX
+                || !self.rng.chance(SPAWN_CHANCE)
+            {
                 continue;
             }
             let dx = (self.rng.next() % (2 * SPAWN_RX as u64 + 1)) as i64 - SPAWN_RX;
             let dy = (self.rng.next() % (2 * SPAWN_RY as u64 + 1)) as i64 - SPAWN_RY;
             let (x, y) = (px + dx, py + dy);
             let ground = self.world.terrain(x, y);
-            if ground.is_wet() || self.finds.iter().filter(|f| f.x == x && f.y == y).count() >= PER_TILE {
+            if ground.is_wet()
+                || self.finds.iter().filter(|f| f.x == x && f.y == y).count() >= PER_TILE
+            {
                 continue;
             }
             let sky = self.world.weather.sky_at(x, y);
             let (season, festival) = (Clock::season(), Clock::festival().is_some());
             let island = crate::server::islands::island_at(x, y).id;
-            let Some(species) = nature::choose(&mut self.rng, ground, sky, phase, season, festival, island, false) else { continue };
+            let Some(species) = nature::choose(
+                &mut self.rng,
+                ground,
+                sky,
+                phase,
+                season,
+                festival,
+                island,
+                false,
+            ) else {
+                continue;
+            };
             let until = nature::lifetime(&mut self.rng);
-            self.finds.push(Find { species, x, y, until });
+            self.finds.push(Find {
+                species,
+                x,
+                y,
+                until,
+            });
 
             // Fluttery things announce themselves when they're close.
             let d = dx.abs().max(dy.abs());
             if matches!(species.kind, Kind::Butterfly | Kind::Bug) && (1..=2).contains(&d) {
-                let dir = DIRS.iter().find(|q| q.2 == dx.signum() && q.3 == dy.signum()).map_or("nearby", |q| q.1);
+                let dir = DIRS
+                    .iter()
+                    .find(|q| q.2 == dx.signum() && q.3 == dy.signum())
+                    .map_or("nearby", |q| q.1);
                 self.say1(
                     id,
-                    Line::col(Col::Pink, format!("{} {} flutters down just to the {dir}.", species.kind.icon(), capitalise(&nature::a(species.name)))),
+                    Line::col(
+                        Col::Pink,
+                        format!(
+                            "{} {} flutters down just to the {dir}.",
+                            species.kind.icon(),
+                            capitalise(&nature::a(species.name))
+                        ),
+                    ),
                 );
             }
         }
 
         // Lines out in the water.
-        let fishers: Vec<u64> = self.players.iter().filter(|(_, p)| p.fishing.is_some()).map(|(&id, _)| id).collect();
+        let fishers: Vec<u64> = self
+            .players
+            .iter()
+            .filter(|(_, p)| p.fishing.is_some())
+            .map(|(&id, _)| id)
+            .collect();
         for id in fishers {
             let left = self.players.get_mut(&id).and_then(|p| {
                 p.fishing = p.fishing.map(|n| n.saturating_sub(1));
@@ -141,7 +193,10 @@ impl Game {
                     }
                     let _ = self.land_fish(id);
                 }
-                Some(1) => self.say1(id, Line::col(Col::Blue, "〰 Your float bobs... something's nibbling!")),
+                Some(1) => self.say1(
+                    id,
+                    Line::col(Col::Blue, "〰 Your float bobs... something's nibbling!"),
+                ),
                 _ => {}
             }
         }
@@ -152,26 +207,67 @@ impl Game {
         if here.is_wet() {
             return Some(here);
         }
-        let around: Vec<_> = DIRS.iter().map(|d| self.world.terrain(x + d.2, y + d.3)).filter(|t| t.is_wet()).collect();
+        let around: Vec<_> = DIRS
+            .iter()
+            .map(|d| self.world.terrain(x + d.2, y + d.3))
+            .filter(|t| t.is_wet())
+            .collect();
         // A pond nearby beats the sea: ponds have their own fish.
-        around.iter().copied().find(|t| *t == crate::server::terrain::Terrain::Pond).or(around.first().copied())
+        around
+            .iter()
+            .copied()
+            .find(|t| *t == crate::server::terrain::Terrain::Pond)
+            .or(around.first().copied())
     }
 
     fn land_fish(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
-        let Some(water) = self.water_near(x, y) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
+        let Some(water) = self.water_near(x, y) else {
+            return Ok(());
+        };
         let sky = self.world.weather.sky_at(x, y);
         let fish = if self.rng.chance(0.2) {
             None
         } else {
-            nature::choose(&mut self.rng, water, sky, Clock::phase(), Clock::season(), false, crate::server::islands::island_at(x, y).id, true)
+            nature::choose(
+                &mut self.rng,
+                water,
+                sky,
+                Clock::phase(),
+                Clock::season(),
+                false,
+                crate::server::islands::island_at(x, y).id,
+                true,
+            )
         };
         match fish {
-            None => self.say1(id, Line::col(Col::Blue, "🎣 The float goes still. Nothing bites this time. Try again?")),
+            None => self.say1(
+                id,
+                Line::col(
+                    Col::Blue,
+                    "🎣 The float goes still. Nothing bites this time. Try again?",
+                ),
+            ),
             Some(s) => {
                 if self.collect(id, s)? {
-                    self.say1(id, Line::new().c(Col::Blue, "🎣 A tug! You reel in ").b(Col::Blue, nature::a(s.name)).c(Col::Blue, "!"));
-                    self.tell_here(x, y, id, Line::col(Col::Blue, format!("🎣 {name} reels in {}!", nature::a(s.name))));
+                    self.say1(
+                        id,
+                        Line::new()
+                            .c(Col::Blue, "🎣 A tug! You reel in ")
+                            .b(Col::Blue, nature::a(s.name))
+                            .c(Col::Blue, "!"),
+                    );
+                    self.tell_here(
+                        x,
+                        y,
+                        id,
+                        Line::col(
+                            Col::Blue,
+                            format!("🎣 {name} reels in {}!", nature::a(s.name)),
+                        ),
+                    );
                 }
             }
         }
@@ -180,7 +276,12 @@ impl Game {
 
     /// How much room is left in someone's satchel.
     pub(super) fn satchel_room(&self, user: &str) -> i64 {
-        let carried: i64 = self.world.db.satchel(user).map(|s| s.iter().map(|(_, n)| n).sum()).unwrap_or(0);
+        let carried: i64 = self
+            .world
+            .db
+            .satchel(user)
+            .map(|s| s.iter().map(|(_, n)| n).sum())
+            .unwrap_or(0);
         (SATCHEL_SIZE - carried).max(0)
     }
 
@@ -189,14 +290,20 @@ impl Game {
         let user = self.user(id);
         let carried: i64 = self.world.db.satchel(&user)?.iter().map(|(_, n)| n).sum();
         if carried >= SATCHEL_SIZE {
-            self.say1(id, Line::plain("🧺 Your satchel is full! Give, place or release something first."));
+            self.say1(
+                id,
+                Line::plain("🧺 Your satchel is full! Give, place or release something first."),
+            );
             return Ok(false);
         }
         self.world.db.satchel_add(&user, s.id, 1)?;
         if self.world.db.journal_add(&user, s.id)? {
             self.say1(
                 id,
-                Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, capitalise(s.name)).c(Col::Yellow, s.rarity.label()),
+                Line::new()
+                    .b(Col::Yellow, "📖 New in your journal: ")
+                    .b(Col::White, capitalise(s.name))
+                    .c(Col::Yellow, s.rarity.label()),
             );
         }
         if !self.players.get(&id).is_some_and(|p| p.bot) {
@@ -208,9 +315,16 @@ impl Game {
     // ---- commands -----------------------------------------------------
 
     pub(super) fn cmd_gather(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
-        let Some(i) = self.finds.iter().position(|f| f.x == x && f.y == y && matches(f.species, what)) else {
-            let msg = if what.trim().is_empty() || !self.finds.iter().any(|f| f.x == x && f.y == y) {
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
+        let Some(i) = self
+            .finds
+            .iter()
+            .position(|f| f.x == x && f.y == y && matches(f.species, what))
+        else {
+            let msg = if what.trim().is_empty() || !self.finds.iter().any(|f| f.x == x && f.y == y)
+            {
                 "There's nothing to gather right here. Look for pink • on your map!".to_string()
             } else {
                 format!("You don't see any {what} here.")
@@ -228,12 +342,28 @@ impl Game {
                 .collect();
             if options.is_empty() {
                 self.finds.remove(i);
-                self.say1(id, Line::col(Col::Pink, format!("{} The {} slips away into the sky!", s.kind.icon(), s.name)));
+                self.say1(
+                    id,
+                    Line::col(
+                        Col::Pink,
+                        format!("{} The {} slips away into the sky!", s.kind.icon(), s.name),
+                    ),
+                );
             } else {
                 let &(nx, ny, dir) = self.rng.pick(&options);
                 self.finds[i].x = nx;
                 self.finds[i].y = ny;
-                self.say1(id, Line::col(Col::Pink, format!("{} So close! The {} flutters off to the {dir}.", s.kind.icon(), s.name)));
+                self.say1(
+                    id,
+                    Line::col(
+                        Col::Pink,
+                        format!(
+                            "{} So close! The {} flutters off to the {dir}.",
+                            s.kind.icon(),
+                            s.name
+                        ),
+                    ),
+                );
             }
             let gone_to = self.finds.get(i).map_or((x, y), |f| (f.x, f.y));
             self.status_near(id, &[(x, y), gone_to]);
@@ -244,16 +374,35 @@ impl Game {
         }
         self.finds.remove(i);
         let verb = s.kind.verb();
-        self.say1(id, Line::new().c(Col::Pink, format!("{} You {verb} ", s.kind.icon())).b(Col::Pink, nature::a(s.name)).c(Col::Pink, "."));
-        self.tell_here(x, y, id, Line::col(Col::Pink, format!("{} {name} {verb}s {}.", s.kind.icon(), nature::a(s.name))));
+        self.say1(
+            id,
+            Line::new()
+                .c(Col::Pink, format!("{} You {verb} ", s.kind.icon()))
+                .b(Col::Pink, nature::a(s.name))
+                .c(Col::Pink, "."),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(
+                Col::Pink,
+                format!("{} {name} {verb}s {}.", s.kind.icon(), nature::a(s.name)),
+            ),
+        );
         self.status_near(id, &[(x, y)]);
         Ok(())
     }
 
     pub(super) fn cmd_fish(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
         if self.water_near(x, y).is_none() {
-            self.say1(id, Line::plain("🎣 You'll need to be by the water to fish."));
+            self.say1(
+                id,
+                Line::plain("🎣 You'll need to be by the water to fish."),
+            );
             return Ok(());
         }
         let ticks = 2 + (self.rng.next() % 3) as u8;
@@ -264,8 +413,16 @@ impl Game {
             }
             p.fishing = Some(ticks);
         }
-        self.say1(id, Line::col(Col::Blue, "🎣 You cast your line and wait quietly..."));
-        self.tell_here(x, y, id, Line::col(Col::Blue, format!("🎣 {name} casts a line into the water.")));
+        self.say1(
+            id,
+            Line::col(Col::Blue, "🎣 You cast your line and wait quietly..."),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(Col::Blue, format!("🎣 {name} casts a line into the water.")),
+        );
         Ok(())
     }
 
@@ -273,17 +430,30 @@ impl Game {
         let user = self.user(id);
         let items = self.world.db.satchel(&user)?;
         let total: i64 = items.iter().map(|(_, n)| n).sum();
-        let mut lines = vec![Line::new().b(Col::Magenta, format!("🧺 Your satchel ({total}/{SATCHEL_SIZE})"))];
+        let mut lines = vec![Line::new().b(
+            Col::Magenta,
+            format!("🧺 Your satchel ({total}/{SATCHEL_SIZE})"),
+        )];
         if items.is_empty() {
-            lines.push(Line::col(Col::Dim, "  Empty. Wander about and gather things!"));
+            lines.push(Line::col(
+                Col::Dim,
+                "  Empty. Wander about and gather things!",
+            ));
         }
         for (sid, n) in items {
             if let Some(s) = nature::by_id(&sid) {
-                let count = if n > 1 { format!("{n} × ") } else { String::new() };
+                let count = if n > 1 {
+                    format!("{n} × ")
+                } else {
+                    String::new()
+                };
                 lines.push(Line::new().t(format!("  {} {count}{}", s.kind.icon(), s.name)));
             }
         }
-        lines.push(Line::col(Col::Dim, "  give daisy to Poppy · place daisy · release butterfly · journal"));
+        lines.push(Line::col(
+            Col::Dim,
+            "  give daisy to Poppy · place daisy · release butterfly · journal",
+        ));
         self.send(id, lines);
         Ok(())
     }
@@ -301,8 +471,14 @@ impl Game {
         )];
         for kind in Kind::ALL {
             let all: Vec<&Species> = nature::SPECIES.iter().filter(|s| s.kind == kind).collect();
-            let mine: Vec<&&Species> = all.iter().filter(|s| found.iter().any(|f| f == s.id)).collect();
-            lines.push(Line::new().b(Col::Yellow, format!("{}  {}/{}", kind.title(), mine.len(), all.len())));
+            let mine: Vec<&&Species> = all
+                .iter()
+                .filter(|s| found.iter().any(|f| f == s.id))
+                .collect();
+            lines.push(Line::new().b(
+                Col::Yellow,
+                format!("{}  {}/{}", kind.title(), mine.len(), all.len()),
+            ));
             let mut l = Line::new().t("   ");
             for s in &mine {
                 let c = match s.rarity {
@@ -320,13 +496,20 @@ impl Game {
             }
             lines.push(l);
         }
-        lines.push(Line::col(Col::Dim, "Some only appear at night, in the rain, or in certain places."));
+        lines.push(Line::col(
+            Col::Dim,
+            "Some only appear at night, in the rain, or in certain places.",
+        ));
         self.send(id, lines);
         Ok(())
     }
 
     /// Find something in the satchel by name.
-    pub(super) fn carried(&self, player: &str, what: &str) -> anyhow::Result<Option<&'static Species>> {
+    pub(super) fn carried(
+        &self,
+        player: &str,
+        what: &str,
+    ) -> anyhow::Result<Option<&'static Species>> {
         Ok(self
             .world
             .db
@@ -337,18 +520,35 @@ impl Game {
     }
 
     pub(super) fn cmd_give(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
         let user = self.user(id);
         let Some((what, to)) = rest.rsplit_once(" to ") else {
-            self.say1(id, Line::plain("Give what to who? e.g. 'give daisy to Poppy'"));
+            self.say1(
+                id,
+                Line::plain("Give what to who? e.g. 'give daisy to Poppy'"),
+            );
             return Ok(());
         };
         let Some(s) = self.carried(&user, what)? else {
-            self.say1(id, Line::plain(format!("You don't have any {} in your satchel.", what.trim())));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "You don't have any {} in your satchel.",
+                    what.trim()
+                )),
+            );
             return Ok(());
         };
         let Some(tid) = self.find_player(to) else {
-            self.say1(id, Line::plain(format!("Nobody called {} is in the world right now.", to.trim())));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "Nobody called {} is in the world right now.",
+                    to.trim()
+                )),
+            );
             return Ok(());
         };
         let (tname, tuser, tx, ty, tbot) = {
@@ -356,11 +556,19 @@ impl Game {
             (t.name.clone(), t.user.clone(), t.x, t.y, t.bot)
         };
         if tid == id {
-            self.say1(id, Line::plain("You give it to yourself. It's already yours, sweetie."));
+            self.say1(
+                id,
+                Line::plain("You give it to yourself. It's already yours, sweetie."),
+            );
             return Ok(());
         }
         if (tx, ty) != (x, y) {
-            self.say1(id, Line::plain(format!("{tname} isn't here. Try 'find {tname}' and go to them!")));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "{tname} isn't here. Try 'find {tname}' and go to them!"
+                )),
+            );
             return Ok(());
         }
         if tbot {
@@ -368,18 +576,41 @@ impl Game {
         }
         let theirs: i64 = self.world.db.satchel(&tuser)?.iter().map(|(_, n)| n).sum();
         if theirs >= SATCHEL_SIZE {
-            self.say1(id, Line::plain(format!("{tname}'s satchel is too full to take it.")));
+            self.say1(
+                id,
+                Line::plain(format!("{tname}'s satchel is too full to take it.")),
+            );
             return Ok(());
         }
         self.world.db.satchel_add(&user, s.id, -1)?;
         self.world.db.satchel_add(&tuser, s.id, 1)?;
         if self.world.db.journal_add(&tuser, s.id)? {
-            self.say1(tid, Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, capitalise(s.name)).c(Col::Yellow, s.rarity.label()));
+            self.say1(
+                tid,
+                Line::new()
+                    .b(Col::Yellow, "📖 New in your journal: ")
+                    .b(Col::White, capitalise(s.name))
+                    .c(Col::Yellow, s.rarity.label()),
+            );
         }
         let thing = nature::a(s.name);
-        self.say1(id, Line::col(Col::Pink, format!("🎁 You give {tname} {thing}.")));
-        self.say1(tid, Line::new().c(Col::Pink, "🎁 ").b(Col::Pink, &name).c(Col::Pink, format!(" gives you {thing}!")));
-        self.tell_onlookers(x, y, &[id, tid], Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}.")));
+        self.say1(
+            id,
+            Line::col(Col::Pink, format!("🎁 You give {tname} {thing}.")),
+        );
+        self.say1(
+            tid,
+            Line::new()
+                .c(Col::Pink, "🎁 ")
+                .b(Col::Pink, &name)
+                .c(Col::Pink, format!(" gives you {thing}!")),
+        );
+        self.tell_onlookers(
+            x,
+            y,
+            &[id, tid],
+            Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}.")),
+        );
         Ok(())
     }
 
@@ -387,7 +618,9 @@ impl Game {
     fn tell_onlookers(&self, x: i64, y: i64, not: &[u64], line: Line) {
         for (pid, p) in &self.players {
             if !not.contains(pid) && (p.x, p.y) == (x, y) {
-                let _ = p.tx.send(ToClient::Lines { lines: vec![line.clone()] });
+                let _ = p.tx.send(ToClient::Lines {
+                    lines: vec![line.clone()],
+                });
             }
         }
     }
@@ -396,15 +629,34 @@ impl Game {
     /// set down right here with thanks, for everyone to enjoy, or, with no
     /// room for it, handed back.
     fn give_resident(&mut self, id: u64, tid: u64, s: &'static Species) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
         let user = self.user(id);
-        let (tname, tuser) = (self.players[&tid].name.clone(), self.players[&tid].user.clone());
+        let (tname, tuser) = (
+            self.players[&tid].name.clone(),
+            self.players[&tid].user.clone(),
+        );
         let thing = nature::a(s.name);
         if s.kind.alive() {
             self.world.db.satchel_add(&user, s.id, -1)?;
             self.say1(id, Line::col(Col::Pink, format!("🎁 {tname} takes {thing} from you very gently, admires it, and lets it go. Off it goes.")));
-            self.say1(tid, Line::col(Col::Pink, format!("🎁 {name} gives you {thing}. You admire it and let it go.")));
-            self.tell_onlookers(x, y, &[id, tid], Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}, and {tname} lets it go.")));
+            self.say1(
+                tid,
+                Line::col(
+                    Col::Pink,
+                    format!("🎁 {name} gives you {thing}. You admire it and let it go."),
+                ),
+            );
+            self.tell_onlookers(
+                x,
+                y,
+                &[id, tid],
+                Line::col(
+                    Col::Pink,
+                    format!("🎁 {name} gives {tname} {thing}, and {tname} lets it go."),
+                ),
+            );
             return Ok(());
         }
         if self.world.terrain(x, y).is_wet() || self.world.things_at(x, y).count() >= 12 {
@@ -414,48 +666,114 @@ impl Game {
         }
         self.world.db.satchel_add(&user, s.id, -1)?;
         let (action, trigger) = comes_alive(s);
-        self.world.add_thing(x, y, thing.clone(), action, trigger, &tuser, None)?;
-        self.say1(id, Line::col(Col::Pink, format!("🎁 {tname} thanks you for {thing} and sets it down right here, just so.")));
-        self.say1(tid, Line::col(Col::Pink, format!("🎁 {name} gives you {thing}. You set it down here for everyone to enjoy.")));
-        self.tell_onlookers(x, y, &[id, tid], Line::col(Col::Pink, format!("🎁 {name} gives {tname} {thing}, and {tname} sets it down here.")));
+        self.world
+            .add_thing(x, y, thing.clone(), action, trigger, &tuser, None)?;
+        self.say1(
+            id,
+            Line::col(
+                Col::Pink,
+                format!("🎁 {tname} thanks you for {thing} and sets it down right here, just so."),
+            ),
+        );
+        self.say1(
+            tid,
+            Line::col(
+                Col::Pink,
+                format!("🎁 {name} gives you {thing}. You set it down here for everyone to enjoy."),
+            ),
+        );
+        self.tell_onlookers(
+            x,
+            y,
+            &[id, tid],
+            Line::col(
+                Col::Pink,
+                format!("🎁 {name} gives {tname} {thing}, and {tname} sets it down here."),
+            ),
+        );
         self.status_near(id, &[(x, y)]);
         Ok(())
     }
 
     pub(super) fn cmd_place(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
         let user = self.user(id);
         let Some(s) = self.carried(&user, what)? else {
-            self.say1(id, Line::plain("Place what? Try 'satchel' to see what you're carrying."));
+            self.say1(
+                id,
+                Line::plain("Place what? Try 'satchel' to see what you're carrying."),
+            );
             return Ok(());
         };
         if s.kind.alive() {
-            self.say1(id, Line::plain(format!("The {} would rather be free. Try 'release {}'.", s.name, s.name)));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "The {} would rather be free. Try 'release {}'.",
+                    s.name, s.name
+                )),
+            );
             return Ok(());
         }
         if self.world.terrain(x, y).is_wet() {
-            self.say1(id, Line::plain("It would just float away. Find dry ground."));
+            self.say1(
+                id,
+                Line::plain("It would just float away. Find dry ground."),
+            );
             return Ok(());
         }
         if self.world.things_at(x, y).count() >= 12 {
-            self.say1(id, Line::plain("It's getting crowded here. Try somewhere else?"));
+            self.say1(
+                id,
+                Line::plain("It's getting crowded here. Try somewhere else?"),
+            );
             return Ok(());
         }
         self.world.db.satchel_add(&user, s.id, -1)?;
         let (action, trigger) = comes_alive(s);
-        self.world.add_thing(x, y, nature::a(s.name), action, trigger, &user, None)?;
-        self.say1(id, Line::col(Col::Yellow, format!("{} You place {} here, just so.", s.kind.icon(), nature::a(s.name))));
-        self.tell_here(x, y, id, Line::col(Col::Yellow, format!("{} {name} places {} here.", s.kind.icon(), nature::a(s.name))));
+        self.world
+            .add_thing(x, y, nature::a(s.name), action, trigger, &user, None)?;
+        self.say1(
+            id,
+            Line::col(
+                Col::Yellow,
+                format!(
+                    "{} You place {} here, just so.",
+                    s.kind.icon(),
+                    nature::a(s.name)
+                ),
+            ),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(
+                Col::Yellow,
+                format!(
+                    "{} {name} places {} here.",
+                    s.kind.icon(),
+                    nature::a(s.name)
+                ),
+            ),
+        );
         self.status_near(id, &[(x, y)]);
         Ok(())
     }
 
     pub(super) fn cmd_release(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
         let user = self.user(id);
         let found = self.carried(&user, what)?;
         let Some(s) = found.filter(|s| s.kind.alive()) else {
-            self.say1(id, Line::plain("Release what? Butterflies, bugs and fish can go free."));
+            self.say1(
+                id,
+                Line::plain("Release what? Butterflies, bugs and fish can go free."),
+            );
             return Ok(());
         };
         self.world.db.satchel_add(&user, s.id, -1)?;
@@ -464,8 +782,22 @@ impl Game {
             Kind::Bug => "trundles off into the grass",
             _ => "flutters up and away into the sky",
         };
-        self.say1(id, Line::col(Col::Pink, format!("{} The {} {how}. Bye bye!", s.kind.icon(), s.name)));
-        self.tell_here(x, y, id, Line::col(Col::Pink, format!("{} {name} lets a {} go. It {how}.", s.kind.icon(), s.name)));
+        self.say1(
+            id,
+            Line::col(
+                Col::Pink,
+                format!("{} The {} {how}. Bye bye!", s.kind.icon(), s.name),
+            ),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(
+                Col::Pink,
+                format!("{} {name} lets a {} go. It {how}.", s.kind.icon(), s.name),
+            ),
+        );
         Ok(())
     }
 }
@@ -480,7 +812,10 @@ fn comes_alive(s: &Species) -> (Option<String>, Trigger) {
         nature::When::Rain => Trigger::Rain,
         nature::When::Day => Trigger::Day,
         nature::When::DryDay => Trigger::Sun,
-        nature::When::Any | nature::When::In(_) | nature::When::Festival(_) | nature::When::On(_) => Trigger::Always,
+        nature::When::Any
+        | nature::When::In(_)
+        | nature::When::Festival(_)
+        | nature::When::On(_) => Trigger::Always,
     };
     (Some(s.here.to_string()), t)
 }

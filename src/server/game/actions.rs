@@ -20,22 +20,37 @@ const PEOPLE: usize = 2;
 const PAT_AGAIN: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 
 fn run(label: impl Into<String>, cmd: impl Into<String>) -> Action {
-    Action { label: label.into(), run: Some(cmd.into()), fill: None }
+    Action {
+        label: label.into(),
+        run: Some(cmd.into()),
+        fill: None,
+    }
 }
 
 fn fill(label: impl Into<String>, text: impl Into<String>) -> Action {
-    Action { label: label.into(), run: None, fill: Some(text.into()) }
+    Action {
+        label: label.into(),
+        run: None,
+        fill: Some(text.into()),
+    }
 }
 
 impl Game {
     /// Everything there is to do where `id` is standing, most likely first.
     pub(super) fn actions_for(&self, id: u64) -> Vec<Action> {
-        let Some(me) = self.players.get(&id) else { return vec![] };
+        let Some(me) = self.players.get(&id) else {
+            return vec![];
+        };
         let (x, y) = (me.x, me.y);
         let mut out = Vec::new();
 
         // People.
-        let mut here: Vec<&str> = self.players.iter().filter(|(pid, p)| **pid != id && (p.x, p.y) == (x, y)).map(|(_, p)| p.name.as_str()).collect();
+        let mut here: Vec<&str> = self
+            .players
+            .iter()
+            .filter(|(pid, p)| **pid != id && (p.x, p.y) == (x, y))
+            .map(|(_, p)| p.name.as_str())
+            .collect();
         here.sort_by_key(|n| n.to_lowercase());
         if !here.is_empty() {
             out.push(run("👋 wave", "wave"));
@@ -52,12 +67,19 @@ impl Game {
         if let Some((a, n)) = &me.companion
             && let Some(an) = companions::animal(a)
         {
-            if self.patted.get(&me.user).is_none_or(|t| t.elapsed() > PAT_AGAIN) {
+            if self
+                .patted
+                .get(&me.user)
+                .is_none_or(|t| t.elapsed() > PAT_AGAIN)
+            {
                 let who = n.clone().unwrap_or_else(|| format!("the {}", an.name));
                 out.push(run(format!("{} pat {who}", an.icon), "pet"));
             }
         } else if let Some(w) = self.wild.iter().find(|w| (w.x, w.y) == (x, y)) {
-            out.push(run(format!("🍓 befriend the {}", w.animal.name), format!("befriend {}", w.animal.name)));
+            out.push(run(
+                format!("🍓 befriend the {}", w.animal.name),
+                format!("befriend {}", w.animal.name),
+            ));
         }
 
         // Things, each offering its own (once each: two boards, one read).
@@ -80,7 +102,10 @@ impl Game {
             if self.water_near(x, y).is_some() {
                 out.push(run("🎣 fish", "fish"));
             }
-            if !matches!(self.world.terrain(x, y), Terrain::Water | Terrain::Pond | Terrain::DeepWater | Terrain::Stone) {
+            if !matches!(
+                self.world.terrain(x, y),
+                Terrain::Water | Terrain::Pond | Terrain::DeepWater | Terrain::Stone
+            ) {
                 out.push(fill("🌱 plant…", "plant "));
             }
         }
@@ -90,7 +115,9 @@ impl Game {
     /// What you could do with one thing where you stand: for the row, and
     /// for the end of looking at it.
     pub(super) fn thing_actions(&self, id: u64, t: &Thing) -> Vec<Action> {
-        let Some(me) = self.players.get(&id) else { return vec![] };
+        let Some(me) = self.players.get(&id) else {
+            return vec![];
+        };
         let kind = t.kind.as_deref().unwrap_or("");
         let mut out = Vec::new();
         if t.is_board() {
@@ -104,7 +131,11 @@ impl Game {
             }
         }
         if kind == gramophone::kind() {
-            out.push(if self.spins.contains_key(&t.id) { run("⏹ stop music", "stop music") } else { run("🎵 play music", "play music") });
+            out.push(if self.spins.contains_key(&t.id) {
+                run("⏹ stop music", "stop music")
+            } else {
+                run("🎵 play music", "play music")
+            });
         }
         if kind == jukebox::kind() {
             out.push(run("➕ add songs", "add songs"));

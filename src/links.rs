@@ -51,7 +51,11 @@ fn link_at(s: &str) -> Option<(&str, &str, usize)> {
     let after = &s[close + 2..];
     let end = after.find(')')?;
     let url = &after[..end];
-    let ok = url.starts_with("https://") && url.len() > "https://".len() && !url.chars().any(|c| c.is_whitespace() || matches!(c, '<' | '>' | '"' | '\''));
+    let ok = url.starts_with("https://")
+        && url.len() > "https://".len()
+        && !url
+            .chars()
+            .any(|c| c.is_whitespace() || matches!(c, '<' | '>' | '"' | '\''));
     ok.then_some((label.trim(), url, close + 2 + end + 1))
 }
 
@@ -99,7 +103,12 @@ pub fn from_slack(text: &str) -> String {
                 (false, true) => out.push_str(&format!("[{label}]({url})")),
                 (false, false) => out.push_str(&format!("{label} ({url})")),
             }
-        } else if let Some(name) = inner.strip_prefix('@').or_else(|| inner.strip_prefix('#')).and_then(|i| i.split_once('|')).map(|(_, n)| n) {
+        } else if let Some(name) = inner
+            .strip_prefix('@')
+            .or_else(|| inner.strip_prefix('#'))
+            .and_then(|i| i.split_once('|'))
+            .map(|(_, n)| n)
+        {
             // <@U123|poppy>, <#C123|general>: just the name.
             out.push_str(name);
         } else {
@@ -120,36 +129,84 @@ mod tests {
     #[test]
     fn finds_markdown_links() {
         assert_eq!(
-            pieces("See [the notes](https://example.com/notes) and [cake](https://example.com/cake)!"),
+            pieces(
+                "See [the notes](https://example.com/notes) and [cake](https://example.com/cake)!"
+            ),
             vec![
                 Piece::Text("See "),
-                Piece::Link { label: "the notes", url: "https://example.com/notes" },
+                Piece::Link {
+                    label: "the notes",
+                    url: "https://example.com/notes"
+                },
                 Piece::Text(" and "),
-                Piece::Link { label: "cake", url: "https://example.com/cake" },
+                Piece::Link {
+                    label: "cake",
+                    url: "https://example.com/cake"
+                },
                 Piece::Text("!"),
             ]
         );
         assert_eq!(pieces("just words"), vec![Piece::Text("just words")]);
-        assert_eq!(pieces("[not a link](http://example.com)"), vec![Piece::Text("[not a link](http://example.com)")], "https only");
-        assert_eq!(pieces("[a] b [c](https://x.y)"), vec![Piece::Text("[a] b "), Piece::Link { label: "c", url: "https://x.y" }]);
-        assert_eq!(pieces("[unclosed](https://x.y"), vec![Piece::Text("[unclosed](https://x.y")]);
-        assert_eq!(pieces("[](https://x.y)"), vec![Piece::Text("[](https://x.y)")]);
-        assert_eq!(pieces("**bold** stays as it is"), vec![Piece::Text("**bold** stays as it is")]);
+        assert_eq!(
+            pieces("[not a link](http://example.com)"),
+            vec![Piece::Text("[not a link](http://example.com)")],
+            "https only"
+        );
+        assert_eq!(
+            pieces("[a] b [c](https://x.y)"),
+            vec![
+                Piece::Text("[a] b "),
+                Piece::Link {
+                    label: "c",
+                    url: "https://x.y"
+                }
+            ]
+        );
+        assert_eq!(
+            pieces("[unclosed](https://x.y"),
+            vec![Piece::Text("[unclosed](https://x.y")]
+        );
+        assert_eq!(
+            pieces("[](https://x.y)"),
+            vec![Piece::Text("[](https://x.y)")]
+        );
+        assert_eq!(
+            pieces("**bold** stays as it is"),
+            vec![Piece::Text("**bold** stays as it is")]
+        );
     }
 
     #[test]
     fn terminal_shows_where_it_goes() {
-        assert_eq!(plain("See [the notes](https://example.com/n) now"), "See the notes (https://example.com/n) now");
+        assert_eq!(
+            plain("See [the notes](https://example.com/n) now"),
+            "See the notes (https://example.com/n) now"
+        );
         assert_eq!(plain("https://example.com"), "https://example.com");
-        assert_eq!(labels("[the cat cam](https://cats.example.com/cam) is on"), "the cat cam is on");
+        assert_eq!(
+            labels("[the cat cam](https://cats.example.com/cam) is on"),
+            "the cat cam is on"
+        );
     }
 
     #[test]
     fn slack_links_become_markdown() {
-        assert_eq!(from_slack("Pizza <https://pizza.example.com/7|#7> is here"), "Pizza [#7](https://pizza.example.com/7) is here");
-        assert_eq!(from_slack("See <https://example.com>"), "See https://example.com");
-        assert_eq!(from_slack("Old <http://example.com|site>"), "Old site (http://example.com)");
-        assert_eq!(from_slack("Hi <@U123|poppy> in <#C9|general>"), "Hi poppy in general");
+        assert_eq!(
+            from_slack("Pizza <https://pizza.example.com/7|#7> is here"),
+            "Pizza [#7](https://pizza.example.com/7) is here"
+        );
+        assert_eq!(
+            from_slack("See <https://example.com>"),
+            "See https://example.com"
+        );
+        assert_eq!(
+            from_slack("Old <http://example.com|site>"),
+            "Old site (http://example.com)"
+        );
+        assert_eq!(
+            from_slack("Hi <@U123|poppy> in <#C9|general>"),
+            "Hi poppy in general"
+        );
         assert_eq!(from_slack("1 < 2 and 3 > 2"), "1 < 2 and 3 > 2");
         assert_eq!(from_slack("a <b"), "a <b");
     }

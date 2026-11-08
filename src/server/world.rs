@@ -73,7 +73,10 @@ impl Thing {
     }
     /// Things that belong to the island itself, which nobody unmakes or pushes.
     pub fn is_fixed(&self) -> bool {
-        matches!(self.kind.as_deref(), Some("journal" | "dock" | "lighthouse"))
+        matches!(
+            self.kind.as_deref(),
+            Some("journal" | "dock" | "lighthouse")
+        )
     }
     pub fn is_lighthouse(&self) -> bool {
         self.kind.as_deref() == Some("lighthouse")
@@ -99,7 +102,13 @@ pub const ROOM_STRIDE: i64 = 1_000;
 
 /// Where the room inside building `id` (standing at bx, by) is.
 pub fn room_for(id: i64, bx: i64, by: i64) -> (i64, i64) {
-    let side = |v: i64| if v.div_euclid(super::islands::REGION) >= 1 { 1 } else { -1 };
+    let side = |v: i64| {
+        if v.div_euclid(super::islands::REGION) >= 1 {
+            1
+        } else {
+            -1
+        }
+    };
     (side(bx) * (ROOMS + id * ROOM_STRIDE), side(by) * ROOMS)
 }
 
@@ -122,7 +131,8 @@ impl Home {
         (x - self.x).abs() <= HOME_RADIUS && (y - self.y).abs() <= HOME_RADIUS
     }
     pub fn welcomes(&self, name: &str) -> bool {
-        self.owner.eq_ignore_ascii_case(name) || self.guests.iter().any(|g| g.eq_ignore_ascii_case(name))
+        self.owner.eq_ignore_ascii_case(name)
+            || self.guests.iter().any(|g| g.eq_ignore_ascii_case(name))
     }
 }
 
@@ -177,15 +187,22 @@ impl World {
                 db.save_tiles(&island.generate(seed))?;
             }
             db.set_meta("archipelago", "1")?;
-            println!("⛵ three new islands rose out of the sea: Driftwood Isle, Mossy Holm and Ember Rock");
+            println!(
+                "⛵ three new islands rose out of the sea: Driftwood Isle, Mossy Holm and Ember Rock"
+            );
         }
         let mut tiles: Vec<Tile> = (0..SIZE * SIZE)
-            .map(|_| Tile { terrain: Terrain::DeepWater, name: None })
+            .map(|_| Tile {
+                terrain: Terrain::DeepWater,
+                name: None,
+            })
             .collect();
         for row in db.tiles()? {
             if in_bounds(row.x, row.y) {
-                tiles[idx(row.x, row.y)] =
-                    Tile { terrain: Terrain::from_code(&row.terrain), name: row.name };
+                tiles[idx(row.x, row.y)] = Tile {
+                    terrain: Terrain::from_code(&row.terrain),
+                    name: row.name,
+                };
             }
         }
         let things = db
@@ -205,9 +222,27 @@ impl World {
             .collect();
         let homes = load_homes(&db)?;
         let nicks = db.users()?.into_iter().collect();
-        let descriptions = db.descriptions()?.into_iter().map(|(x, y, t)| ((x, y), t)).collect();
-        let plantings = db.plantings()?.into_iter().map(|p| ((p.x, p.y), p)).collect();
-        let mut world = World { seed, tiles, things, homes, nicks, descriptions, plantings, weather: Weather::new(SIZE, seed), db };
+        let descriptions = db
+            .descriptions()?
+            .into_iter()
+            .map(|(x, y, t)| ((x, y), t))
+            .collect();
+        let plantings = db
+            .plantings()?
+            .into_iter()
+            .map(|p| ((p.x, p.y), p))
+            .collect();
+        let mut world = World {
+            seed,
+            tiles,
+            things,
+            homes,
+            nicks,
+            descriptions,
+            plantings,
+            weather: Weather::new(SIZE, seed),
+            db,
+        };
         world.ensure_docks()?;
         world.ensure_lighthouse()?;
         Ok(world)
@@ -234,7 +269,9 @@ impl World {
     /// Where (x, y) is out on the island: the building's spot, for a room.
     pub fn outside(&self, x: i64, y: i64) -> (i64, i64) {
         match room_of(x, y) {
-            Some(_) => self.room_building(x, y).map_or_else(|| self.spawn_point(), |b| (b.x, b.y)),
+            Some(_) => self
+                .room_building(x, y)
+                .map_or_else(|| self.spawn_point(), |b| (b.x, b.y)),
             None => (x, y),
         }
     }
@@ -253,7 +290,14 @@ impl World {
 
     /// Something newly planted at (x, y), starting to grow now.
     pub fn plant(&mut self, x: i64, y: i64, kind: &str, by: &str, at: i64) -> anyhow::Result<()> {
-        let row = PlantingRow { x, y, kind: kind.to_string(), by: by.to_string(), at, told: 0 };
+        let row = PlantingRow {
+            x,
+            y,
+            kind: kind.to_string(),
+            by: by.to_string(),
+            at,
+            told: 0,
+        };
         self.db.set_planting(&row)?;
         self.plantings.insert((x, y), row);
         Ok(())
@@ -272,7 +316,11 @@ impl World {
     /// is still young.
     fn glyph_at(&self, x: i64, y: i64) -> (&'static str, Col) {
         let t = self.terrain(x, y);
-        let young = self.plantings.get(&(x, y)).and_then(|p| super::gardens::stage_of(p, now())).filter(|(p, s)| *s < super::gardens::grown(p.kind));
+        let young = self
+            .plantings
+            .get(&(x, y))
+            .and_then(|p| super::gardens::stage_of(p, now()))
+            .filter(|(p, s)| *s < super::gardens::grown(p.kind));
         match young {
             Some((p, _)) if p.kind == super::gardens::Kind::Tree => ("♣", Col::Green),
             Some(_) => ("\"", Col::Pink),
@@ -280,7 +328,14 @@ impl World {
         }
     }
 
-    pub fn set_description(&mut self, x: i64, y: i64, text: Option<String>, by: &str, at: i64) -> anyhow::Result<()> {
+    pub fn set_description(
+        &mut self,
+        x: i64,
+        y: i64,
+        text: Option<String>,
+        by: &str,
+        at: i64,
+    ) -> anyhow::Result<()> {
         self.db.set_description(x, y, text.as_deref(), by, at)?;
         match text {
             Some(t) => self.descriptions.insert((x, y), t),
@@ -299,27 +354,43 @@ impl World {
 
     fn persist_tile(&mut self, x: i64, y: i64) -> anyhow::Result<()> {
         let t = &self.tiles[idx(x, y)];
-        let row = TileRow { x, y, terrain: t.terrain.code().into(), name: t.name.clone() };
+        let row = TileRow {
+            x,
+            y,
+            terrain: t.terrain.code().into(),
+            name: t.name.clone(),
+        };
         self.db.save_tiles(&[row])
     }
 
     /// Someone's nickname, from their username (or the text itself, for
     /// things like "the island").
     pub fn nick(&self, user: &str) -> String {
-        self.nicks.get(user).cloned().unwrap_or_else(|| user.to_string())
+        self.nicks
+            .get(user)
+            .cloned()
+            .unwrap_or_else(|| user.to_string())
     }
 
     /// The home (x, y) is part of. A room inside a building counts as part
     /// of the home the building stands in, so the same people may change it.
     pub fn home_at(&self, x: i64, y: i64) -> Option<&Home> {
-        let (x, y) = if room_of(x, y).is_some() { self.room_building(x, y).map(|b| (b.x, b.y))? } else { (x, y) };
+        let (x, y) = if room_of(x, y).is_some() {
+            self.room_building(x, y).map(|b| (b.x, b.y))?
+        } else {
+            (x, y)
+        };
         self.homes.iter().find(|h| h.covers(x, y))
     }
 
     pub fn place_title(&self, x: i64, y: i64) -> String {
         if room_of(x, y).is_some() {
             return match self.room_building(x, y) {
-                Some(b) => format!("Inside {}'s {}", self.nick(&b.maker), strip_article(&b.name)),
+                Some(b) => format!(
+                    "Inside {}'s {}",
+                    self.nick(&b.maker),
+                    strip_article(&b.name)
+                ),
                 None => "Somewhere Indoors".into(),
             };
         }
@@ -327,7 +398,11 @@ impl World {
             Some(Tile { name: Some(n), .. }) => n.clone(),
             Some(_) if self.home_at(x, y).is_some() => {
                 let h = self.home_at(x, y).unwrap();
-                let what = if (h.x, h.y) == (x, y) { "Home" } else { "Garden" };
+                let what = if (h.x, h.y) == (x, y) {
+                    "Home"
+                } else {
+                    "Garden"
+                };
                 format!("{}'s {what}", self.nick(&h.owner))
             }
             Some(t) => t.terrain.place_name().to_string(),
@@ -360,7 +435,17 @@ impl World {
             kind: kind.map(Into::into),
             paint: None,
         })?;
-        self.things.push(Thing { id, x, y, name, action, trigger, maker: maker.into(), kind: kind.map(Into::into), paint: None });
+        self.things.push(Thing {
+            id,
+            x,
+            y,
+            name,
+            action,
+            trigger,
+            maker: maker.into(),
+            kind: kind.map(Into::into),
+            paint: None,
+        });
         Ok(id)
     }
 
@@ -384,19 +469,33 @@ impl World {
     pub fn ensure_docks(&mut self) -> anyhow::Result<()> {
         let mid = (SIZE / 2, SIZE / 2);
         for island in &super::islands::ISLANDS {
-            if self.things.iter().any(|t| t.is_dock() && island.covers(t.x, t.y)) {
+            if self
+                .things
+                .iter()
+                .any(|t| t.is_dock() && island.covers(t.x, t.y))
+            {
                 continue;
             }
             let shore = |x: i64, y: i64| {
                 let t = self.terrain(x, y);
-                t.walkable() && !t.is_wet() && DIRS.iter().any(|d| self.terrain(x + d.2, y + d.3).is_wet())
+                t.walkable()
+                    && !t.is_wet()
+                    && DIRS.iter().any(|d| self.terrain(x + d.2, y + d.3).is_wet())
             };
             let spot = (island.oy..island.oy + super::islands::REGION)
                 .flat_map(|y| (island.ox..island.ox + super::islands::REGION).map(move |x| (x, y)))
                 .filter(|&(x, y)| shore(x, y))
                 .min_by_key(|&(x, y)| (x - mid.0).pow(2) + (y - mid.1).pow(2));
             if let Some((x, y)) = spot {
-                self.add_thing(x, y, "a little wooden dock, with a rowing boat tied up".into(), None, Trigger::Always, "the island", Some("dock"))?;
+                self.add_thing(
+                    x,
+                    y,
+                    "a little wooden dock, with a rowing boat tied up".into(),
+                    None,
+                    Trigger::Always,
+                    "the island",
+                    Some("dock"),
+                )?;
                 if self.tile(x, y).is_some_and(|t| t.name.is_none()) {
                     self.set_name(x, y, Some(format!("{} Dock", island.name)))?;
                 }
@@ -415,14 +514,28 @@ impl World {
         let mid = (SIZE / 2, SIZE / 2);
         let shore = |x: i64, y: i64| {
             let t = self.terrain(x, y);
-            t.walkable() && !t.is_wet() && DIRS.iter().any(|d| self.terrain(x + d.2, y + d.3).is_wet())
+            t.walkable()
+                && !t.is_wet()
+                && DIRS.iter().any(|d| self.terrain(x + d.2, y + d.3).is_wet())
         };
         let spot = (island.oy..island.oy + super::islands::REGION)
             .flat_map(|y| (island.ox..island.ox + super::islands::REGION).map(move |x| (x, y)))
-            .filter(|&(x, y)| shore(x, y) && self.home_at(x, y).is_none() && !self.things_at(x, y).any(|t| t.is_dock()))
+            .filter(|&(x, y)| {
+                shore(x, y)
+                    && self.home_at(x, y).is_none()
+                    && !self.things_at(x, y).any(|t| t.is_dock())
+            })
             .max_by_key(|&(x, y)| (x - mid.0).pow(2) + (y - mid.1).pow(2));
         if let Some((x, y)) = spot {
-            self.add_thing(x, y, "an old lighthouse".into(), None, Trigger::Always, "the island", Some("lighthouse"))?;
+            self.add_thing(
+                x,
+                y,
+                "an old lighthouse".into(),
+                None,
+                Trigger::Always,
+                "the island",
+                Some("lighthouse"),
+            )?;
             if self.tile(x, y).is_some_and(|t| t.name.is_none()) {
                 self.set_name(x, y, Some("Lighthouse Point".into()))?;
             }
@@ -443,7 +556,12 @@ impl World {
         }
         for h in &self.homes {
             if !out.iter().any(|p| (p.0, p.1) == (h.x, h.y)) {
-                out.push((h.x, h.y, self.place_title(h.x, h.y), super::islands::island_at(h.x, h.y)));
+                out.push((
+                    h.x,
+                    h.y,
+                    self.place_title(h.x, h.y),
+                    super::islands::island_at(h.x, h.y),
+                ));
             }
         }
         out.sort_by_key(|p| (p.3.id, p.2.to_lowercase()));
@@ -452,13 +570,22 @@ impl World {
 
     /// Whether everyone's mended and lit the lighthouse yet.
     pub fn lighthouse_lit(&self) -> bool {
-        self.db.meta("lighthouse_stage").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0) >= 4
+        self.db
+            .meta("lighthouse_stage")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0)
+            >= 4
     }
 
     /// Bring back the last thing `by` unmade in the past day.
     pub fn undo_remove(&mut self, by: &str) -> anyhow::Result<Option<&Thing>> {
-        let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64 - 86_400;
-        let Some(r) = self.db.last_removed(by, since) else { return Ok(None) };
+        let since = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs() as i64
+            - 86_400;
+        let Some(r) = self.db.last_removed(by, since) else {
+            return Ok(None);
+        };
         self.db.restore_thing(r.id)?;
         self.things.push(Thing {
             id: r.id,
@@ -535,8 +662,15 @@ impl World {
         let phase = Clock::phase();
         let mut out = Vec::new();
 
-        let title = paint::glyph_colour(self.home_at(x, y).and_then(|h| h.paint.as_deref()), Col::Magenta);
-        out.push(Line::new().t("").b(title, format!("~ {} ~", self.place_title(x, y))));
+        let title = paint::glyph_colour(
+            self.home_at(x, y).and_then(|h| h.paint.as_deref()),
+            Col::Magenta,
+        );
+        out.push(
+            Line::new()
+                .t("")
+                .b(title, format!("~ {} ~", self.place_title(x, y))),
+        );
 
         if room_of(x, y).is_some() {
             return self.describe_room(x, y, others, out);
@@ -544,14 +678,28 @@ impl World {
 
         // Someone's own words for the place, or the land's.
         // (or what's been planted here, as it is now).
-        let growing = self.plantings.get(&(x, y)).and_then(|p| super::gardens::stage_of(p, now()));
+        let growing = self
+            .plantings
+            .get(&(x, y))
+            .and_then(|p| super::gardens::stage_of(p, now()));
         let mut text = match (self.descriptions.get(&(x, y)), growing) {
             (Some(d), _) => d.clone(),
             (None, Some((plant, stage))) => super::gardens::looks(plant, stage, Clock::season()),
-            (None, None) => rng::pick(here.descriptions_in(Clock::season()), self.seed, x, y).to_string(),
+            (None, None) => {
+                rng::pick(here.descriptions_in(Clock::season()), self.seed, x, y).to_string()
+            }
         };
         text.push(' ');
-        text.push_str(&atmosphere(here, sky, phase, Clock::season(), self.weather.breezy(), self.seed, x, y));
+        text.push_str(&atmosphere(
+            here,
+            sky,
+            phase,
+            Clock::season(),
+            self.weather.breezy(),
+            self.seed,
+            x,
+            y,
+        ));
         out.push(Line::plain(text));
 
         // What lies around.
@@ -584,7 +732,11 @@ impl World {
             .filter(|(_, _, dx, dy)| self.terrain(x + dx, y + dy).walkable())
             .map(|d| d.0)
             .collect();
-        out.push(Line::new().c(Col::Dim, "exits: ").c(Col::Green, exits.join(" ")));
+        out.push(
+            Line::new()
+                .c(Col::Dim, "exits: ")
+                .c(Col::Green, exits.join(" ")),
+        );
         out
     }
 
@@ -619,7 +771,11 @@ impl World {
                     };
                     line = line.c(Col::Yellow, sep);
                 }
-                let name = if i == 0 { capitalise(&t.name) } else { t.name.clone() };
+                let name = if i == 0 {
+                    capitalise(&t.name)
+                } else {
+                    t.name.clone()
+                };
                 let from = line.0.len();
                 line = paint::painted(line, &name, t.paint.as_deref(), Col::Yellow);
                 // Tap a thing to look at it (and see what you could do with it).
@@ -662,8 +818,15 @@ impl World {
         for y in island.oy..island.oy + region {
             for x in island.ox..island.ox + region {
                 // Docks show as ⚓ rather than a number, and a lit lighthouse as ☼.
-                let dock = self.things.iter().any(|t| (t.is_dock() || (t.is_lighthouse() && self.lighthouse_lit())) && (t.x, t.y) == (x, y));
-                if let Some(n) = self.tile(x, y).and_then(|t| t.name.clone()).filter(|_| !dock) {
+                let dock = self.things.iter().any(|t| {
+                    (t.is_dock() || (t.is_lighthouse() && self.lighthouse_lit()))
+                        && (t.x, t.y) == (x, y)
+                });
+                if let Some(n) = self
+                    .tile(x, y)
+                    .and_then(|t| t.name.clone())
+                    .filter(|_| !dock)
+                {
                     named.push((x, y, n));
                 }
             }
@@ -682,8 +845,14 @@ impl World {
             .filter(|&(x, y)| self.terrain(x, y) != Terrain::DeepWater)
             .map(|(x, y)| cell(x, y))
             .collect();
-        let (x0, x1) = (land.iter().map(|c| c.0).min().unwrap_or(0) - 1, land.iter().map(|c| c.0).max().unwrap_or(SIZE / 2) + 1);
-        let (y0, y1) = (land.iter().map(|c| c.1).min().unwrap_or(0) - 1, land.iter().map(|c| c.1).max().unwrap_or(SIZE / 2) + 1);
+        let (x0, x1) = (
+            land.iter().map(|c| c.0).min().unwrap_or(0) - 1,
+            land.iter().map(|c| c.0).max().unwrap_or(SIZE / 2) + 1,
+        );
+        let (y0, y1) = (
+            land.iter().map(|c| c.1).min().unwrap_or(0) - 1,
+            land.iter().map(|c| c.1).max().unwrap_or(SIZE / 2) + 1,
+        );
         let mut out = Vec::new();
         for cy in y0.max(0)..=y1.min(SIZE / 2 - 1) {
             let mut line = Line::new();
@@ -697,11 +866,24 @@ impl World {
                     line = line.b(Col::Yellow, KEYS.chars().nth(i).unwrap().to_string());
                 } else if let Some(h) = self.homes.iter().find(|h| covers((h.x, h.y))) {
                     line = line.b(paint::glyph_colour(h.paint.as_deref(), Col::Magenta), "⌂");
-                } else if self.things.iter().any(|t| t.is_dock() && covers((t.x, t.y))) {
+                } else if self
+                    .things
+                    .iter()
+                    .any(|t| t.is_dock() && covers((t.x, t.y)))
+                {
                     line = line.b(Col::Brown, "⚓");
-                } else if lit && self.things.iter().any(|t| t.is_lighthouse() && covers((t.x, t.y))) {
+                } else if lit
+                    && self
+                        .things
+                        .iter()
+                        .any(|t| t.is_lighthouse() && covers((t.x, t.y)))
+                {
                     line = line.b(Col::Yellow, "☼");
-                } else if self.things.iter().any(|t| t.is_board() && covers((t.x, t.y))) {
+                } else if self
+                    .things
+                    .iter()
+                    .any(|t| t.is_board() && covers((t.x, t.y)))
+                {
                     line = line.b(Col::Yellow, "▣");
                 } else {
                     // The most common ground in the patch.
@@ -713,8 +895,16 @@ impl World {
                             None => counts.push((t, 1)),
                         }
                     }
-                    let t = counts.iter().max_by_key(|(_, n)| *n).map_or(Terrain::DeepWater, |c| c.0);
-                    let (g, c) = match [(0, 0), (1, 0), (0, 1), (1, 1)].iter().map(|(dx, dy)| (cx * 2 + dx, cy * 2 + dy)).find(|&(x, y)| self.terrain(x, y) == t && self.plantings.contains_key(&(x, y))) {
+                    let t = counts
+                        .iter()
+                        .max_by_key(|(_, n)| *n)
+                        .map_or(Terrain::DeepWater, |c| c.0);
+                    let (g, c) = match [(0, 0), (1, 0), (0, 1), (1, 1)]
+                        .iter()
+                        .map(|(dx, dy)| (cx * 2 + dx, cy * 2 + dy))
+                        .find(|&(x, y)| {
+                            self.terrain(x, y) == t && self.plantings.contains_key(&(x, y))
+                        }) {
                         Some((x, y)) => self.glyph_at(x, y),
                         None => t.glyph(),
                     };
@@ -723,19 +913,44 @@ impl World {
             }
             out.push(line);
         }
-        let mut key = Line::new().b(Col::Magenta, "@").t(" you  ").b(Col::White, "☺").t(" friends  ").b(Col::Magenta, "⌂").t(" homes  ").b(Col::Yellow, "▣").t(" boards  ").b(Col::Brown, "⚓").t(" dock");
-        if lit && self.things.iter().any(|t| t.is_lighthouse() && island.covers(t.x, t.y)) {
+        let mut key = Line::new()
+            .b(Col::Magenta, "@")
+            .t(" you  ")
+            .b(Col::White, "☺")
+            .t(" friends  ")
+            .b(Col::Magenta, "⌂")
+            .t(" homes  ")
+            .b(Col::Yellow, "▣")
+            .t(" boards  ")
+            .b(Col::Brown, "⚓")
+            .t(" dock");
+        if lit
+            && self
+                .things
+                .iter()
+                .any(|t| t.is_lighthouse() && island.covers(t.x, t.y))
+        {
             key = key.t("  ").b(Col::Yellow, "☼").t(" lighthouse");
         }
         out.push(key);
         for (i, (_, _, n)) in named.iter().enumerate() {
-            out.push(Line::new().b(Col::Yellow, format!("{} ", KEYS.chars().nth(i).unwrap())).t(n.clone()));
+            out.push(
+                Line::new()
+                    .b(Col::Yellow, format!("{} ", KEYS.chars().nth(i).unwrap()))
+                    .t(n.clone()),
+            );
         }
         out
     }
 
     /// A small coloured map centred on (cx, cy).
-    pub fn minimap(&self, cx: i64, cy: i64, people: &[(i64, i64)], finds: &[(i64, i64)]) -> Vec<Line> {
+    pub fn minimap(
+        &self,
+        cx: i64,
+        cy: i64,
+        people: &[(i64, i64)],
+        finds: &[(i64, i64)],
+    ) -> Vec<Line> {
         let (rw, rh) = MINIMAP_REACH;
         let people: HashSet<(i64, i64)> = people.iter().copied().collect();
         let lit = self.lighthouse_lit();
@@ -749,13 +964,26 @@ impl World {
                 } else if people.contains(&(x, y)) {
                     ("☺", Col::White, true)
                 } else if let Some(h) = self.homes.iter().find(|h| (h.x, h.y) == (x, y)) {
-                    ("⌂", paint::glyph_colour(h.paint.as_deref(), Col::Magenta), true)
+                    (
+                        "⌂",
+                        paint::glyph_colour(h.paint.as_deref(), Col::Magenta),
+                        true,
+                    )
                 } else if self.things_at(x, y).any(|t| t.is_board()) {
                     ("▣", Col::Yellow, true)
                 } else if lit && self.things_at(x, y).any(|t| t.is_lighthouse()) {
                     ("☼", Col::Yellow, true)
                 } else if let Some(t) = self.things_at(x, y).next() {
-                    ("✦", paint::glyph_colour(self.things_at(x, y).find_map(|t| t.paint.as_deref()).or(t.paint.as_deref()), Col::Yellow), false)
+                    (
+                        "✦",
+                        paint::glyph_colour(
+                            self.things_at(x, y)
+                                .find_map(|t| t.paint.as_deref())
+                                .or(t.paint.as_deref()),
+                            Col::Yellow,
+                        ),
+                        false,
+                    )
                 } else if finds.contains(&(x, y)) {
                     ("•", Col::Pink, true)
                 } else if !in_bounds(x, y) {
@@ -770,7 +998,13 @@ impl World {
                         last.t.push_str(g);
                         last.t.push_str(gap);
                     }
-                    _ => spans.push(Span { t: format!("{g}{gap}"), c, b, run: None, fill: None }),
+                    _ => spans.push(Span {
+                        t: format!("{g}{gap}"),
+                        c,
+                        b,
+                        run: None,
+                        fill: None,
+                    }),
                 }
             }
             out.push(Line(spans));
@@ -795,7 +1029,9 @@ fn season_line(here: Terrain, season: Season) -> &'static str {
         (Season::Summer, Sand | Water | DeepWater) => "The sand is warm and the water inviting.",
         (Season::Summer, _) => "It's a long, golden summer.",
         (Season::Autumn, Forest) => "The trees blaze red and gold, and leaves drift down.",
-        (Season::Autumn, Meadow | Grass) => "The grass has turned gold, and there's a crispness in the air.",
+        (Season::Autumn, Meadow | Grass) => {
+            "The grass has turned gold, and there's a crispness in the air."
+        }
         (Season::Autumn, Sand | Water | DeepWater) => "A cool autumn wind comes in off the sea.",
         (Season::Autumn, _) => "Autumn leaves skitter across the ground.",
         (Season::Winter, Forest) => "The bare branches are traced with frost.",
@@ -829,9 +1065,19 @@ fn atmosphere(
         (_, Sky::Rain) => "Rain falls steadily.",
     };
     let snow = season == Season::Winter;
-    let mut s = if snow { light.replace("drizzle", "flurry of snow").replace("Rain falls", "Snow falls") } else { light.to_string() };
+    let mut s = if snow {
+        light
+            .replace("drizzle", "flurry of snow")
+            .replace("Rain falls", "Snow falls")
+    } else {
+        light.to_string()
+    };
     if sky == Sky::Rain && phase != Phase::Day {
-        s.push_str(if snow { " Snow falls steadily." } else { " Rain falls steadily." });
+        s.push_str(if snow {
+            " Snow falls steadily."
+        } else {
+            " Rain falls steadily."
+        });
     }
     s.push(' ');
     s.push_str(season_line(here, season));
@@ -850,7 +1096,11 @@ fn atmosphere(
     } else if breezy {
         s.push(' ');
         s.push_str(rng::pick::<&str>(
-            &["A breeze tugs at your clothes.", "The wind is up, and lively.", "Gusts of wind come and go."],
+            &[
+                "A breeze tugs at your clothes.",
+                "The wind is up, and lively.",
+                "Gusts of wind come and go.",
+            ],
             seed ^ 0xb,
             x,
             y,
@@ -889,7 +1139,9 @@ pub fn strip_article(s: &str) -> &str {
 }
 
 fn now() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64)
 }
 
 pub fn in_bounds(x: i64, y: i64) -> bool {
@@ -900,11 +1152,20 @@ fn idx(x: i64, y: i64) -> usize {
     (y * SIZE + x) as usize
 }
 
-
 /// Every home, with its guests and its paint.
 fn load_homes(db: &Db) -> anyhow::Result<Vec<Home>> {
     let paints = db.home_paints()?;
-    Ok(db.homes()?.into_iter().map(|(owner, x, y, guests)| Home { paint: paints.get(&owner).cloned(), owner, x, y, guests }).collect())
+    Ok(db
+        .homes()?
+        .into_iter()
+        .map(|(owner, x, y, guests)| Home {
+            paint: paints.get(&owner).cloned(),
+            owner,
+            x,
+            y,
+            guests,
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -914,16 +1175,32 @@ mod tests {
     #[test]
     fn rooms_stay_on_their_islands_side() {
         use super::super::islands::{REGION, island_at};
-        for (bx, by) in [(5, 5), (REGION + 5, 5), (5, REGION + 5), (REGION + 5, REGION + 5)] {
+        for (bx, by) in [
+            (5, 5),
+            (REGION + 5, 5),
+            (5, REGION + 5),
+            (REGION + 5, REGION + 5),
+        ] {
             let (rx, ry) = room_for(42, bx, by);
             assert_eq!(room_of(rx, ry), Some(42));
-            assert_eq!(island_at(rx, ry).id, island_at(bx, by).id, "a room is on its building's island");
+            assert_eq!(
+                island_at(rx, ry).id,
+                island_at(bx, by).id,
+                "a room is on its building's island"
+            );
             assert!(in_room_space(rx, ry) && !in_room_space(bx, by));
         }
         assert_eq!(room_of(5, 5), None);
-        assert_ne!(room_for(1, 5, 5), room_for(2, 5, 5), "every building has its own room");
+        assert_ne!(
+            room_for(1, 5, 5),
+            room_for(2, 5, 5),
+            "every building has its own room"
+        );
         let (a, b) = (room_for(1, 5, 5), room_for(2, 5, 5));
-        assert!((a.0 - b.0).abs() >= ROOM_STRIDE, "rooms are far enough apart that nothing carries between them");
+        assert!(
+            (a.0 - b.0).abs() >= ROOM_STRIDE,
+            "rooms are far enough apart that nothing carries between them"
+        );
     }
 
     /// `cargo test -- --nocapture print_island` to eyeball the generator.
@@ -931,9 +1208,18 @@ mod tests {
     fn every_island_has_plenty_of_land_and_a_sea_around_it() {
         for island in &super::super::islands::ISLANDS {
             let rows = island.generate(7);
-            let land = rows.iter().filter(|r| { let t = Terrain::from_code(&r.terrain); t.walkable() && !t.is_wet() }).count();
+            let land = rows
+                .iter()
+                .filter(|r| {
+                    let t = Terrain::from_code(&r.terrain);
+                    t.walkable() && !t.is_wet()
+                })
+                .count();
             assert!(land > 300, "{} is too small: {land}", island.name);
-            let edge = rows.iter().filter(|r| r.x == island.ox || r.y == island.oy).all(|r| r.terrain == "deep");
+            let edge = rows
+                .iter()
+                .filter(|r| r.x == island.ox || r.y == island.oy)
+                .all(|r| r.terrain == "deep");
             assert!(edge, "{} touches its neighbours", island.name);
         }
     }

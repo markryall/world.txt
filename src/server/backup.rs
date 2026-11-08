@@ -8,17 +8,30 @@ use std::time::Duration;
 fn backup_dir(db_path: &str, dir: Option<&Path>) -> PathBuf {
     match dir {
         Some(d) => d.to_path_buf(),
-        None => Path::new(db_path).parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new(".")).join("backups"),
+        None => Path::new(db_path)
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."))
+            .join("backups"),
     }
 }
 
 fn stem(db_path: &str) -> String {
-    Path::new(db_path).file_stem().and_then(|s| s.to_str()).unwrap_or("world").to_string()
+    Path::new(db_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("world")
+        .to_string()
 }
 
 /// Copy the world to backups/<name>-<date>.db, unless today's copy exists
 /// (or `force`), then keep only the newest `keep`. Returns the new copy's path.
-pub fn backup(db_path: &str, dir: Option<&Path>, keep: usize, force: bool) -> anyhow::Result<Option<PathBuf>> {
+pub fn backup(
+    db_path: &str,
+    dir: Option<&Path>,
+    keep: usize,
+    force: bool,
+) -> anyhow::Result<Option<PathBuf>> {
     let dir = backup_dir(db_path, dir);
     std::fs::create_dir_all(&dir)?;
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
@@ -26,9 +39,14 @@ pub fn backup(db_path: &str, dir: Option<&Path>, keep: usize, force: bool) -> an
     if target.exists() && !force {
         return Ok(None);
     }
-    let src = rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let src =
+        rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let tmp = target.with_extension("db.partial");
-    src.backup(rusqlite::MAIN_DB, &tmp, None::<fn(rusqlite::backup::Progress)>)?;
+    src.backup(
+        rusqlite::MAIN_DB,
+        &tmp,
+        None::<fn(rusqlite::backup::Progress)>,
+    )?;
     std::fs::rename(&tmp, &target)?;
     prune(&dir, &stem(db_path), keep)?;
     Ok(Some(target))
@@ -40,7 +58,9 @@ fn prune(dir: &Path, stem: &str, keep: usize) -> anyhow::Result<()> {
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| {
             p.extension().is_some_and(|x| x == "db")
-                && p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with(&prefix))
+                && p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with(&prefix))
         })
         .collect();
     copies.sort(); // dates sort as text
@@ -56,7 +76,8 @@ pub async fn run_daily(db_path: String, dir: Option<PathBuf>, keep: usize) {
     loop {
         let path = db_path.clone();
         let dir = dir.clone();
-        match tokio::task::spawn_blocking(move || backup(&path, dir.as_deref(), keep, false)).await {
+        match tokio::task::spawn_blocking(move || backup(&path, dir.as_deref(), keep, false)).await
+        {
             Ok(Ok(Some(p))) => println!("💾 backed up the world to {}", p.display()),
             Ok(Ok(None)) => {}
             Ok(Err(e)) => eprintln!("⚠ backup failed: {e}"),
@@ -77,16 +98,24 @@ mod tests {
         std::fs::create_dir_all(dir.join("backups")).unwrap();
         let db = dir.join("island.db");
         let conn = rusqlite::Connection::open(&db).unwrap();
-        conn.execute_batch("CREATE TABLE t (x); INSERT INTO t VALUES (42);").unwrap();
+        conn.execute_batch("CREATE TABLE t (x); INSERT INTO t VALUES (42);")
+            .unwrap();
         for day in ["2026-10-01", "2026-10-02", "2026-10-03"] {
             std::fs::write(dir.join("backups").join(format!("island-{day}.db")), "old").unwrap();
         }
         let db_path = db.to_str().unwrap();
 
-        let made = backup(db_path, None, 2, false).unwrap().expect("first backup today");
-        assert!(backup(db_path, None, 2, false).unwrap().is_none(), "only one a day");
+        let made = backup(db_path, None, 2, false)
+            .unwrap()
+            .expect("first backup today");
+        assert!(
+            backup(db_path, None, 2, false).unwrap().is_none(),
+            "only one a day"
+        );
         let elsewhere = dir.join("cloud");
-        let copy = backup(db_path, Some(&elsewhere), 2, false).unwrap().expect("a copy in the chosen folder");
+        let copy = backup(db_path, Some(&elsewhere), 2, false)
+            .unwrap()
+            .expect("a copy in the chosen folder");
         assert!(copy.starts_with(&elsewhere));
         let copy = rusqlite::Connection::open(&made).unwrap();
         let x: i64 = copy.query_row("SELECT x FROM t", [], |r| r.get(0)).unwrap();

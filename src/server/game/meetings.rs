@@ -14,7 +14,15 @@ pub fn kind() -> &'static str {
 
 pub fn is_meeting_spot(name: &str) -> bool {
     let n = name.to_lowercase();
-    ["meeting", "gazebo", "gathering table", "gathering spot", "gathering place"].iter().any(|w| n.contains(w))
+    [
+        "meeting",
+        "gazebo",
+        "gathering table",
+        "gathering spot",
+        "gathering place",
+    ]
+    .iter()
+    .any(|w| n.contains(w))
 }
 
 /// A call link worth keeping: https, one piece, not too long.
@@ -23,7 +31,9 @@ pub fn clean_link(raw: &str) -> Option<String> {
     let ok = url.starts_with("https://")
         && url.len() > "https://".len() + 3
         && url.chars().count() <= MAX_LINK
-        && !url.chars().any(|c| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '"' | '\''));
+        && !url
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '"' | '\''));
     ok.then(|| url.to_string())
 }
 
@@ -38,15 +48,20 @@ pub fn split_link(text: &str) -> (String, Option<String>) {
     let words: Vec<&str> = text
         .split_whitespace()
         .filter(|w| {
-            if links.len() < MAX_LINKS && w.starts_with("https://")
-                && let Some(l) = clean_link(w) {
-                    links.push(l);
-                    return false;
-                }
+            if links.len() < MAX_LINKS
+                && w.starts_with("https://")
+                && let Some(l) = clean_link(w)
+            {
+                links.push(l);
+                return false;
+            }
             true
         })
         .collect();
-    (words.join(" "), (!links.is_empty()).then(|| links.join(" ")))
+    (
+        words.join(" "),
+        (!links.is_empty()).then(|| links.join(" ")),
+    )
 }
 
 /// Links kept together, for reading: "https://a · https://b".
@@ -64,11 +79,16 @@ impl Game {
 
     /// The meeting spot at (x, y), if there is one.
     fn meeting_spot_at(&self, x: i64, y: i64) -> Option<(i64, String, String)> {
-        self.world.things_at(x, y).find(|t| t.kind.as_deref() == Some(KIND)).map(|t| (t.id, t.name.clone(), t.maker.clone()))
+        self.world
+            .things_at(x, y)
+            .find(|t| t.kind.as_deref() == Some(KIND))
+            .map(|t| (t.id, t.name.clone(), t.maker.clone()))
     }
 
     pub(super) fn meeting_here(&self, id: u64) -> bool {
-        self.players.get(&id).is_some_and(|p| self.meeting_spot_at(p.x, p.y).is_some())
+        self.players
+            .get(&id)
+            .is_some_and(|p| self.meeting_spot_at(p.x, p.y).is_some())
     }
 
     /// The standing call link at (x, y), from a meeting spot there.
@@ -79,22 +99,50 @@ impl Game {
 
     /// For `look`: the call link here, if any.
     pub(super) fn meeting_lines_here(&self, id: u64) -> Vec<Line> {
-        let Some(p) = self.players.get(&id) else { return vec![] };
-        let Some((thing, name, _)) = self.meeting_spot_at(p.x, p.y) else { return vec![] };
+        let Some(p) = self.players.get(&id) else {
+            return vec![];
+        };
+        let Some((thing, name, _)) = self.meeting_spot_at(p.x, p.y) else {
+            return vec![];
+        };
         match self.meeting_links.get(&thing) {
-            Some(link) => vec![Line::new().c(Col::Cyan, format!("🔗 {} has {}: ", super::capitalise(&super::the(&name)), if link.contains(' ') { "links" } else { "a link" })).c(Col::Cyan, shown(link)).c(Col::Dim, " (meet to get them)")],
-            None => vec![Line::col(Col::Dim, "🔗 Nobody's left any links here yet (meet https://…)")],
+            Some(link) => vec![
+                Line::new()
+                    .c(
+                        Col::Cyan,
+                        format!(
+                            "🔗 {} has {}: ",
+                            super::capitalise(&super::the(&name)),
+                            if link.contains(' ') {
+                                "links"
+                            } else {
+                                "a link"
+                            }
+                        ),
+                    )
+                    .c(Col::Cyan, shown(link))
+                    .c(Col::Dim, " (meet to get them)"),
+            ],
+            None => vec![Line::col(
+                Col::Dim,
+                "🔗 Nobody's left any links here yet (meet https://…)",
+            )],
         }
     }
 
     /// `meet` (go into the call here), `meet https://…` (set the spot's
     /// link) and `meet off` (clear it).
     pub(super) fn cmd_meet(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
         let rest = rest.trim();
         let spot = self.meeting_spot_at(x, y);
         if rest.is_empty() {
-            let link = spot.as_ref().and_then(|s| self.meeting_links.get(&s.0).cloned()).or_else(|| self.event_link_now(x, y));
+            let link = spot
+                .as_ref()
+                .and_then(|s| self.meeting_links.get(&s.0).cloned())
+                .or_else(|| self.event_link_now(x, y));
             let Some(link) = link else {
                 let msg = if spot.is_some() {
                     "There are no links here yet. Leave some for whatever happens here: meet https://…"
@@ -104,13 +152,33 @@ impl Game {
                 self.say1(id, Line::plain(msg));
                 return Ok(());
             };
-            self.say1(id, Line::new().c(Col::Cyan, "🔗 Here you go: ").b(Col::Cyan, shown(&link)).c(Col::Dim, " (the island will be right here when you're back)"));
+            self.say1(
+                id,
+                Line::new()
+                    .c(Col::Cyan, "🔗 Here you go: ")
+                    .b(Col::Cyan, shown(&link))
+                    .c(
+                        Col::Dim,
+                        " (the island will be right here when you're back)",
+                    ),
+            );
             let user = self.user(id);
-            self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("🔗 {name} heads off to the gathering.")));
+            self.tell_here_from(
+                x,
+                y,
+                id,
+                &user,
+                Line::col(Col::Cyan, format!("🔗 {name} heads off to the gathering.")),
+            );
             return Ok(());
         }
         let Some((thing, spot_name, maker)) = spot else {
-            self.say1(id, Line::plain("Links live on gathering spots. Make one here first: make a gathering table"));
+            self.say1(
+                id,
+                Line::plain(
+                    "Links live on gathering spots. Make one here first: make a gathering table",
+                ),
+            );
             return Ok(());
         };
         let user = self.user(id);
@@ -118,24 +186,64 @@ impl Game {
         // The island's own tables (the one on the village green) are everyone's.
         let everyones = maker == super::green::BY;
         if maker != user && !home_owner && !everyones && !self.is_keeper(&user) {
-            self.say1(id, Line::plain(format!("Only whoever made {} (or a keeper) can change its links.", super::the(&spot_name))));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "Only whoever made {} (or a keeper) can change its links.",
+                    super::the(&spot_name)
+                )),
+            );
             return Ok(());
         }
         let the_spot = super::the(&spot_name);
-        if matches!(rest.to_lowercase().as_str(), "off" | "clear" | "none" | "stop") {
-            self.world.db.set_meeting_link(thing, None, &user, super::boards::now())?;
+        if matches!(
+            rest.to_lowercase().as_str(),
+            "off" | "clear" | "none" | "stop"
+        ) {
+            self.world
+                .db
+                .set_meeting_link(thing, None, &user, super::boards::now())?;
             self.meeting_links.remove(&thing);
-            self.say1(id, Line::col(Col::Cyan, format!("🔗 {} has no links now.", super::capitalise(&the_spot))));
+            self.say1(
+                id,
+                Line::col(
+                    Col::Cyan,
+                    format!("🔗 {} has no links now.", super::capitalise(&the_spot)),
+                ),
+            );
             return Ok(());
         }
         let (_, Some(link)) = split_link(rest) else {
-            self.say1(id, Line::plain("That doesn't look like a link. Links need to start https://"));
+            self.say1(
+                id,
+                Line::plain("That doesn't look like a link. Links need to start https://"),
+            );
             return Ok(());
         };
-        self.world.db.set_meeting_link(thing, Some(&link), &user, super::boards::now())?;
+        self.world
+            .db
+            .set_meeting_link(thing, Some(&link), &user, super::boards::now())?;
         self.meeting_links.insert(thing, link.clone());
-        self.say1(id, Line::new().c(Col::Cyan, format!("🔗 {} now holds ", super::capitalise(&the_spot))).c(Col::Cyan, shown(&link)).c(Col::Dim, ". Anyone here can type meet to get them."));
-        self.tell_here_from(x, y, id, &user, Line::col(Col::Cyan, format!("🔗 {name} leaves some links at {the_spot}. (meet to get them)")));
+        self.say1(
+            id,
+            Line::new()
+                .c(
+                    Col::Cyan,
+                    format!("🔗 {} now holds ", super::capitalise(&the_spot)),
+                )
+                .c(Col::Cyan, shown(&link))
+                .c(Col::Dim, ". Anyone here can type meet to get them."),
+        );
+        self.tell_here_from(
+            x,
+            y,
+            id,
+            &user,
+            Line::col(
+                Col::Cyan,
+                format!("🔗 {name} leaves some links at {the_spot}. (meet to get them)"),
+            ),
+        );
         Ok(())
     }
 }
@@ -147,13 +255,26 @@ mod tests {
     #[test]
     fn takes_the_link_out_of_an_events_name() {
         let (name, link) = split_link("Standup https://meet.google.com/abc-defg-hij");
-        assert_eq!((name.as_str(), link.as_deref()), ("Standup", Some("https://meet.google.com/abc-defg-hij")));
+        assert_eq!(
+            (name.as_str(), link.as_deref()),
+            ("Standup", Some("https://meet.google.com/abc-defg-hij"))
+        );
         let (name, link) = split_link("Retro (https://zoom.us/j/123) with cake");
         assert_eq!(link, None, "a bracketed link isn't a clean word");
         assert!(name.contains("Retro"));
-        let (name, link) = split_link("Standup https://meet.google.com/abc https://trello.com/b/xyz/team");
-        assert_eq!((name.as_str(), link.as_deref()), ("Standup", Some("https://meet.google.com/abc https://trello.com/b/xyz/team")));
-        assert_eq!(shown(&link.unwrap()), "https://meet.google.com/abc · https://trello.com/b/xyz/team");
+        let (name, link) =
+            split_link("Standup https://meet.google.com/abc https://trello.com/b/xyz/team");
+        assert_eq!(
+            (name.as_str(), link.as_deref()),
+            (
+                "Standup",
+                Some("https://meet.google.com/abc https://trello.com/b/xyz/team")
+            )
+        );
+        assert_eq!(
+            shown(&link.unwrap()),
+            "https://meet.google.com/abc · https://trello.com/b/xyz/team"
+        );
         let (_, link) = split_link("x https://a.bc/1 https://a.bc/2 https://a.bc/3 https://a.bc/4");
         assert_eq!(link.unwrap().split(' ').count(), 3, "three at most");
         let (name, link) = split_link("Beach party");
@@ -162,11 +283,17 @@ mod tests {
 
     #[test]
     fn only_tidy_https_links() {
-        assert_eq!(clean_link("https://meet.google.com/abc.").as_deref(), Some("https://meet.google.com/abc"));
+        assert_eq!(
+            clean_link("https://meet.google.com/abc.").as_deref(),
+            Some("https://meet.google.com/abc")
+        );
         assert_eq!(clean_link("http://meet.google.com/abc"), None);
         assert_eq!(clean_link("https://"), None);
         assert_eq!(clean_link("https://a.b/\"><script>"), None);
-        assert_eq!(clean_link(&format!("https://x.y/{}", "a".repeat(400))), None);
+        assert_eq!(
+            clean_link(&format!("https://x.y/{}", "a".repeat(400))),
+            None
+        );
     }
 
     #[test]
@@ -174,7 +301,10 @@ mod tests {
         assert!(is_meeting_spot("a round meeting table"));
         assert!(is_meeting_spot("a little Gazebo"));
         assert!(is_meeting_spot("a gathering table"));
-        assert!(!is_meeting_spot("a gathering basket"), "gathering finds is something else");
+        assert!(
+            !is_meeting_spot("a gathering basket"),
+            "gathering finds is something else"
+        );
         assert!(!is_meeting_spot("a bench"));
     }
 }

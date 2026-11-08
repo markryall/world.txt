@@ -28,15 +28,49 @@ pub struct Island {
 }
 
 pub const ISLANDS: [Island; 4] = [
-    Island { id: 0, name: "Home Island", ox: 0, oy: 0, style: Style::Home, blurb: "meadows, woods and a rocky heart" },
-    Island { id: 1, name: "Driftwood Isle", ox: REGION, oy: 0, style: Style::Beach, blurb: "long beaches, pearls and driftwood" },
-    Island { id: 2, name: "Mossy Holm", ox: 0, oy: REGION, style: Style::Woods, blurb: "deep green woods and giant mushrooms" },
-    Island { id: 3, name: "Ember Rock", ox: REGION, oy: REGION, style: Style::Rocky, blurb: "warm stone heights full of gems" },
+    Island {
+        id: 0,
+        name: "Home Island",
+        ox: 0,
+        oy: 0,
+        style: Style::Home,
+        blurb: "meadows, woods and a rocky heart",
+    },
+    Island {
+        id: 1,
+        name: "Driftwood Isle",
+        ox: REGION,
+        oy: 0,
+        style: Style::Beach,
+        blurb: "long beaches, pearls and driftwood",
+    },
+    Island {
+        id: 2,
+        name: "Mossy Holm",
+        ox: 0,
+        oy: REGION,
+        style: Style::Woods,
+        blurb: "deep green woods and giant mushrooms",
+    },
+    Island {
+        id: 3,
+        name: "Ember Rock",
+        ox: REGION,
+        oy: REGION,
+        style: Style::Rocky,
+        blurb: "warm stone heights full of gems",
+    },
 ];
 
 pub fn island_at(x: i64, y: i64) -> &'static Island {
-    let (rx, ry) = (x.div_euclid(REGION).clamp(0, 1), y.div_euclid(REGION).clamp(0, 1));
-    ISLANDS.iter().find(|i| i.ox == rx * REGION && i.oy == ry * REGION).unwrap_or(&ISLANDS[0])
+    let (rx, ry) = (
+        x.div_euclid(REGION).clamp(0, 1),
+        y.div_euclid(REGION).clamp(0, 1),
+    );
+    ISLANDS
+        .iter()
+        .find(|i| i.ox == rx * REGION && i.oy == ry * REGION)
+        .unwrap_or(&ISLANDS[0])
 }
 
 pub fn by_name(words: &str) -> Option<&'static Island> {
@@ -44,7 +78,10 @@ pub fn by_name(words: &str) -> Option<&'static Island> {
     if w.is_empty() {
         return None;
     }
-    ISLANDS.iter().find(|i| i.name.to_lowercase().contains(&w) || i.name.to_lowercase().split(' ').next() == w.split(' ').next())
+    ISLANDS.iter().find(|i| {
+        i.name.to_lowercase().contains(&w)
+            || i.name.to_lowercase().split(' ').next() == w.split(' ').next()
+    })
 }
 
 impl Island {
@@ -65,7 +102,11 @@ impl Island {
             Style::Woods => (0.42, 1.25, 0.36, 0.78, 0.90, 0.22),
             Style::Rocky => (0.50, 1.30, 0.36, 0.60, 0.74, -0.1),
         };
-        let seed = if self.style == Style::Home { seed } else { seed ^ (self.id as u64).wrapping_mul(0x9e37_79b9) };
+        let seed = if self.style == Style::Home {
+            seed
+        } else {
+            seed ^ (self.id as u64).wrapping_mul(0x9e37_79b9)
+        };
         let mut rows = Vec::new();
         let c = (REGION - 1) as f64 / 2.0;
         for y in 0..REGION {
@@ -96,7 +137,12 @@ impl Island {
                 // A ring of deep sea keeps the islands apart.
                 let edge = x < 2 || y < 2 || x >= REGION - 2 || y >= REGION - 2;
                 let terrain = if edge { Terrain::DeepWater } else { terrain };
-                rows.push(TileRow { x: self.ox + x, y: self.oy + y, terrain: terrain.code().into(), name: None });
+                rows.push(TileRow {
+                    x: self.ox + x,
+                    y: self.oy + y,
+                    terrain: terrain.code().into(),
+                    name: None,
+                });
             }
         }
         rows

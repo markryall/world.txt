@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 
-
 // ---- device tokens ----------------------------------------------------------
 //
 // Opening an invite gives this device a token for that account on that
@@ -13,9 +12,21 @@ fn token_path(who: &str, server: &str) -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     let label: String = format!("{who}@{server}")
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '@' || c == '-' { c.to_ascii_lowercase() } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '@' || c == '-' {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
         .collect();
-    Some(PathBuf::from(home).join(".config").join("world.txt").join("tokens").join(label))
+    Some(
+        PathBuf::from(home)
+            .join(".config")
+            .join("world.txt")
+            .join("tokens")
+            .join(label),
+    )
 }
 
 pub fn load_token(who: &str, server: &str) -> Option<String> {
@@ -25,7 +36,9 @@ pub fn load_token(who: &str, server: &str) -> Option<String> {
 }
 
 pub fn save_token(who: &str, server: &str, token: &str) {
-    let Some(path) = token_path(who, server) else { return };
+    let Some(path) = token_path(who, server) else {
+        return;
+    };
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
@@ -46,11 +59,37 @@ pub fn forget_token(who: &str, server: &str) {
 
 /// The hello for `who` on `server`: the invite if there is one, otherwise
 /// this device's saved token.
-pub fn hello(who: &str, server: &str, bot: bool, invite: Option<String>) -> crate::protocol::ToServer {
+pub fn hello(
+    who: &str,
+    server: &str,
+    bot: bool,
+    invite: Option<String>,
+) -> crate::protocol::ToServer {
     // Accept a whole magic link as well as just its code.
-    let invite = invite.map(|i| i.rsplit("invite=").next().unwrap_or(&i).split('&').next().unwrap_or("").trim().to_string());
-    let token = if invite.is_some() { None } else { load_token(who, server) };
-    crate::protocol::ToServer::Hello { name: who.to_string(), bot, invite, token, passport: None, back: false, tz: local_zone() }
+    let invite = invite.map(|i| {
+        i.rsplit("invite=")
+            .next()
+            .unwrap_or(&i)
+            .split('&')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_string()
+    });
+    let token = if invite.is_some() {
+        None
+    } else {
+        load_token(who, server)
+    };
+    crate::protocol::ToServer::Hello {
+        name: who.to_string(),
+        bot,
+        invite,
+        token,
+        passport: None,
+        back: false,
+        tz: local_zone(),
+    }
 }
 
 /// This computer's timezone, as an IANA name: from TZ, or where
@@ -64,14 +103,17 @@ pub fn local_zone() -> Option<String> {
     }
     let target = std::fs::read_link("/etc/localtime").ok()?;
     let path = target.to_string_lossy();
-    path.split_once("zoneinfo/").map(|(_, zone)| zone.to_string())
+    path.split_once("zoneinfo/")
+        .map(|(_, zone)| zone.to_string())
 }
 
 /// What to do with what the world said about signing in.
 pub fn on_sign_in(who: &str, server: &str, msg: &crate::protocol::ToClient) {
     match msg {
         crate::protocol::ToClient::Welcome { token: Some(t), .. } => save_token(who, server, t),
-        crate::protocol::ToClient::Bye { reason } if reason.contains("isn't signed in") => forget_token(who, server),
+        crate::protocol::ToClient::Bye { reason } if reason.contains("isn't signed in") => {
+            forget_token(who, server)
+        }
         _ => {}
     }
 }

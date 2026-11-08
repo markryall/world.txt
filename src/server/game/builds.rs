@@ -11,9 +11,9 @@
 //! Not in `help`'s front page: the scenery hints at it when your satchel is
 //! full enough.
 
-use super::craft::{need_label, plan_needs, Need};
-use super::progress::NEAR;
 use super::Game;
+use super::craft::{Need, need_label, plan_needs};
+use super::progress::NEAR;
 use crate::protocol::{Bar, Col, Line};
 use crate::server::nature::Kind;
 use crate::server::world::Trigger;
@@ -181,7 +181,11 @@ pub fn plan_named(words: &str, loose: bool) -> Option<&'static Plan> {
         .iter()
         .find(|p| p.name == w)
         .or_else(|| PLANS.iter().find(|p| w.contains(p.name)))
-        .or_else(|| PLANS.iter().find(|p| loose && w.len() >= 4 && p.name.contains(w.as_str())))
+        .or_else(|| {
+            PLANS
+                .iter()
+                .find(|p| loose && w.len() >= 4 && p.name.contains(w.as_str()))
+        })
 }
 
 /// A building that's going up, or has gone up.
@@ -204,8 +208,16 @@ fn minutes(secs: i64) -> String {
     }
 }
 
-const STEPS: [(i64, i64, &str); 8] =
-    [(0, -1, "north"), (1, -1, "north-east"), (1, 0, "east"), (1, 1, "south-east"), (0, 1, "south"), (-1, 1, "south-west"), (-1, 0, "west"), (-1, -1, "north-west")];
+const STEPS: [(i64, i64, &str); 8] = [
+    (0, -1, "north"),
+    (1, -1, "north-east"),
+    (1, 0, "east"),
+    (1, 1, "south-east"),
+    (0, 1, "south"),
+    (-1, 1, "south-west"),
+    (-1, 0, "west"),
+    (-1, -1, "north-west"),
+];
 
 impl Game {
     /// A building that's finished going up.
@@ -220,7 +232,16 @@ impl Game {
             Ok(rows) => {
                 for (thing, plan, by, started, ready, told) in rows {
                     if let Some(plan) = plan_by_id(&plan) {
-                        self.builds.insert(thing, Build { plan, by, started, ready, told });
+                        self.builds.insert(
+                            thing,
+                            Build {
+                                plan,
+                                by,
+                                started,
+                                ready,
+                                told,
+                            },
+                        );
                     }
                 }
             }
@@ -230,12 +251,17 @@ impl Game {
 
     /// The building standing at a spot: (thing id, its plan).
     fn building_at(&self, x: i64, y: i64) -> Option<(i64, &'static Plan)> {
-        self.world.things_at(x, y).find_map(|t| self.builds.get(&t.id).map(|b| (t.id, b.plan)))
+        self.world
+            .things_at(x, y)
+            .find_map(|t| self.builds.get(&t.id).map(|b| (t.id, b.plan)))
     }
 
     /// Buildings next door to a spot: (plan, which way).
     fn next_door(&self, x: i64, y: i64) -> Vec<(&'static Plan, &'static str)> {
-        STEPS.iter().filter_map(|&(dx, dy, way)| self.building_at(x + dx, y + dy).map(|(_, p)| (p, way))).collect()
+        STEPS
+            .iter()
+            .filter_map(|&(dx, dy, way)| self.building_at(x + dx, y + dy).map(|(_, p)| (p, way)))
+            .collect()
     }
 
     /// `build` on its own: what you could build, and whether you've the things for it.
@@ -243,7 +269,10 @@ impl Game {
         let user = self.user(id);
         let satchel = self.world.db.satchel(&user)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "🏗️ Things you could build")];
-        for (extensions, heading) in [(false, None), (true, Some("  …and next door to a building:"))] {
+        for (extensions, heading) in [
+            (false, None),
+            (true, Some("  …and next door to a building:")),
+        ] {
             if let Some(h) = heading {
                 lines.push(Line::col(Col::Dim, h));
             }
@@ -252,10 +281,20 @@ impl Game {
                 let needs: Vec<String> = p.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
                 lines.push(
                     Line::new()
-                        .c(if ready { Col::Green } else { Col::Dim }, if ready { "  ✓ " } else { "    " })
+                        .c(
+                            if ready { Col::Green } else { Col::Dim },
+                            if ready { "  ✓ " } else { "    " },
+                        )
                         .t(format!("{} ", p.icon))
                         .b(if ready { Col::Yellow } else { Col::Plain }, p.name)
-                        .c(Col::Dim, format!("  ← {} · {}", needs.join(" + "), minutes(p.secs).trim_start_matches("about "))),
+                        .c(
+                            Col::Dim,
+                            format!(
+                                "  ← {} · {}",
+                                needs.join(" + "),
+                                minutes(p.secs).trim_start_matches("about ")
+                            ),
+                        ),
                 );
             }
         }
@@ -266,20 +305,33 @@ impl Game {
 
     /// `build a mushroom house`: spend the things and start it going up. None
     /// if that isn't something to build (so it's an ordinary `make`).
-    pub(super) fn cmd_build(&mut self, id: u64, verb: &str, what: &str) -> Option<anyhow::Result<()>> {
+    pub(super) fn cmd_build(
+        &mut self,
+        id: u64,
+        verb: &str,
+        what: &str,
+    ) -> Option<anyhow::Result<()>> {
         let plan = plan_named(what, matches!(verb, "build" | "construct"))?;
         Some(self.build(id, plan))
     }
 
     fn build(&mut self, id: u64, plan: &'static Plan) -> anyhow::Result<()> {
-        let Some((x, y, who)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, who)) = self.here(id) else {
+            return Ok(());
+        };
         if crate::server::world::room_of(x, y).is_some() {
-            self.say1(id, Line::plain("Buildings go up outdoors. (out to go outside)"));
+            self.say1(
+                id,
+                Line::plain("Buildings go up outdoors. (out to go outside)"),
+            );
             return Ok(());
         }
         // The same twelve-things-a-spot as making or placing anything.
         if self.world.things_at(x, y).count() >= 12 {
-            self.say1(id, Line::plain("It's getting crowded here. Try somewhere else?"));
+            self.say1(
+                id,
+                Line::plain("It's getting crowded here. Try somewhere else?"),
+            );
             return Ok(());
         }
         let user = self.user(id);
@@ -288,37 +340,104 @@ impl Game {
             return Ok(());
         }
         if let Some((_, there)) = self.building_at(x, y) {
-            self.say1(id, Line::plain(format!("There's already {} here. Build next door to make it bigger.", crate::server::nature::a(there.name))));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "There's already {} here. Build next door to make it bigger.",
+                    crate::server::nature::a(there.name)
+                )),
+            );
             return Ok(());
         }
         if plan.extension && self.next_door(x, y).is_empty() {
-            self.say1(id, Line::plain(format!("{} {} goes next door to a building. Stand beside one and try again.", capital(&crate::server::nature::a(plan.name)), plan.icon)));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "{} {} goes next door to a building. Stand beside one and try again.",
+                    capital(&crate::server::nature::a(plan.name)),
+                    plan.icon
+                )),
+            );
             return Ok(());
         }
         let t = now();
-        let going_up = self.builds.iter().filter(|(thing, b)| b.by == user && b.ready > t && self.world.things.iter().any(|x| x.id == **thing)).count();
+        let going_up = self
+            .builds
+            .iter()
+            .filter(|(thing, b)| {
+                b.by == user && b.ready > t && self.world.things.iter().any(|x| x.id == **thing)
+            })
+            .count();
         if going_up >= AT_ONCE {
-            self.say1(id, Line::plain("You've already got two things going up. Let one finish first."));
+            self.say1(
+                id,
+                Line::plain("You've already got two things going up. Let one finish first."),
+            );
             return Ok(());
         }
         let satchel = self.world.db.satchel(&user)?;
         let Some(used) = plan_needs(plan.needs, &satchel) else {
             let needs: Vec<String> = plan.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
-            self.say1(id, Line::plain(format!("{} {} needs {}. Keep gathering! 🧺 (build lists them all)", capital(&crate::server::nature::a(plan.name)), plan.icon, needs.join(" + "))));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "{} {} needs {}. Keep gathering! 🧺 (build lists them all)",
+                    capital(&crate::server::nature::a(plan.name)),
+                    plan.icon,
+                    needs.join(" + ")
+                )),
+            );
             return Ok(());
         };
         for (sid, n) in &used {
             self.world.db.satchel_add(&user, sid, -n)?;
         }
         let name = crate::server::nature::a(plan.name);
-        let thing = self.world.add_thing(x, y, name.clone(), None, Trigger::Always, &user, Some(KIND))?;
+        let thing =
+            self.world
+                .add_thing(x, y, name.clone(), None, Trigger::Always, &user, Some(KIND))?;
         let ready = t + plan.secs;
-        self.world.db.add_building(thing, plan.id, &user, t, ready)?;
-        self.builds.insert(thing, Build { plan, by: user, started: t, ready, told: false });
+        self.world
+            .db
+            .add_building(thing, plan.id, &user, t, ready)?;
+        self.builds.insert(
+            thing,
+            Build {
+                plan,
+                by: user,
+                started: t,
+                ready,
+                told: false,
+            },
+        );
         let place = self.world.place_title(x, y);
-        self.say1(id, Line::new().c(Col::Yellow, format!("🏗️ You start building {name} {} here. It'll be ready in {}.", plan.icon, minutes(plan.secs))));
-        self.say1(id, Line::col(Col::Dim, "Off you go if you like: the bar in your side panel keeps track."));
-        self.tell_here(x, y, id, Line::col(Col::Yellow, format!("🏗️ {who} starts building {name} {} at {place}.", plan.icon)));
+        self.say1(
+            id,
+            Line::new().c(
+                Col::Yellow,
+                format!(
+                    "🏗️ You start building {name} {} here. It'll be ready in {}.",
+                    plan.icon,
+                    minutes(plan.secs)
+                ),
+            ),
+        );
+        self.say1(
+            id,
+            Line::col(
+                Col::Dim,
+                "Off you go if you like: the bar in your side panel keeps track.",
+            ),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(
+                Col::Yellow,
+                format!("🏗️ {who} starts building {name} {} at {place}.", plan.icon),
+            ),
+        );
         self.builds_changed(thing);
         self.status_all();
         Ok(())
@@ -327,7 +446,9 @@ impl Game {
     /// The bars for buildings going up (or just finished) that `id` can see:
     /// their own wherever they are, and anyone's nearby.
     pub(super) fn build_bars_for(&self, id: u64) -> Vec<Bar> {
-        let Some(p) = self.players.get(&id) else { return vec![] };
+        let Some(p) = self.players.get(&id) else {
+            return vec![];
+        };
         let t = now();
         self.builds
             .iter()
@@ -338,7 +459,12 @@ impl Game {
                 (near || b.by == p.user).then(|| {
                     let span = (b.ready - b.started).max(1);
                     let done = ((t - b.started).clamp(0, span) * 100 / span) as u64;
-                    Bar { label: format!("{} {}", b.plan.icon, b.plan.name), done, total: 100, place: self.world.place_title(at.x, at.y) }
+                    Bar {
+                        label: format!("{} {}", b.plan.icon, b.plan.name),
+                        done,
+                        total: 100,
+                        place: self.world.place_title(at.x, at.y),
+                    }
                 })
             })
             .collect()
@@ -347,7 +473,12 @@ impl Game {
     /// A building's bar has moved on: freshen its builder's side panel and
     /// those of anyone nearby.
     fn builds_changed(&self, thing: i64) {
-        let (Some(b), Some(at)) = (self.builds.get(&thing), self.world.things.iter().find(|x| x.id == thing)) else { return };
+        let (Some(b), Some(at)) = (
+            self.builds.get(&thing),
+            self.world.things.iter().find(|x| x.id == thing),
+        ) else {
+            return;
+        };
         for p in self.players.values() {
             if p.user == b.by || ((at.x - p.x).abs() <= NEAR && (at.y - p.y).abs() <= NEAR) {
                 p.status_due.set(true);
@@ -358,13 +489,20 @@ impl Game {
     /// Every tick: move the bars along, and say when something's finished.
     pub(super) fn builds_tick(&mut self) {
         let t = now();
-        let live: Vec<i64> = self.builds.iter().filter(|(_, b)| t < b.ready + LINGER + 5).map(|(&k, _)| k).collect();
+        let live: Vec<i64> = self
+            .builds
+            .iter()
+            .filter(|(_, b)| t < b.ready + LINGER + 5)
+            .map(|(&k, _)| k)
+            .collect();
         for thing in live {
             if !self.world.things.iter().any(|x| x.id == thing) {
                 continue;
             }
             self.builds_changed(thing);
-            let Some(b) = self.builds.get_mut(&thing) else { continue };
+            let Some(b) = self.builds.get_mut(&thing) else {
+                continue;
+            };
             if b.told || t < b.ready {
                 continue;
             }
@@ -376,7 +514,15 @@ impl Game {
     }
 
     fn finished(&mut self, thing: i64, plan: &'static Plan, by: &str) {
-        let Some((x, y)) = self.world.things.iter().find(|t| t.id == thing).map(|t| (t.x, t.y)) else { return };
+        let Some((x, y)) = self
+            .world
+            .things
+            .iter()
+            .find(|t| t.id == thing)
+            .map(|t| (t.x, t.y))
+        else {
+            return;
+        };
         let place = self.world.place_title(x, y);
         let builder = self.world.nick(by);
         let ids: Vec<(u64, bool)> = self
@@ -387,9 +533,28 @@ impl Game {
             .collect();
         for (id, mine) in ids {
             let line = if mine {
-                Line::new().c(Col::Yellow, format!("{} Your {} at {place} is finished! ", plan.icon, plan.name)).c(Col::Dim, "The scaffolding comes down with a satisfying clatter.")
+                Line::new()
+                    .c(
+                        Col::Yellow,
+                        format!("{} Your {} at {place} is finished! ", plan.icon, plan.name),
+                    )
+                    .c(
+                        Col::Dim,
+                        "The scaffolding comes down with a satisfying clatter.",
+                    )
             } else {
-                Line::new().c(Col::Yellow, format!("{} {builder}'s {} at {place} is finished! ", plan.icon, plan.name)).c(Col::Dim, "The scaffolding comes down with a satisfying clatter.")
+                Line::new()
+                    .c(
+                        Col::Yellow,
+                        format!(
+                            "{} {builder}'s {} at {place} is finished! ",
+                            plan.icon, plan.name
+                        ),
+                    )
+                    .c(
+                        Col::Dim,
+                        "The scaffolding comes down with a satisfying clatter.",
+                    )
             };
             self.say1(id, line);
         }
@@ -398,28 +563,53 @@ impl Game {
     /// Looking at a spot with a building on it: what it's like, whether it's
     /// done, and what's next door.
     pub(super) fn building_lines_here(&self, id: u64) -> Vec<Line> {
-        let Some(p) = self.players.get(&id) else { return vec![] };
+        let Some(p) = self.players.get(&id) else {
+            return vec![];
+        };
         let (x, y) = (p.x, p.y);
-        let Some((thing, plan)) = self.building_at(x, y) else { return vec![] };
-        let Some(b) = self.builds.get(&thing) else { return vec![] };
+        let Some((thing, plan)) = self.building_at(x, y) else {
+            return vec![];
+        };
+        let Some(b) = self.builds.get(&thing) else {
+            return vec![];
+        };
         let t = now();
         let mut lines = Vec::new();
         if t < b.ready {
-            lines.push(Line::col(Col::Sand, format!("🏗️ Scaffolding stands around a half-built {} {}. Still {} to go.", plan.name, plan.icon, minutes(b.ready - t))));
+            lines.push(Line::col(
+                Col::Sand,
+                format!(
+                    "🏗️ Scaffolding stands around a half-built {} {}. Still {} to go.",
+                    plan.name,
+                    plan.icon,
+                    minutes(b.ready - t)
+                ),
+            ));
         } else {
-            lines.push(Line::col(Col::Sand, format!("{} {}", plan.icon, plan.looks)));
+            lines.push(Line::col(
+                Col::Sand,
+                format!("{} {}", plan.icon, plan.looks),
+            ));
         }
         let doors = self.next_door(x, y);
         if !doors.is_empty() {
-            let parts: Vec<String> = doors.iter().map(|(p, way)| format!("{} to the {way}", crate::server::nature::a(p.name))).collect();
-            lines.push(Line::col(Col::Dim, format!("Next door: {}.", crate::server::world::join_and(&parts))));
+            let parts: Vec<String> = doors
+                .iter()
+                .map(|(p, way)| format!("{} to the {way}", crate::server::nature::a(p.name)))
+                .collect();
+            lines.push(Line::col(
+                Col::Dim,
+                format!("Next door: {}.", crate::server::world::join_and(&parts)),
+            ));
         }
         lines
     }
 
     /// For the scenery: a nudge towards something you could build here.
     pub(super) fn build_hints(&self, id: u64) -> Vec<&'static str> {
-        let Some(p) = self.players.get(&id) else { return vec![] };
+        let Some(p) = self.players.get(&id) else {
+            return vec![];
+        };
         let (x, y) = (p.x, p.y);
         let terrain = self.world.terrain(x, y);
         if !terrain.walkable() || terrain.is_wet() || self.building_at(x, y).is_some() {
@@ -427,7 +617,11 @@ impl Game {
         }
         let satchel = self.world.db.satchel(&p.user).unwrap_or_default();
         let beside = !self.next_door(x, y).is_empty();
-        PLANS.iter().filter(|plan| plan.extension == beside && plan_needs(plan.needs, &satchel).is_some()).map(|plan| plan.hint).collect()
+        PLANS
+            .iter()
+            .filter(|plan| plan.extension == beside && plan_needs(plan.needs, &satchel).is_some())
+            .map(|plan| plan.hint)
+            .collect()
     }
 }
 
@@ -444,11 +638,23 @@ mod tests {
         for p in PLANS {
             let n: i64 = p.needs.iter().map(|(_, c)| c).sum();
             assert!((2..=5).contains(&n), "{} needs {n} things", p.name);
-            assert_eq!(plan_named(&format!("a {}", p.name), false).map(|f| f.id), Some(p.id));
+            assert_eq!(
+                plan_named(&format!("a {}", p.name), false).map(|f| f.id),
+                Some(p.id)
+            );
         }
-        assert_eq!(plan_named("Mushroom House", false).map(|p| p.id), Some("mushroom_house"));
-        assert_eq!(plan_named("turret", true).map(|p| p.id), Some("pebble_turret"));
-        assert!(plan_named("a fish", false).is_none(), "make a fish is just a fish");
+        assert_eq!(
+            plan_named("Mushroom House", false).map(|p| p.id),
+            Some("mushroom_house")
+        );
+        assert_eq!(
+            plan_named("turret", true).map(|p| p.id),
+            Some("pebble_turret")
+        );
+        assert!(
+            plan_named("a fish", false).is_none(),
+            "make a fish is just a fish"
+        );
         assert!(plan_named("a little blue bench", true).is_none());
         assert!(plan_named("a frog that croaks", true).is_none());
     }

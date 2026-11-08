@@ -7,24 +7,158 @@ use crate::protocol::{Col, Line};
 /// Words for colours, and the island colour each is drawn in. Two-word
 /// names come first, so "dark green" isn't just "green".
 const COLOURS: &[(&[&str], Col)] = &[
-    (&["dark green", "forest green", "bottle green", "emerald", "olive", "moss", "moss green"], Col::DarkGreen),
-    (&["sky blue", "baby blue", "light blue", "pale blue", "cornflower", "blue", "sky", "periwinkle"], Col::Blue),
-    (&["navy", "navy blue", "dark blue", "deep blue", "royal blue", "midnight blue", "indigo", "midnight"], Col::DeepBlue),
-    (&["sea green", "teal", "turquoise", "aqua", "cyan", "aquamarine"], Col::Cyan),
-    (&["red", "scarlet", "crimson", "cherry", "ruby", "tomato"], Col::Red),
-    (&["pink", "rose", "rosy", "blush", "coral", "salmon", "bubblegum", "hot pink", "fuchsia"], Col::Pink),
-    (&["purple", "lilac", "lavender", "violet", "magenta", "plum", "mauve", "grape"], Col::Magenta),
-    (&["orange", "peach", "apricot", "tangerine", "copper", "rust", "terracotta", "brown", "chocolate", "caramel", "ginger", "conker"], Col::Brown),
-    (&["yellow", "gold", "golden", "lemon", "sunny", "mustard", "sunflower", "buttercup"], Col::Yellow),
-    (&["cream", "sandy", "sand", "beige", "honey", "butter", "oatmeal", "biscuit"], Col::Sand),
-    (&["green", "mint", "lime", "sage", "leafy", "apple green", "pistachio", "grass green"], Col::Green),
-    (&["white", "snow", "snowy", "ivory", "pearl", "chalk"], Col::White),
-    (&["grey", "gray", "silver", "slate", "stone", "pebble", "dove grey", "dove gray"], Col::Grey),
+    (
+        &[
+            "dark green",
+            "forest green",
+            "bottle green",
+            "emerald",
+            "olive",
+            "moss",
+            "moss green",
+        ],
+        Col::DarkGreen,
+    ),
+    (
+        &[
+            "sky blue",
+            "baby blue",
+            "light blue",
+            "pale blue",
+            "cornflower",
+            "blue",
+            "sky",
+            "periwinkle",
+        ],
+        Col::Blue,
+    ),
+    (
+        &[
+            "navy",
+            "navy blue",
+            "dark blue",
+            "deep blue",
+            "royal blue",
+            "midnight blue",
+            "indigo",
+            "midnight",
+        ],
+        Col::DeepBlue,
+    ),
+    (
+        &[
+            "sea green",
+            "teal",
+            "turquoise",
+            "aqua",
+            "cyan",
+            "aquamarine",
+        ],
+        Col::Cyan,
+    ),
+    (
+        &["red", "scarlet", "crimson", "cherry", "ruby", "tomato"],
+        Col::Red,
+    ),
+    (
+        &[
+            "pink",
+            "rose",
+            "rosy",
+            "blush",
+            "coral",
+            "salmon",
+            "bubblegum",
+            "hot pink",
+            "fuchsia",
+        ],
+        Col::Pink,
+    ),
+    (
+        &[
+            "purple", "lilac", "lavender", "violet", "magenta", "plum", "mauve", "grape",
+        ],
+        Col::Magenta,
+    ),
+    (
+        &[
+            "orange",
+            "peach",
+            "apricot",
+            "tangerine",
+            "copper",
+            "rust",
+            "terracotta",
+            "brown",
+            "chocolate",
+            "caramel",
+            "ginger",
+            "conker",
+        ],
+        Col::Brown,
+    ),
+    (
+        &[
+            "yellow",
+            "gold",
+            "golden",
+            "lemon",
+            "sunny",
+            "mustard",
+            "sunflower",
+            "buttercup",
+        ],
+        Col::Yellow,
+    ),
+    (
+        &[
+            "cream", "sandy", "sand", "beige", "honey", "butter", "oatmeal", "biscuit",
+        ],
+        Col::Sand,
+    ),
+    (
+        &[
+            "green",
+            "mint",
+            "lime",
+            "sage",
+            "leafy",
+            "apple green",
+            "pistachio",
+            "grass green",
+        ],
+        Col::Green,
+    ),
+    (
+        &["white", "snow", "snowy", "ivory", "pearl", "chalk"],
+        Col::White,
+    ),
+    (
+        &[
+            "grey",
+            "gray",
+            "silver",
+            "slate",
+            "stone",
+            "pebble",
+            "dove grey",
+            "dove gray",
+        ],
+        Col::Grey,
+    ),
     (&["black", "charcoal", "jet", "inky", "ink"], Col::Dim),
 ];
 
 /// Every colour a rainbow runs through.
-const RAINBOW: &[Col] = &[Col::Red, Col::Brown, Col::Yellow, Col::Green, Col::Cyan, Col::Blue, Col::Magenta];
+const RAINBOW: &[Col] = &[
+    Col::Red,
+    Col::Brown,
+    Col::Yellow,
+    Col::Green,
+    Col::Cyan,
+    Col::Blue,
+    Col::Magenta,
+];
 
 /// Words that mean "take the paint off".
 pub const PLAIN: &[&str] = &["plain", "none", "nothing", "unpainted", "natural", "bare"];
@@ -35,7 +169,10 @@ pub fn colour(word: &str) -> Option<Col> {
     if w == "rainbow" || w == "rainbow-coloured" || w == "rainbow coloured" {
         return Some(Col::Pink);
     }
-    COLOURS.iter().find(|(words, _)| words.contains(&w.as_str())).map(|(_, c)| *c)
+    COLOURS
+        .iter()
+        .find(|(words, _)| words.contains(&w.as_str()))
+        .map(|(_, c)| *c)
 }
 
 /// "paint the shell cottage sky blue" (after the verb) → ("shell cottage", "sky blue").
@@ -48,7 +185,11 @@ pub fn parse(rest: &str) -> Option<(String, String)> {
             continue;
         }
         let (front, back) = words.split_at(words.len() - take);
-        let word = back.join(" ").to_lowercase().trim_end_matches(['!', '.']).to_string();
+        let word = back
+            .join(" ")
+            .to_lowercase()
+            .trim_end_matches(['!', '.'])
+            .to_string();
         if colour(&word).is_none() && !PLAIN.contains(&word.as_str()) {
             continue;
         }
@@ -56,7 +197,10 @@ pub fn parse(rest: &str) -> Option<(String, String)> {
         if front.last().is_some_and(|w| w.eq_ignore_ascii_case("in")) {
             front.pop();
         }
-        while front.first().is_some_and(|w| ["the", "my", "our", "a"].contains(&w.to_lowercase().as_str())) {
+        while front
+            .first()
+            .is_some_and(|w| ["the", "my", "our", "a"].contains(&w.to_lowercase().as_str()))
+        {
             front.remove(0);
         }
         return Some((front.join(" "), word));
@@ -71,7 +215,11 @@ pub fn painted(line: Line, text: &str, paint: Option<&str>, otherwise: Col) -> L
             let mut line = line;
             let mut i = 0;
             for ch in text.chars() {
-                let c = if ch.is_whitespace() { Col::Plain } else { RAINBOW[i % RAINBOW.len()] };
+                let c = if ch.is_whitespace() {
+                    Col::Plain
+                } else {
+                    RAINBOW[i % RAINBOW.len()]
+                };
                 if !ch.is_whitespace() {
                     i += 1;
                 }
@@ -107,9 +255,18 @@ mod tests {
     #[test]
     fn the_colour_is_at_the_end() {
         let p = parse;
-        assert_eq!(p("the shell cottage pink"), Some(("shell cottage".into(), "pink".into())));
-        assert_eq!(p("bench in sky blue"), Some(("bench".into(), "sky blue".into())));
-        assert_eq!(p("my home dark green!"), Some(("home".into(), "dark green".into())));
+        assert_eq!(
+            p("the shell cottage pink"),
+            Some(("shell cottage".into(), "pink".into()))
+        );
+        assert_eq!(
+            p("bench in sky blue"),
+            Some(("bench".into(), "sky blue".into()))
+        );
+        assert_eq!(
+            p("my home dark green!"),
+            Some(("home".into(), "dark green".into()))
+        );
         assert_eq!(p("the frog plain"), Some(("frog".into(), "plain".into())));
         assert_eq!(p("rainbow"), Some(("".into(), "rainbow".into())));
         assert_eq!(p("the bench"), None);
@@ -118,7 +275,12 @@ mod tests {
     #[test]
     fn rainbows_run_through_every_colour() {
         let line = painted(Line::new(), "a cat", Some("rainbow"), Col::Yellow);
-        let colours: Vec<Col> = line.0.iter().filter(|s| s.t.trim() != "").map(|s| s.c).collect();
+        let colours: Vec<Col> = line
+            .0
+            .iter()
+            .filter(|s| s.t.trim() != "")
+            .map(|s| s.c)
+            .collect();
         assert_eq!(colours, vec![Col::Red, Col::Brown, Col::Yellow, Col::Green]);
     }
 }

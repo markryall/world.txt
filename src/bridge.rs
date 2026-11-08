@@ -25,11 +25,19 @@ pub fn paths(dir: &Path, name: &str) -> (PathBuf, PathBuf) {
     (dir.join(format!("{n}.log")), dir.join(format!("{n}.sock")))
 }
 
-pub async fn run(name: String, server: &str, dir: PathBuf, invite: Option<String>) -> anyhow::Result<()> {
+pub async fn run(
+    name: String,
+    server: &str,
+    dir: PathBuf,
+    invite: Option<String>,
+) -> anyhow::Result<()> {
     std::fs::create_dir_all(&dir)?;
     let (log_path, sock_path) = paths(&dir, &name);
     let _ = std::fs::remove_file(&sock_path);
-    let mut log = std::fs::OpenOptions::new().create(true).append(true).open(&log_path)?;
+    let mut log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)?;
     let note = |log: &mut std::fs::File, s: &str| {
         let _ = writeln!(log, "# {s}");
         let _ = log.flush();
@@ -40,10 +48,17 @@ pub async fn run(name: String, server: &str, dir: PathBuf, invite: Option<String
     let (mut sink, mut source) = ws.split();
     let who = name.to_lowercase();
     let hello = crate::identity::hello(&who, server, true, invite);
-    sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
+    sink.send(Message::Text(serde_json::to_string(&hello)?.into()))
+        .await?;
 
     let listener = UnixListener::bind(&sock_path)?;
-    note(&mut log, &format!("bridge up: {name} joined {server}; log {}", log_path.display()));
+    note(
+        &mut log,
+        &format!(
+            "bridge up: {name} joined {server}; log {}",
+            log_path.display()
+        ),
+    );
 
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<String>();
     let (lines_tx, _) = broadcast::channel::<String>(256);
@@ -143,7 +158,10 @@ async fn handle_send(
 pub async fn send(name: &str, dir: &Path, words: &[String]) -> anyhow::Result<()> {
     let (_, sock_path) = paths(dir, name);
     let mut stream = UnixStream::connect(&sock_path).await.map_err(|e| {
-        anyhow::anyhow!("no bridge for {name} at {} ({e}). Start one with: world.txt bridge {name}", sock_path.display())
+        anyhow::anyhow!(
+            "no bridge for {name} at {} ({e}). Start one with: world.txt bridge {name}",
+            sock_path.display()
+        )
     })?;
     let cmd = words.join(" ").replace('\n', " ");
     stream.write_all(format!("{cmd}\n").as_bytes()).await?;
@@ -156,7 +174,9 @@ pub async fn send(name: &str, dir: &Path, words: &[String]) -> anyhow::Result<()
 /// Connect, retrying for a little while in case the world is still starting.
 pub async fn connect_retry(
     server: &str,
-) -> anyhow::Result<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>> {
+) -> anyhow::Result<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+> {
     let mut tries = 0;
     loop {
         match tokio_tungstenite::connect_async(server).await {

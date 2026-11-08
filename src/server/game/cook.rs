@@ -19,7 +19,19 @@ pub fn kitchen(name: &str) -> Option<&'static str> {
     let n = name.to_lowercase();
     if n.contains("oven") {
         Some(OVEN)
-    } else if ["campfire", "camp fire", "camp stove", "stove", "fire pit", "firepit", "bonfire", "hearth"].iter().any(|w| n.contains(w)) {
+    } else if [
+        "campfire",
+        "camp fire",
+        "camp stove",
+        "stove",
+        "fire pit",
+        "firepit",
+        "bonfire",
+        "hearth",
+    ]
+    .iter()
+    .any(|w| n.contains(w))
+    {
         Some(FIRE)
     } else {
         None
@@ -121,7 +133,10 @@ pub const DISHES: &[Dish] = &[
 ];
 
 fn recipe(d: &Dish) -> Recipe {
-    Recipe { makes: d.makes, needs: d.needs }
+    Recipe {
+        makes: d.makes,
+        needs: d.needs,
+    }
 }
 
 /// Something on the go at a campfire or oven.
@@ -137,14 +152,25 @@ pub struct Cooking {
 impl Game {
     /// The campfire or oven here, if there is one: (thing id, which kind).
     pub(super) fn kitchen_here(&self, x: i64, y: i64) -> Option<(i64, &'static str)> {
-        self.world.things.iter().filter(|t| t.x == x && t.y == y).find_map(|t| t.kind.as_deref().and_then(|k| [FIRE, OVEN].into_iter().find(|w| *w == k)).map(|k| (t.id, k)))
+        self.world
+            .things
+            .iter()
+            .filter(|t| t.x == x && t.y == y)
+            .find_map(|t| {
+                t.kind
+                    .as_deref()
+                    .and_then(|k| [FIRE, OVEN].into_iter().find(|w| *w == k))
+                    .map(|k| (t.id, k))
+            })
     }
 
     /// Everyone within smelling distance of (x, y).
     fn waft(&self, x: i64, y: i64, line: Line) {
         for p in self.players.values() {
             if (p.x - x).abs().max((p.y - y).abs()) <= SMELL {
-                let _ = p.tx.send(crate::protocol::ToClient::Lines { lines: vec![line.clone()] });
+                let _ = p.tx.send(crate::protocol::ToClient::Lines {
+                    lines: vec![line.clone()],
+                });
             }
         }
     }
@@ -154,13 +180,22 @@ impl Game {
         let satchel = self.world.db.satchel(&self.user(id))?;
         let mut lines = vec![Line::new().b(Col::Magenta, "🍳 Things to cook")];
         for d in DISHES {
-            let Some(s) = nature::by_id(d.makes) else { continue };
+            let Some(s) = nature::by_id(d.makes) else {
+                continue;
+            };
             let ready = plan(&recipe(d), &satchel).is_some();
             let needs: Vec<String> = d.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
-            let place = if d.on == OVEN { "clay oven" } else { "campfire" };
+            let place = if d.on == OVEN {
+                "clay oven"
+            } else {
+                "campfire"
+            };
             lines.push(
                 Line::new()
-                    .c(if ready { Col::Green } else { Col::Dim }, if ready { "  ✓ " } else { "    " })
+                    .c(
+                        if ready { Col::Green } else { Col::Dim },
+                        if ready { "  ✓ " } else { "    " },
+                    )
                     .b(if ready { Col::Yellow } else { Col::Plain }, s.name)
                     .c(Col::Dim, format!("  ← {} · {place}", needs.join(" + "))),
             );
@@ -178,46 +213,107 @@ impl Game {
 
     /// `cook mint tea`, at a campfire or clay oven.
     pub(super) fn cmd_cook(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, who)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, who)) = self.here(id) else {
+            return Ok(());
+        };
         let kitchen = self.kitchen_here(x, y);
         let w = crate::server::world::strip_article(what.trim()).to_lowercase();
         if w.is_empty() {
             return self.menu(id, kitchen.map(|k| k.1));
         }
         let Some(dish) = DISHES.iter().find(|d| {
-            nature::by_id(d.makes).is_some_and(|s| s.name.contains(&w) || s.id == w.replace(' ', "_") || s.id.replace('_', " ").contains(&w))
+            nature::by_id(d.makes).is_some_and(|s| {
+                s.name.contains(&w)
+                    || s.id == w.replace(' ', "_")
+                    || s.id.replace('_', " ").contains(&w)
+            })
         }) else {
-            self.say1(id, Line::plain(format!("You don't know how to cook '{w}'. Type cook to see what you can make.")));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "You don't know how to cook '{w}'. Type cook to see what you can make."
+                )),
+            );
             return Ok(());
         };
         let s = nature::by_id(dish.makes).expect("a real dish");
         let Some((thing, kind)) = kitchen else {
-            let place = if dish.on == OVEN { "a clay oven" } else { "a campfire" };
-            self.say1(id, Line::plain(format!("You'll need {place} for that. Make one right here: make {place}")));
+            let place = if dish.on == OVEN {
+                "a clay oven"
+            } else {
+                "a campfire"
+            };
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "You'll need {place} for that. Make one right here: make {place}"
+                )),
+            );
             return Ok(());
         };
         if kind != dish.on {
-            let place = if dish.on == OVEN { "a clay oven" } else { "a campfire" };
-            self.say1(id, Line::plain(format!("That needs {place}, not this. Make one nearby: make {place}")));
+            let place = if dish.on == OVEN {
+                "a clay oven"
+            } else {
+                "a campfire"
+            };
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "That needs {place}, not this. Make one nearby: make {place}"
+                )),
+            );
             return Ok(());
         }
         if self.cooking.contains_key(&thing) {
-            self.say1(id, Line::plain("Something's already cooking here. Give it a moment, it'll be worth it."));
+            self.say1(
+                id,
+                Line::plain(
+                    "Something's already cooking here. Give it a moment, it'll be worth it.",
+                ),
+            );
             return Ok(());
         }
         let user = self.user(id);
         let satchel = self.world.db.satchel(&user)?;
         let Some(used) = plan(&recipe(dish), &satchel) else {
             let needs: Vec<String> = dish.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
-            self.say1(id, Line::plain(format!("For {} you'll need {}. Keep an eye out while you wander 🧺", nature::a(s.name), needs.join(" + "))));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "For {} you'll need {}. Keep an eye out while you wander 🧺",
+                    nature::a(s.name),
+                    needs.join(" + ")
+                )),
+            );
             return Ok(());
         };
         for (sid, n) in &used {
             self.world.db.satchel_add(&user, sid, -n)?;
         }
-        self.cooking.insert(thing, Cooking { dish, user, used, started: Instant::now(), halfway: false });
-        self.say1(id, Line::col(Col::Yellow, format!("🍳 You start cooking {}.", nature::a(s.name))));
-        self.tell_here(x, y, id, Line::col(Col::Yellow, format!("🍳 {who} starts cooking.")));
+        self.cooking.insert(
+            thing,
+            Cooking {
+                dish,
+                user,
+                used,
+                started: Instant::now(),
+                halfway: false,
+            },
+        );
+        self.say1(
+            id,
+            Line::col(
+                Col::Yellow,
+                format!("🍳 You start cooking {}.", nature::a(s.name)),
+            ),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(Col::Yellow, format!("🍳 {who} starts cooking.")),
+        );
         self.waft(x, y, Line::col(Col::Pink, dish.smells[0]));
         Ok(())
     }
@@ -236,16 +332,27 @@ impl Game {
                     let line = Line::col(Col::Pink, c.dish.smells[1]);
                     for p in self.players.values() {
                         if (p.x - x).abs().max((p.y - y).abs()) <= SMELL {
-                            let _ = p.tx.send(crate::protocol::ToClient::Lines { lines: vec![line.clone()] });
+                            let _ = p.tx.send(crate::protocol::ToClient::Lines {
+                                lines: vec![line.clone()],
+                            });
                         }
                     }
                 }
             }
         }
         for thing in done {
-            let Some(c) = self.cooking.remove(&thing) else { continue };
-            let Some(s) = nature::by_id(c.dish.makes) else { continue };
-            let at = self.world.things.iter().find(|t| t.id == thing).map(|t| (t.x, t.y));
+            let Some(c) = self.cooking.remove(&thing) else {
+                continue;
+            };
+            let Some(s) = nature::by_id(c.dish.makes) else {
+                continue;
+            };
+            let at = self
+                .world
+                .things
+                .iter()
+                .find(|t| t.id == thing)
+                .map(|t| (t.x, t.y));
             if let Some((x, y)) = at {
                 self.waft(x, y, Line::col(Col::Pink, c.dish.smells[2]));
             }
@@ -257,12 +364,27 @@ impl Game {
                 continue;
             }
             if let Some((x, y)) = at.filter(|_| left > 0) {
-                for _ in 0..left.min(12 - self.world.things_at(x, y).count() as i64).max(0) {
-                    let _ = self.world.add_thing(x, y, nature::a(s.name), Some(s.here.to_string()), crate::server::world::Trigger::Always, &c.user, None);
+                for _ in 0..left
+                    .min(12 - self.world.things_at(x, y).count() as i64)
+                    .max(0)
+                {
+                    let _ = self.world.add_thing(
+                        x,
+                        y,
+                        nature::a(s.name),
+                        Some(s.here.to_string()),
+                        crate::server::world::Trigger::Always,
+                        &c.user,
+                        None,
+                    );
                 }
             }
             let first = self.world.db.journal_add(&c.user, s.id).unwrap_or(false);
-            let cook = self.players.iter().find(|(_, p)| p.user == c.user).map(|(id, _)| *id);
+            let cook = self
+                .players
+                .iter()
+                .find(|(_, p)| p.user == c.user)
+                .map(|(id, _)| *id);
             if let Some(id) = cook {
                 let line = match (fits, left) {
                     (_, 0) => {
@@ -274,7 +396,12 @@ impl Game {
                 };
                 self.say1(id, Line::col(Col::Green, line));
                 if first {
-                    self.say1(id, Line::new().b(Col::Yellow, "📖 New in your journal: ").b(Col::White, crate::server::world::capitalise(s.name)));
+                    self.say1(
+                        id,
+                        Line::new()
+                            .b(Col::Yellow, "📖 New in your journal: ")
+                            .b(Col::White, crate::server::world::capitalise(s.name)),
+                    );
                 }
             }
         }
@@ -282,28 +409,52 @@ impl Game {
 
     /// `eat stew`
     pub(super) fn cmd_eat(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, who)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, who)) = self.here(id) else {
+            return Ok(());
+        };
         let user = self.user(id);
         let Some(s) = self.food_in_satchel(&user, what)? else {
-            self.say1(id, Line::plain("You've nothing like that to eat. Cook something! (cook)"));
+            self.say1(
+                id,
+                Line::plain("You've nothing like that to eat. Cook something! (cook)"),
+            );
             return Ok(());
         };
         self.world.db.satchel_add(&user, s.id, -1)?;
-        let eaten = DISHES.iter().find(|d| d.makes == s.id).map_or("Delicious.", |d| d.eaten);
+        let eaten = DISHES
+            .iter()
+            .find(|d| d.makes == s.id)
+            .map_or("Delicious.", |d| d.eaten);
         self.say1(id, Line::col(Col::Pink, format!("😋 {eaten}")));
-        self.tell_here(x, y, id, Line::col(Col::Pink, format!("😋 {who} enjoys {}.", nature::a(s.name))));
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(Col::Pink, format!("😋 {who} enjoys {}.", nature::a(s.name))),
+        );
         Ok(())
     }
 
     /// `serve crumble`: a helping for everyone standing with you.
     pub(super) fn cmd_serve(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, who)) = self.here(id) else { return Ok(()) };
-        let user = self.user(id);
-        let Some(s) = self.food_in_satchel(&user, what)? else {
-            self.say1(id, Line::plain("You've nothing like that to serve. Cook something first! (cook)"));
+        let Some((x, y, who)) = self.here(id) else {
             return Ok(());
         };
-        let have = self.world.db.satchel(&user)?.iter().find(|(i, _)| i == s.id).map_or(0, |(_, n)| *n);
+        let user = self.user(id);
+        let Some(s) = self.food_in_satchel(&user, what)? else {
+            self.say1(
+                id,
+                Line::plain("You've nothing like that to serve. Cook something first! (cook)"),
+            );
+            return Ok(());
+        };
+        let have = self
+            .world
+            .db
+            .satchel(&user)?
+            .iter()
+            .find(|(i, _)| i == s.id)
+            .map_or(0, |(_, n)| *n);
         let guests: Vec<(u64, String, String)> = self
             .players
             .iter()
@@ -315,31 +466,62 @@ impl Game {
             return Ok(());
         }
         // Only whoever has room in their satchel can take a portion.
-        let (guests, full): (Vec<_>, Vec<_>) = guests.into_iter().partition(|(_, u, _)| self.satchel_room(u) > 0);
+        let (guests, full): (Vec<_>, Vec<_>) = guests
+            .into_iter()
+            .partition(|(_, u, _)| self.satchel_room(u) > 0);
         for (gid, _, _) in &full {
-            self.say1(*gid, Line::plain(format!("{who} offers you {}, but your satchel's too full to take it.", nature::a(s.name))));
+            self.say1(
+                *gid,
+                Line::plain(format!(
+                    "{who} offers you {}, but your satchel's too full to take it.",
+                    nature::a(s.name)
+                )),
+            );
         }
         let guests: Vec<_> = guests.into_iter().take(have as usize).collect();
         if guests.is_empty() {
-            self.say1(id, Line::plain("Everyone here has a satchel too full to take any. Maybe later!"));
+            self.say1(
+                id,
+                Line::plain("Everyone here has a satchel too full to take any. Maybe later!"),
+            );
             return Ok(());
         }
         for (gid, guser, _) in &guests {
             self.world.db.satchel_add(&user, s.id, -1)?;
             self.world.db.satchel_add(guser, s.id, 1)?;
-            self.say1(*gid, Line::col(Col::Pink, format!("🍽 {who} hands you {}. It smells wonderful. (eat it whenever you like)", nature::a(s.name))));
+            self.say1(
+                *gid,
+                Line::col(
+                    Col::Pink,
+                    format!(
+                        "🍽 {who} hands you {}. It smells wonderful. (eat it whenever you like)",
+                        nature::a(s.name)
+                    ),
+                ),
+            );
         }
         let names: Vec<&str> = guests.iter().map(|(_, _, n)| n.as_str()).collect();
         let who_gets = match names.as_slice() {
             [one] => format!("{one} gets {}", nature::a(s.name)),
-            [rest @ .., last] => format!("{} and {last} each get {}", rest.join(", "), nature::a(s.name)),
+            [rest @ .., last] => format!(
+                "{} and {last} each get {}",
+                rest.join(", "),
+                nature::a(s.name)
+            ),
             [] => unreachable!("there are guests"),
         };
-        self.say1(id, Line::col(Col::Pink, format!("🍽 You serve up: {who_gets}.")));
+        self.say1(
+            id,
+            Line::col(Col::Pink, format!("🍽 You serve up: {who_gets}.")),
+        );
         Ok(())
     }
 
-    fn food_in_satchel(&self, user: &str, what: &str) -> anyhow::Result<Option<&'static nature::Species>> {
+    fn food_in_satchel(
+        &self,
+        user: &str,
+        what: &str,
+    ) -> anyhow::Result<Option<&'static nature::Species>> {
         Ok(self
             .world
             .db
@@ -383,11 +565,22 @@ mod tests {
 
     #[test]
     fn cooking_uses_what_you_gathered() {
-        let bag = |items: &[(&str, i64)]| items.iter().map(|(i, n)| (i.to_string(), *n)).collect::<Vec<_>>();
+        let bag = |items: &[(&str, i64)]| {
+            items
+                .iter()
+                .map(|(i, n)| (i.to_string(), *n))
+                .collect::<Vec<_>>()
+        };
         let tea = DISHES.iter().find(|d| d.makes == "mint_tea").unwrap();
         assert!(plan(&recipe(tea), &bag(&[("wild_mint", 1)])).is_some());
         assert!(plan(&recipe(tea), &bag(&[("daisy", 3)])).is_none());
         let stew = DISHES.iter().find(|d| d.makes == "mushroom_stew").unwrap();
-        assert!(plan(&recipe(stew), &bag(&[("chanterelle", 1), ("button", 1), ("thyme", 1)])).is_some());
+        assert!(
+            plan(
+                &recipe(stew),
+                &bag(&[("chanterelle", 1), ("button", 1), ("thyme", 1)])
+            )
+            .is_some()
+        );
     }
 }

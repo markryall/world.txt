@@ -23,7 +23,11 @@ impl Sky {
         }
     }
     pub fn icon_in(self, phase: Phase, season: Season) -> &'static str {
-        if season == Season::Winter && self.wet() { "🌨" } else { self.icon(phase) }
+        if season == Season::Winter && self.wet() {
+            "🌨"
+        } else {
+            self.icon(phase)
+        }
     }
     pub fn label(self) -> &'static str {
         match self {
@@ -95,22 +99,53 @@ impl Season {
     }
     pub fn arrival(self) -> &'static str {
         match self {
-            Season::Spring => "🌸 Spring has come to the island! Blossom drifts on the breeze and everything is waking up.",
-            Season::Summer => "☀️ Summer is here! Long golden days, warm sand, and dragonflies over the meadows.",
-            Season::Autumn => "🍂 Autumn has arrived. The woods turn red and gold, and leaves come spinning down.",
-            Season::Winter => "❄️ Winter has come. Frost on the grass, snow in the clouds, and cosy evenings ahead.",
+            Season::Spring => {
+                "🌸 Spring has come to the island! Blossom drifts on the breeze and everything is waking up."
+            }
+            Season::Summer => {
+                "☀️ Summer is here! Long golden days, warm sand, and dragonflies over the meadows."
+            }
+            Season::Autumn => {
+                "🍂 Autumn has arrived. The woods turn red and gold, and leaves come spinning down."
+            }
+            Season::Winter => {
+                "❄️ Winter has come. Frost on the grass, snow in the clouds, and cosy evenings ahead."
+            }
         }
     }
     pub fn festival(self) -> Festival {
         match self {
-            Season::Spring => Festival { name: "the Blossom Picnic", icon: "🧺", greeting: "It's the Blossom Picnic! Golden blossoms are hiding all over the island. 🌸" },
-            Season::Summer => Festival { name: "Midsummer Beach Night", icon: "🏖️", greeting: "It's Midsummer Beach Night! Glowing shells are washing up on the shore. 🐚" },
-            Season::Autumn => Festival { name: "Lantern Night", icon: "🏮", greeting: "It's Lantern Night! Paper lanterns are hiding all over the island. 🏮" },
-            Season::Winter => Festival { name: "Snow Lights", icon: "✨", greeting: "It's Snow Lights! Snow globes are tucked away all over the island. ❄️" },
+            Season::Spring => Festival {
+                name: "the Blossom Picnic",
+                icon: "🧺",
+                greeting: "It's the Blossom Picnic! Golden blossoms are hiding all over the island. 🌸",
+            },
+            Season::Summer => Festival {
+                name: "Midsummer Beach Night",
+                icon: "🏖️",
+                greeting: "It's Midsummer Beach Night! Glowing shells are washing up on the shore. 🐚",
+            },
+            Season::Autumn => Festival {
+                name: "Lantern Night",
+                icon: "🏮",
+                greeting: "It's Lantern Night! Paper lanterns are hiding all over the island. 🏮",
+            },
+            Season::Winter => Festival {
+                name: "Snow Lights",
+                icon: "✨",
+                greeting: "It's Snow Lights! Snow globes are tucked away all over the island. ❄️",
+            },
         }
     }
     fn from_label(s: &str) -> Option<Season> {
-        [Season::Spring, Season::Summer, Season::Autumn, Season::Winter].into_iter().find(|x| x.label() == s.trim().to_lowercase())
+        [
+            Season::Spring,
+            Season::Summer,
+            Season::Autumn,
+            Season::Winter,
+        ]
+        .into_iter()
+        .find(|x| x.label() == s.trim().to_lowercase())
     }
 }
 
@@ -130,7 +165,10 @@ pub struct Clock;
 impl Clock {
     /// Game time in minutes past midnight (0..1440).
     pub fn minutes() -> u64 {
-        let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         secs % 1440
     }
     pub fn phase() -> Phase {
@@ -143,7 +181,10 @@ impl Clock {
     }
     /// This week's season. WORLD_SEASON=autumn forces one (for testing, or a treat).
     pub fn season() -> Season {
-        if let Some(s) = std::env::var("WORLD_SEASON").ok().and_then(|s| Season::from_label(&s)) {
+        if let Some(s) = std::env::var("WORLD_SEASON")
+            .ok()
+            .and_then(|s| Season::from_label(&s))
+        {
             return s;
         }
         use chrono::Datelike;
@@ -151,14 +192,20 @@ impl Clock {
         // The island's first spring was the week of 2 November 2026.
         let first = chrono::NaiveDate::from_ymd_opt(2026, 11, 2).map_or(0, monday_weeks);
         let now = monday_weeks(chrono::Local::now().date_naive());
-        [Season::Spring, Season::Summer, Season::Autumn, Season::Winter][(now - first).rem_euclid(4) as usize]
+        [
+            Season::Spring,
+            Season::Summer,
+            Season::Autumn,
+            Season::Winter,
+        ][(now - first).rem_euclid(4) as usize]
     }
 
     /// Saturdays are festivals. WORLD_FESTIVAL=1 starts one any day.
     pub fn festival() -> Option<Festival> {
         use chrono::Datelike;
         let forced = std::env::var("WORLD_FESTIVAL").is_ok_and(|v| v == "1");
-        (forced || chrono::Local::now().weekday() == chrono::Weekday::Sat).then(|| Self::season().festival())
+        (forced || chrono::Local::now().weekday() == chrono::Weekday::Sat)
+            .then(|| Self::season().festival())
     }
 
     pub fn label() -> String {
@@ -171,7 +218,12 @@ impl Clock {
             _ => (h - 12, "pm"),
         };
         let season = Self::season();
-        let mut s = format!("{h12}:{mm:02}{ampm} · {} · {} {}", Self::phase().label(), season.icon(), season.label());
+        let mut s = format!(
+            "{h12}:{mm:02}{ampm} · {} · {} {}",
+            Self::phase().label(),
+            season.icon(),
+            season.label()
+        );
         if let Some(f) = Self::festival() {
             s.push_str(&format!(" · {} {}!", f.icon, f.name));
         }
@@ -277,7 +329,16 @@ impl Weather {
     pub fn wind_label(&self) -> &'static str {
         // Wind is named for where it comes from.
         let from = (self.wind + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU);
-        let names = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"];
+        let names = [
+            "east",
+            "south-east",
+            "south",
+            "south-west",
+            "west",
+            "north-west",
+            "north",
+            "north-east",
+        ];
         let i = ((from / std::f64::consts::TAU) * 8.0).round() as usize % 8;
         names[i]
     }

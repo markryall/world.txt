@@ -21,7 +21,9 @@ pub fn random_u64() -> anyhow::Result<u64> {
 }
 
 pub fn now() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() as i64)
 }
 
 /// Make an account with a fresh username. Returns the username.
@@ -43,7 +45,11 @@ pub fn create_account(db: &Db, nickname: &str, keeper: bool) -> anyhow::Result<S
 /// A one-use invite for someone's next device. Returns the secret.
 pub fn issue_invite(db: &Db, user: &str) -> anyhow::Result<String> {
     let token = new_secret()?;
-    db.add_invite(user, &super::names::hash(&token), now() + INVITE_DAYS * 86_400)?;
+    db.add_invite(
+        user,
+        &super::names::hash(&token),
+        now() + INVITE_DAYS * 86_400,
+    )?;
     Ok(token)
 }
 
@@ -57,7 +63,9 @@ pub fn how_to_join(url: Option<&str>, token: &str) -> Vec<String> {
     };
     vec![
         "In a browser (phones too): just open the link.".to_string(),
-        format!("In a terminal (brew install markryall/tap/world-txt): world.txt play --server {server} --invite {token}"),
+        format!(
+            "In a terminal (brew install markryall/tap/world-txt): world.txt play --server {server} --invite {token}"
+        ),
         format!("  and after that, world.txt play --server {server} is all it takes."),
     ]
 }
@@ -85,7 +93,11 @@ pub fn invite_state(expires: i64, used_at: Option<i64>, now: i64) -> String {
         None if expires <= now => "expired".into(),
         None => {
             let left = expires - now;
-            if left < 86_400 { format!("waiting ({}h left)", (left / 3600).max(1)) } else { format!("waiting ({}d left)", left / 86_400) }
+            if left < 86_400 {
+                format!("waiting ({}h left)", (left / 3600).max(1))
+            } else {
+                format!("waiting ({}d left)", left / 86_400)
+            }
         }
     }
 }
@@ -97,9 +109,15 @@ mod tests {
     #[test]
     fn says_how_to_join_from_a_terminal() {
         let how = how_to_join(Some("https://world.example.com/"), "abc123").join("\n");
-        assert!(how.contains("world.txt play --server wss://world.example.com --invite abc123"), "{how}");
+        assert!(
+            how.contains("world.txt play --server wss://world.example.com --invite abc123"),
+            "{how}"
+        );
         assert!(how.contains("open the link"));
-        assert!(how_to_join(Some("http://127.0.0.1:4040"), "x")[1].contains("--server ws://127.0.0.1:4040 "));
+        assert!(
+            how_to_join(Some("http://127.0.0.1:4040"), "x")[1]
+                .contains("--server ws://127.0.0.1:4040 ")
+        );
         assert!(how_to_join(None, "x")[1].contains("--server <world address> "));
     }
 }

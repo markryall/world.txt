@@ -36,7 +36,8 @@ impl Game {
             }
             for &(_, _, dx, dy) in &DIRS {
                 let n = (p.0 + dx, p.1 + dy);
-                if !in_bounds(n.0, n.1) || seen[idx(n)] || !self.world.terrain(n.0, n.1).walkable() {
+                if !in_bounds(n.0, n.1) || seen[idx(n)] || !self.world.terrain(n.0, n.1).walkable()
+                {
                     continue;
                 }
                 seen[idx(n)] = true;
@@ -51,14 +52,21 @@ impl Game {
     /// step at a time. It's what tapping the map sends, so it reaches as far
     /// as the map shows.
     pub(super) fn cmd_go_by(&mut self, id: u64, dx: i64, dy: i64) -> anyhow::Result<()> {
-        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, _)) = self.here(id) else {
+            return Ok(());
+        };
         if room_of(x, y).is_some() {
             self.say1(id, Line::plain("Indoors, just walk: n, s, e, w, or out."));
             return Ok(());
         }
         let (rw, rh) = MINIMAP_REACH;
         if dx.abs() > rw || dy.abs() > rh {
-            self.say1(id, Line::plain("That's further than you can see from here. Try 'go <place>' or 'join <Name>'."));
+            self.say1(
+                id,
+                Line::plain(
+                    "That's further than you can see from here. Try 'go <place>' or 'join <Name>'.",
+                ),
+            );
             return Ok(());
         }
         if (dx, dy) == (0, 0) {
@@ -75,9 +83,17 @@ impl Game {
     }
 
     pub(super) fn cmd_join(&mut self, id: u64, who: &str) -> anyhow::Result<()> {
-        let Some((_, _, name)) = self.here(id) else { return Ok(()) };
+        let Some((_, _, name)) = self.here(id) else {
+            return Ok(());
+        };
         let Some(tid) = self.find_player(who) else {
-            self.say1(id, Line::plain(format!("Nobody called {} is in the world right now. Try 'who'.", who.trim())));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "Nobody called {} is in the world right now. Try 'who'.",
+                    who.trim()
+                )),
+            );
             return Ok(());
         };
         let target = self.players[&tid].name.clone();
@@ -87,10 +103,15 @@ impl Game {
             return Ok(());
         }
         if self.players[&tid].hears(&self.user(id)) {
-            self.say1(tid, Line::col(Col::Cyan, format!("🚶 {name} is coming to find you!")));
+            self.say1(
+                tid,
+                Line::col(Col::Cyan, format!("🚶 {name} is coming to find you!")),
+            );
         }
         // Over the water too, if need be: to the dock, across, then find them.
-        let (tx, ty) = self.world.outside(self.players[&tid].x, self.players[&tid].y);
+        let (tx, ty) = self
+            .world
+            .outside(self.players[&tid].x, self.players[&tid].y);
         self.set_off(id, tx, ty, &target, Some(target_user))
     }
 
@@ -107,7 +128,11 @@ impl Game {
                 island = Some(isl.id);
                 lines.push(Line::col(Col::Pink, format!("  {}", isl.name)));
             }
-            lines.push(Line::new().c(Col::Yellow, format!("   {:>2}. ", i + 1)).t(name.clone()));
+            lines.push(
+                Line::new()
+                    .c(Col::Yellow, format!("   {:>2}. ", i + 1))
+                    .t(name.clone()),
+            );
         }
         if !places.is_empty() {
             lines.push(Line::col(Col::Dim, "  go to The Greenhouse (part of a name will do) or go 3 walks you there, rowing across if need be"));
@@ -119,7 +144,9 @@ impl Game {
     /// `go [to] The Greenhouse` or `go 3`: walk there, by boat if it's on
     /// another island.
     pub(super) fn cmd_go_place(&mut self, id: u64, rest: &str) -> anyhow::Result<()> {
-        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, _)) = self.here(id) else {
+            return Ok(());
+        };
         let want = rest.trim();
         let want = want.strip_prefix("to ").unwrap_or(want).trim();
         if want.is_empty() {
@@ -128,7 +155,12 @@ impl Game {
         }
         let places = self.world.places();
         let Some((tx, ty, name, _)) = pick_place(&places, want) else {
-            self.say1(id, Line::plain(format!("There's nowhere called {want}. 'places' lists everywhere with a name.")));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "There's nowhere called {want}. 'places' lists everywhere with a name."
+                )),
+            );
             return Ok(());
         };
         if (tx, ty) == (x, y) {
@@ -141,9 +173,18 @@ impl Game {
     /// Head for (tx, ty): walking, or down to the dock and rowing across if
     /// it's on another island, then walking on. `join`: then go and find
     /// that person (by username) once across.
-    pub(super) fn set_off(&mut self, id: u64, tx: i64, ty: i64, name: &str, join: Option<String>) -> anyhow::Result<()> {
+    pub(super) fn set_off(
+        &mut self,
+        id: u64,
+        tx: i64,
+        ty: i64,
+        name: &str,
+        join: Option<String>,
+    ) -> anyhow::Result<()> {
         self.step_out_first(id)?;
-        let Some((x, y, _)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, _)) = self.here(id) else {
+            return Ok(());
+        };
         let here = crate::server::islands::island_at(x, y);
         let island = crate::server::islands::island_at(tx, ty);
         if here.id == island.id {
@@ -161,11 +202,20 @@ impl Game {
                     }
                 }
             }
-            self.say1(id, Line::col(Col::Cyan, format!("🚶 You set off for {name}. (stop to stop)")));
+            self.say1(
+                id,
+                Line::col(
+                    Col::Cyan,
+                    format!("🚶 You set off for {name}. (stop to stop)"),
+                ),
+            );
         } else {
             // Over the water: down to the dock, row across, then walk on.
             let Some((dx, dy)) = self.dock_on(here) else {
-                self.say1(id, Line::plain("There's no dock on this island to row from."));
+                self.say1(
+                    id,
+                    Line::plain("There's no dock on this island to row from."),
+                );
                 return Ok(());
             };
             let dock = self.world.place_title(dx, dy);
@@ -187,12 +237,18 @@ impl Game {
     /// Setting off from indoors: out of the door first (the building
     /// stays put).
     pub(super) fn step_out_first(&mut self, id: u64) -> anyhow::Result<()> {
-        if self.in_room(id) { self.cmd_go_out(id) } else { Ok(()) }
+        if self.in_room(id) {
+            self.cmd_go_out(id)
+        } else {
+            Ok(())
+        }
     }
 
     /// At a dock on the way somewhere over the water: row on across.
     fn carry_on(&mut self, id: u64) {
-        let Some((tx, ty, _)) = self.players.get(&id).and_then(|p| p.heading.clone()) else { return };
+        let Some((tx, ty, _)) = self.players.get(&id).and_then(|p| p.heading.clone()) else {
+            return;
+        };
         let dest = crate::server::islands::island_at(tx, ty);
         let word = dest.name.split(' ').next().unwrap_or(dest.name).to_string();
         let _ = self.cmd_sail(id, &word);
@@ -204,7 +260,12 @@ impl Game {
             p.join_after = None;
         }
         let place = self.players.get_mut(&id).and_then(|p| p.walk_to.take());
-        let was = self.players.get_mut(&id).and_then(|p| p.travel.take()).map(|_| ()).or(place.map(|_| ()));
+        let was = self
+            .players
+            .get_mut(&id)
+            .and_then(|p| p.travel.take())
+            .map(|_| ())
+            .or(place.map(|_| ()));
         if was.is_some() && say {
             self.say1(id, Line::col(Col::Dim, "You stop and look around."));
             self.look(id);
@@ -214,13 +275,19 @@ impl Game {
     /// Everyone on their way somewhere takes one more step.
     pub(super) fn step_travellers(&mut self) {
         // Walking to a place.
-        let walkers: Vec<(u64, (i64, i64, String))> =
-            self.players.iter().filter_map(|(&id, p)| p.walk_to.clone().map(|w| (id, w))).collect();
+        let walkers: Vec<(u64, (i64, i64, String))> = self
+            .players
+            .iter()
+            .filter_map(|(&id, p)| p.walk_to.clone().map(|w| (id, w)))
+            .collect();
         for (id, (tx, ty, place)) in walkers {
             let me = (self.players[&id].x, self.players[&id].y);
             if me != (tx, ty) {
                 let Some((dx, dy)) = self.first_step(me, (tx, ty)) else {
-                    self.say1(id, Line::plain(format!("You can't find a way to {place} over land.")));
+                    self.say1(
+                        id,
+                        Line::plain(format!("You can't find a way to {place} over land.")),
+                    );
                     self.stop_travelling(id, true);
                     continue;
                 };
@@ -240,16 +307,29 @@ impl Game {
                 self.look(id);
             }
         }
-        let travellers: Vec<(u64, String)> =
-            self.players.iter().filter_map(|(&id, p)| p.travel.clone().map(|t| (id, t))).collect();
+        let travellers: Vec<(u64, String)> = self
+            .players
+            .iter()
+            .filter_map(|(&id, p)| p.travel.clone().map(|t| (id, t)))
+            .collect();
         for (id, target_user) in travellers {
             let target = self.world.nick(&target_user);
-            let Some(tid) = self.find_player(&target_user).filter(|t| self.players[t].user == target_user) else {
-                self.say1(id, Line::plain(format!("{target} has drifted off to sleep, so you stop.")));
+            let Some(tid) = self
+                .find_player(&target_user)
+                .filter(|t| self.players[t].user == target_user)
+            else {
+                self.say1(
+                    id,
+                    Line::plain(format!("{target} has drifted off to sleep, so you stop.")),
+                );
                 self.stop_travelling(id, true);
                 continue;
             };
-            let (me, them) = ((self.players[&id].x, self.players[&id].y), self.world.outside(self.players[&tid].x, self.players[&tid].y));
+            let (me, them) = (
+                (self.players[&id].x, self.players[&id].y),
+                self.world
+                    .outside(self.players[&tid].x, self.players[&tid].y),
+            );
             if me != them {
                 let island = |p: (i64, i64)| crate::server::islands::island_at(p.0, p.1).id;
                 if island(me) != island(them) {
@@ -258,7 +338,10 @@ impl Game {
                     continue;
                 }
                 let Some((dx, dy)) = self.first_step(me, them) else {
-                    self.say1(id, Line::plain(format!("You can't find a way to {target} over land.")));
+                    self.say1(
+                        id,
+                        Line::plain(format!("You can't find a way to {target} over land.")),
+                    );
                     self.stop_travelling(id, true);
                     continue;
                 };
@@ -282,12 +365,19 @@ impl Game {
 
 /// Getting there: home is home.
 pub fn arrived(place: &str) -> String {
-    if place == "home" { "🏡 You're home.".to_string() } else { format!("🎉 You've arrived at {place}!") }
+    if place == "home" {
+        "🏡 You're home.".to_string()
+    } else {
+        format!("🎉 You've arrived at {place}!")
+    }
 }
 
 /// The place someone means: its number from `places`, or its name (whole,
 /// then the start of it, then any part), with or without "the".
-fn pick_place(places: &[(i64, i64, String, &'static crate::server::islands::Island)], want: &str) -> Option<(i64, i64, String, &'static crate::server::islands::Island)> {
+fn pick_place(
+    places: &[(i64, i64, String, &'static crate::server::islands::Island)],
+    want: &str,
+) -> Option<(i64, i64, String, &'static crate::server::islands::Island)> {
     if let Ok(n) = want.parse::<usize>() {
         return places.get(n.checked_sub(1)?).cloned();
     }
@@ -297,7 +387,9 @@ fn pick_place(places: &[(i64, i64, String, &'static crate::server::islands::Isla
     };
     let w = norm(want);
     let by = |f: &dyn Fn(&str) -> bool| places.iter().find(|p| f(&norm(&p.2))).cloned();
-    by(&|n| n == w).or_else(|| by(&|n| n.starts_with(&w))).or_else(|| by(&|n| n.contains(&w)))
+    by(&|n| n == w)
+        .or_else(|| by(&|n| n.starts_with(&w)))
+        .or_else(|| by(&|n| n.contains(&w)))
 }
 
 #[cfg(test)]
@@ -326,7 +418,11 @@ mod tests {
         ];
         let name = |w: &str| pick_place(&places, w).map(|p| p.2);
         assert_eq!(name("2").as_deref(), Some("The Farmhouse"));
-        assert_eq!(name("greenhouse").as_deref(), Some("The Greenhouse"), "the whole name wins, 'the' or not");
+        assert_eq!(
+            name("greenhouse").as_deref(),
+            Some("The Greenhouse"),
+            "the whole name wins, 'the' or not"
+        );
         assert_eq!(name("the farm").as_deref(), Some("The Farmhouse"));
         assert_eq!(name("lighthouse").as_deref(), Some("Lighthouse Point"));
         assert_eq!(name("annex").as_deref(), Some("Greenhouse Annex"));

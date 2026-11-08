@@ -219,24 +219,65 @@ enum ServiceCmd {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     match Cli::parse().cmd {
-        Cmd::Serve { addr, db, seed, keep_backups, backup_dir, url } => {
-            server::run(&addr, &db, seed, keep_backups, backup_dir, url).await
-        }
-        Cmd::Backup { db, keep_backups, backup_dir } => {
+        Cmd::Serve {
+            addr,
+            db,
+            seed,
+            keep_backups,
+            backup_dir,
+            url,
+        } => server::run(&addr, &db, seed, keep_backups, backup_dir, url).await,
+        Cmd::Backup {
+            db,
+            keep_backups,
+            backup_dir,
+        } => {
             let made = server::backup::backup(&db, backup_dir.as_deref(), keep_backups, true)?;
             if let Some(p) = made {
                 println!("💾 backed up the world to {}", p.display());
             }
             Ok(())
         }
-        Cmd::Play { server, invite, sound } => client::run(&server, invite, sound).await,
+        Cmd::Play {
+            server,
+            invite,
+            sound,
+        } => client::run(&server, invite, sound).await,
         Cmd::Sound { on } => speakers::helper(on).await,
-        Cmd::Agent { name, persona, server, daily_usd, state_dir, dry_run, invite } => {
-            let persona = persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());
-            agent::run(agent::Options { name, persona, server, daily_usd, state_dir, dry_run, invite }).await
+        Cmd::Agent {
+            name,
+            persona,
+            server,
+            daily_usd,
+            state_dir,
+            dry_run,
+            invite,
+        } => {
+            let persona =
+                persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());
+            agent::run(agent::Options {
+                name,
+                persona,
+                server,
+                daily_usd,
+                state_dir,
+                dry_run,
+                invite,
+            })
+            .await
         }
-        Cmd::Bridge { name, server, dir, invite } => bridge::run(name, &server, dir, invite).await,
-        Cmd::Invite { nickname, keeper, url, db } => server::invite(&db, &nickname, keeper, url.as_deref()),
+        Cmd::Bridge {
+            name,
+            server,
+            dir,
+            invite,
+        } => bridge::run(name, &server, dir, invite).await,
+        Cmd::Invite {
+            nickname,
+            keeper,
+            url,
+            db,
+        } => server::invite(&db, &nickname, keeper, url.as_deref()),
         Cmd::Link { name, url, db } => server::link(&db, &name, url.as_deref()),
         Cmd::Invites { db } => server::invites(&db),
         Cmd::Revoke { name, db } => server::revoke(&db, &name),
@@ -245,9 +286,21 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Promote { name, db } => server::promote(&db, &name),
         Cmd::BackfillJournal { db } => server::backfill_journal(&db),
         Cmd::Service { action } => match action {
-            ServiceCmd::Install { db, url, backup_dir, tunnel, name, port } => {
-                service::install(service::Install { db, url, backup_dir, tunnel, name, port })
-            }
+            ServiceCmd::Install {
+                db,
+                url,
+                backup_dir,
+                tunnel,
+                name,
+                port,
+            } => service::install(service::Install {
+                db,
+                url,
+                backup_dir,
+                tunnel,
+                name,
+                port,
+            }),
             ServiceCmd::Uninstall { name, all } => service::uninstall(name, all),
             ServiceCmd::Status => service::status(),
         },

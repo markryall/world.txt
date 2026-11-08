@@ -20,7 +20,10 @@ fn unhex(s: &str) -> Option<Vec<u8>> {
     if !s.len().is_multiple_of(2) {
         return None;
     }
-    (0..s.len()).step_by(2).map(|i| u8::from_str_radix(s.get(i..i + 2)?, 16).ok()).collect()
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(s.get(i..i + 2)?, 16).ok())
+        .collect()
 }
 
 /// "https://World.Example.com/" → "https://world.example.com"
@@ -36,7 +39,11 @@ pub fn host(url: &str) -> String {
 
 /// This world's signing key, made the first time it's needed.
 pub fn world_key(db: &Db) -> anyhow::Result<SigningKey> {
-    if let Some(bytes) = db.meta("signing_key").and_then(|h| unhex(&h)).and_then(|b| <[u8; 32]>::try_from(b).ok()) {
+    if let Some(bytes) = db
+        .meta("signing_key")
+        .and_then(|h| unhex(&h))
+        .and_then(|b| <[u8; 32]>::try_from(b).ok())
+    {
         return Ok(SigningKey::from_bytes(&bytes));
     }
     let mut bytes = [0u8; 32];
@@ -69,7 +76,11 @@ pub const NAME_KEY: &str = "world_name";
 
 /// A world name fit to show: letters, numbers, spaces and a little punctuation.
 pub fn clean_world_name(raw: &str) -> String {
-    let kept: String = raw.chars().filter(|c| c.is_alphanumeric() || " -'.".contains(*c)).take(40).collect();
+    let kept: String = raw
+        .chars()
+        .filter(|c| c.is_alphanumeric() || " -'.".contains(*c))
+        .take(40)
+        .collect();
     kept.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
@@ -102,9 +113,14 @@ impl Passport {
 /// Check a passport presented to the world at `my_url`: it's for here, in
 /// date, and signed by the key its home world publishes.
 pub async fn verify(token: &str, my_url: &str, now: i64) -> anyhow::Result<Passport> {
-    let (body_hex, sig_hex) = token.trim().split_once('.').ok_or_else(|| anyhow::anyhow!("that passport is torn"))?;
+    let (body_hex, sig_hex) = token
+        .trim()
+        .split_once('.')
+        .ok_or_else(|| anyhow::anyhow!("that passport is torn"))?;
     let body = unhex(body_hex).ok_or_else(|| anyhow::anyhow!("that passport is smudged"))?;
-    let sig = unhex(sig_hex).and_then(|b| <[u8; 64]>::try_from(b).ok()).ok_or_else(|| anyhow::anyhow!("that passport's stamp is smudged"))?;
+    let sig = unhex(sig_hex)
+        .and_then(|b| <[u8; 64]>::try_from(b).ok())
+        .ok_or_else(|| anyhow::anyhow!("that passport's stamp is smudged"))?;
     let passport: Passport = serde_json::from_slice(&body)?;
     if normalise(&passport.dest) != normalise(my_url) {
         anyhow::bail!("that passport is for a different world");
@@ -127,7 +143,9 @@ pub async fn verify(token: &str, my_url: &str, now: i64) -> anyhow::Result<Passp
     if normalise(&info.url) != home {
         anyhow::bail!("their home world doesn't recognise its own address");
     }
-    let key_bytes = unhex(&info.public_key).and_then(|b| <[u8; 32]>::try_from(b).ok()).ok_or_else(|| anyhow::anyhow!("their home world's key is odd"))?;
+    let key_bytes = unhex(&info.public_key)
+        .and_then(|b| <[u8; 32]>::try_from(b).ok())
+        .ok_or_else(|| anyhow::anyhow!("their home world's key is odd"))?;
     VerifyingKey::from_bytes(&key_bytes)?
         .verify(&body, &Signature::from_bytes(&sig))
         .map_err(|_| anyhow::anyhow!("that passport's stamp doesn't match its home world"))?;
@@ -147,12 +165,27 @@ static CHECKING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(CHEC
 /// up once and the request pinned to it, so it can't change in between, and
 /// redirects aren't followed.
 async fn home_info(home: &str, local_ok: bool) -> anyhow::Result<WorldInfo> {
-    let _turn = CHECKING.try_acquire().map_err(|_| anyhow::anyhow!("too many passports being checked at once"))?;
+    let _turn = CHECKING
+        .try_acquire()
+        .map_err(|_| anyhow::anyhow!("too many passports being checked at once"))?;
     let url = reqwest::Url::parse(&format!("{home}{WELL_KNOWN}"))?;
-    let host = url.host_str().ok_or_else(|| anyhow::anyhow!("no host"))?.to_string();
-    let port = url.port_or_known_default().ok_or_else(|| anyhow::anyhow!("no port"))?;
-    let lookup = host.trim_start_matches('[').trim_end_matches(']').to_string();
-    let addrs: Vec<std::net::SocketAddr> = tokio::time::timeout(std::time::Duration::from_secs(5), tokio::net::lookup_host((lookup.as_str(), port))).await??.collect();
+    let host = url
+        .host_str()
+        .ok_or_else(|| anyhow::anyhow!("no host"))?
+        .to_string();
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| anyhow::anyhow!("no port"))?;
+    let lookup = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_string();
+    let addrs: Vec<std::net::SocketAddr> = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::net::lookup_host((lookup.as_str(), port)),
+    )
+    .await??
+    .collect();
     if addrs.is_empty() {
         anyhow::bail!("{host} has no address");
     }
@@ -219,10 +252,19 @@ mod tests {
     #[test]
     fn a_world_goes_by_its_name_or_else_its_address() {
         let key = SigningKey::from_bytes(&[7u8; 32]);
-        assert_eq!(WorldInfo::new("https://Home.Example.com/", &key, None).name, "home.example.com");
+        assert_eq!(
+            WorldInfo::new("https://Home.Example.com/", &key, None).name,
+            "home.example.com"
+        );
         let named = WorldInfo::new("https://home.example.com", &key, Some("Willow Bank".into()));
-        assert_eq!((named.name.as_str(), named.url.as_str()), ("Willow Bank", "https://home.example.com"));
-        assert_eq!(clean_world_name("  Willow   <b>Bank</b>! "), "Willow bBankb");
+        assert_eq!(
+            (named.name.as_str(), named.url.as_str()),
+            ("Willow Bank", "https://home.example.com")
+        );
+        assert_eq!(
+            clean_world_name("  Willow   <b>Bank</b>! "),
+            "Willow bBankb"
+        );
     }
 
     #[test]
@@ -251,7 +293,21 @@ mod tests {
     #[test]
     fn only_public_addresses_count() {
         let p = |a: &str| public(a.parse().unwrap());
-        for private in ["127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "0.0.0.0", "100.64.0.1", "::1", "fdaa::1", "fe80::1", "::ffff:127.0.0.1", "64:ff9b::a00:1", "::"] {
+        for private in [
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.169.254",
+            "0.0.0.0",
+            "100.64.0.1",
+            "::1",
+            "fdaa::1",
+            "fe80::1",
+            "::ffff:127.0.0.1",
+            "64:ff9b::a00:1",
+            "::",
+        ] {
             assert!(!p(private), "{private} isn't public");
         }
         for open in ["93.184.216.34", "1.1.1.1", "2606:4700::1111"] {
@@ -261,9 +317,15 @@ mod tests {
 
     #[tokio::test]
     async fn home_worlds_must_be_out_on_the_internet() {
-        let e = home_info("http://127.0.0.1:9", false).await.unwrap_err().to_string();
+        let e = home_info("http://127.0.0.1:9", false)
+            .await
+            .unwrap_err()
+            .to_string();
         assert!(e.contains("isn't out on the internet"), "{e}");
-        let e = home_info("https://[::1]", false).await.unwrap_err().to_string();
+        let e = home_info("https://[::1]", false)
+            .await
+            .unwrap_err()
+            .to_string();
         assert!(e.contains("isn't out on the internet"), "{e}");
     }
 
@@ -276,11 +338,16 @@ mod tests {
             let (mut c, _) = listener.accept().await.unwrap();
             let mut buf = [0u8; 1024];
             let _ = c.read(&mut buf).await;
-            let _ = c.write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n").await;
+            let _ = c
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n")
+                .await;
             let junk = vec![b' '; 64 * 1024];
             let _ = c.write_all(&junk).await;
         });
-        let e = home_info(&format!("http://{addr}"), true).await.unwrap_err().to_string();
+        let e = home_info(&format!("http://{addr}"), true)
+            .await
+            .unwrap_err()
+            .to_string();
         assert!(e.contains("far too long"), "{e}");
     }
 }

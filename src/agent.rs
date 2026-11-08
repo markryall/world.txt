@@ -39,9 +39,48 @@ const MAX_NOTES: usize = 30;
 
 /// Commands a resident may use. No unmake, push, shout or world-wide chat.
 const ALLOWED: &[&str] = &[
-    "say", "emote", "me", "tell", "reply", "look", "hum", "sing", "whistle", "plant", "dig",
-    "path", "make", "gather", "pick", "catch", "fish", "give", "read", "post", "play", "sit", "rest", "dance", "wave", "find", "n", "s", "e", "w", "ne", "nw", "se",
-    "sw", "north", "south", "east", "west", "north-east", "north-west", "south-east", "south-west",
+    "say",
+    "emote",
+    "me",
+    "tell",
+    "reply",
+    "look",
+    "hum",
+    "sing",
+    "whistle",
+    "plant",
+    "dig",
+    "path",
+    "make",
+    "gather",
+    "pick",
+    "catch",
+    "fish",
+    "give",
+    "read",
+    "post",
+    "play",
+    "sit",
+    "rest",
+    "dance",
+    "wave",
+    "find",
+    "n",
+    "s",
+    "e",
+    "w",
+    "ne",
+    "nw",
+    "se",
+    "sw",
+    "north",
+    "south",
+    "east",
+    "west",
+    "north-east",
+    "north-west",
+    "south-east",
+    "south-west",
 ];
 
 pub struct Options {
@@ -76,12 +115,16 @@ struct Status {
 
 pub async fn run(opts: Options) -> anyhow::Result<()> {
     let persona = std::fs::read_to_string(&opts.persona)?;
-    let api_key = std::env::var("ANTHROPIC_API_KEY").ok().filter(|k| !k.is_empty());
+    let api_key = std::env::var("ANTHROPIC_API_KEY")
+        .ok()
+        .filter(|k| !k.is_empty());
     if api_key.is_none() && !opts.dry_run {
         anyhow::bail!("set ANTHROPIC_API_KEY (or use --dry-run to watch without calling Claude)");
     }
     std::fs::create_dir_all(&opts.state_dir)?;
-    let ledger_path = opts.state_dir.join(format!("{}.json", opts.name.to_lowercase()));
+    let ledger_path = opts
+        .state_dir
+        .join(format!("{}.json", opts.name.to_lowercase()));
     let mut ledger: Ledger = std::fs::read_to_string(&ledger_path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -91,8 +134,15 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
     let (mut sink, mut source) = ws.split();
     let who = opts.name.to_lowercase();
     let hello = crate::identity::hello(&who, &opts.server, true, opts.invite.clone());
-    sink.send(Message::Text(serde_json::to_string(&hello)?.into())).await?;
-    log(&opts.name, &format!("🐾 joined {} (budget ${:.2}/day, {MODEL})", opts.server, opts.daily_usd));
+    sink.send(Message::Text(serde_json::to_string(&hello)?.into()))
+        .await?;
+    log(
+        &opts.name,
+        &format!(
+            "🐾 joined {} (budget ${:.2}/day, {MODEL})",
+            opts.server, opts.daily_usd
+        ),
+    );
 
     let system = system_prompt(&opts.name, &persona);
     let http = reqwest::Client::new();
@@ -163,28 +213,46 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
         }
         let today = day_number();
         if ledger.day != today {
-            ledger = Ledger { day: today, notes: std::mem::take(&mut ledger.notes), ..Default::default() };
+            ledger = Ledger {
+                day: today,
+                notes: std::mem::take(&mut ledger.notes),
+                ..Default::default()
+            };
         }
         if ledger.usd >= opts.daily_usd {
             if !ledger.asleep_announced {
                 ledger.asleep_announced = true;
                 save(&ledger_path, &ledger);
-                send_cmd(&mut sink, "emote yawns, stretches, and curls up for a long nap. 💤").await?;
-                log(&opts.name, &format!("daily budget reached (${:.4}); sleeping until tomorrow", ledger.usd));
+                send_cmd(
+                    &mut sink,
+                    "emote yawns, stretches, and curls up for a long nap. 💤",
+                )
+                .await?;
+                log(
+                    &opts.name,
+                    &format!(
+                        "daily budget reached (${:.4}); sleeping until tomorrow",
+                        ledger.usd
+                    ),
+                );
             }
             continue;
         }
         let now = Instant::now();
         if let Some(t) = last_call
-            && now < t + MIN_GAP {
-                // Too soon: think a little later instead, keeping the reason.
-                if wake_at.is_none() {
-                    wake_at = Some(t + MIN_GAP);
-                    wake_reason = reason;
-                }
-                continue;
+            && now < t + MIN_GAP
+        {
+            // Too soon: think a little later instead, keeping the reason.
+            if wake_at.is_none() {
+                wake_at = Some(t + MIN_GAP);
+                wake_reason = reason;
             }
-        while recent_calls.front().is_some_and(|t| now.duration_since(*t) > Duration::from_secs(3600)) {
+            continue;
+        }
+        while recent_calls
+            .front()
+            .is_some_and(|t| now.duration_since(*t) > Duration::from_secs(3600))
+        {
             recent_calls.pop_front();
         }
         if recent_calls.len() >= MAX_PER_HOUR {
@@ -198,7 +266,10 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
         let body = request_body(&system, &context);
 
         if opts.dry_run {
-            log(&opts.name, &format!("[dry run] would think because: {reason}\n{context}"));
+            log(
+                &opts.name,
+                &format!("[dry run] would think because: {reason}\n{context}"),
+            );
             continue;
         }
         let Some(key) = &api_key else { continue };
@@ -242,7 +313,8 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
 pub(crate) fn trigger(text: &str, me: &str) -> Option<&'static str> {
     let lower = text.to_lowercase();
     let own_chat = lower.starts_with(&format!("💬 {me}:"));
-    if lower.starts_with("you ") || lower.starts_with(me) || own_chat || lower.starts_with("✉ you ") {
+    if lower.starts_with("you ") || lower.starts_with(me) || own_chat || lower.starts_with("✉ you ")
+    {
         return None; // our own actions echoed back
     }
     if lower.contains("for the first time") {
@@ -354,7 +426,9 @@ fn user_prompt(st: &Status, seen: &VecDeque<String>, notes: &[String], reason: &
         s.push_str(line);
         s.push('\n');
     }
-    s.push_str(&format!("\nYou're paying attention because {reason}. What do you do?"));
+    s.push_str(&format!(
+        "\nYou're paying attention because {reason}. What do you do?"
+    ));
     s
 }
 
@@ -410,7 +484,10 @@ async fn call_claude(http: &reqwest::Client, key: &str, body: &Value) -> anyhow:
     let status = resp.status();
     let v: Value = resp.json().await?;
     if !status.is_success() {
-        anyhow::bail!("API {status}: {}", v["error"]["message"].as_str().unwrap_or("unknown error"));
+        anyhow::bail!(
+            "API {status}: {}",
+            v["error"]["message"].as_str().unwrap_or("unknown error")
+        );
     }
 
     let u = &v["usage"];
@@ -426,13 +503,22 @@ async fn call_claude(http: &reqwest::Client, key: &str, body: &Value) -> anyhow:
         + cr as f64 * PRICE_CACHE_READ
         + out as f64 * PRICE_OUT)
         / 1_000_000.0;
-    let mut reply = Reply { commands: vec![], remember: None, usd, input_tokens: inp + cw + cr, output_tokens: out };
+    let mut reply = Reply {
+        commands: vec![],
+        remember: None,
+        usd,
+        input_tokens: inp + cw + cr,
+        output_tokens: out,
+    };
 
     // Check why it stopped before trusting the content.
     match v["stop_reason"].as_str() {
         Some("end_turn") => {}
         other => {
-            log("agent", &format!("no action (stop_reason {other:?}, cache read {cr} tokens)"));
+            log(
+                "agent",
+                &format!("no action (stop_reason {other:?}, cache read {cr} tokens)"),
+            );
             return Ok(reply);
         }
     }
@@ -449,7 +535,12 @@ async fn call_claude(http: &reqwest::Client, key: &str, body: &Value) -> anyhow:
         remember: String,
     }
     let out: Out = serde_json::from_str(&text)?;
-    reply.commands = out.commands.into_iter().map(|c| c.trim().to_string()).filter(|c| !c.is_empty()).collect();
+    reply.commands = out
+        .commands
+        .into_iter()
+        .map(|c| c.trim().to_string())
+        .filter(|c| !c.is_empty())
+        .collect();
     reply.remember = Some(out.remember);
     Ok(reply)
 }
@@ -459,7 +550,9 @@ where
     S: futures_util::Sink<Message> + Unpin,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    let msg = serde_json::to_string(&ToServer::Cmd { text: text.to_string() })?;
+    let msg = serde_json::to_string(&ToServer::Cmd {
+        text: text.to_string(),
+    })?;
     sink.send(Message::Text(msg.into())).await?;
     Ok(())
 }
@@ -471,7 +564,11 @@ fn save(path: &PathBuf, ledger: &Ledger) {
 }
 
 fn day_number() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() / 86_400
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        / 86_400
 }
 
 fn log(who: &str, msg: &str) {
@@ -507,7 +604,13 @@ mod tests {
         assert!(trigger("You say, \"hi\"", "moss").is_none());
         assert!(trigger("Moss says, \"mrrp\"", "moss").is_none());
         assert!(trigger("A wave rolls in and hushes back out.", "moss").is_none());
-        assert!(trigger("🐣 Poppy has arrived on the island for the first time!", "moss").is_some());
+        assert!(
+            trigger(
+                "🐣 Poppy has arrived on the island for the first time!",
+                "moss"
+            )
+            .is_some()
+        );
         assert!(trigger("✧ Poppy has wandered into the world.", "moss").is_none());
     }
 }

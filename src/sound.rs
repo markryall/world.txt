@@ -61,7 +61,14 @@ pub enum Heard {
 
 impl Sound {
     pub fn new() -> Self {
-        Sound { mpv: find("mpv"), on: false, playing: HashMap::new(), radios: HashMap::new(), synth: None, levels: Default::default() }
+        Sound {
+            mpv: find("mpv"),
+            on: false,
+            playing: HashMap::new(),
+            radios: HashMap::new(),
+            synth: None,
+            levels: Default::default(),
+        }
     }
 
     pub fn is_on(&self) -> bool {
@@ -77,7 +84,11 @@ impl Sound {
             self.synth = None;
             return Ok(());
         }
-        let Some(mpv) = self.mpv.clone() else { return Err(format!("🔇 Sound needs mpv: {INSTALL}, then world.txt play again.")) };
+        let Some(mpv) = self.mpv.clone() else {
+            return Err(format!(
+                "🔇 Sound needs mpv: {INSTALL}, then world.txt play again."
+            ));
+        };
         self.on = true;
         if self.synth.is_none() {
             self.synth = crate::synth::Synth::start(&mpv);
@@ -85,7 +96,11 @@ impl Sound {
                 s.levels(self.levels);
             }
         }
-        let radios: Vec<(i64, String, f32)> = self.radios.iter().map(|(t, (u, g))| (*t, u.clone(), *g)).collect();
+        let radios: Vec<(i64, String, f32)> = self
+            .radios
+            .iter()
+            .map(|(t, (u, g))| (*t, u.clone(), *g))
+            .collect();
         for (thing, url, gain) in radios {
             self.radio(thing, Some(&url), gain);
         }
@@ -110,9 +125,15 @@ impl Sound {
             return Heard::Nothing;
         };
         self.radios.insert(thing, (url.to_string(), gain));
-        let (Some(mpv), true) = (self.mpv.clone(), self.on) else { return self.heard() };
+        let (Some(mpv), true) = (self.mpv.clone(), self.on) else {
+            return self.heard();
+        };
         let volume = volume(gain);
-        if let Some(p) = self.playing.get_mut(&thing).filter(|p| p.url.as_deref() == Some(url)) {
+        if let Some(p) = self
+            .playing
+            .get_mut(&thing)
+            .filter(|p| p.url.as_deref() == Some(url))
+        {
             set_volume(p, volume);
             return Heard::Playing;
         }
@@ -125,12 +146,16 @@ impl Sound {
 
     /// Frames from a gramophone (or jukebox) in earshot.
     pub fn audio(&mut self, thing: i64, frames: &[String], gain: f32) -> Heard {
-        let (Some(mpv), true) = (self.mpv.clone(), self.on) else { return self.heard() };
+        let (Some(mpv), true) = (self.mpv.clone(), self.on) else {
+            return self.heard();
+        };
         let volume = volume(gain);
         let p = match self.playing.entry(thing) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
-                let Some(p) = start(&mpv, thing, None, volume) else { return Heard::Nothing };
+                let Some(p) = start(&mpv, thing, None, volume) else {
+                    return Heard::Nothing;
+                };
                 e.insert(p)
             }
         };
@@ -178,26 +203,34 @@ fn volume(gain: f32) -> u32 {
 }
 
 pub fn find(name: &str) -> Option<PathBuf> {
-    std::env::split_paths(&std::env::var_os("PATH")?).map(|d| d.join(name)).find(|p| p.is_file())
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|d| d.join(name))
+        .find(|p| p.is_file())
 }
 
 fn start(mpv: &Path, thing: i64, url: Option<&str>, volume: u32) -> Option<Playing> {
     let sock = std::env::temp_dir().join(format!("world-txt-{}-{thing}.sock", std::process::id()));
     let _ = std::fs::remove_file(&sock);
     let mut cmd = Command::new(mpv);
-    cmd.args(["--no-video", "--no-terminal", "--idle=no", "--audio-display=no"])
-        .arg(format!("--volume={volume}"))
-        .arg(format!("--input-ipc-server={}", sock.display()))
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
+    cmd.args([
+        "--no-video",
+        "--no-terminal",
+        "--idle=no",
+        "--audio-display=no",
+    ])
+    .arg(format!("--volume={volume}"))
+    .arg(format!("--input-ipc-server={}", sock.display()))
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .kill_on_drop(true);
     match url {
         Some(u) => {
             cmd.args(["--", u]).stdin(Stdio::null());
         }
         // From stdin, with no waiting to fill a cache: it's live.
         None => {
-            cmd.args(["--cache=no", "--demuxer-lavf-format=ogg", "-"]).stdin(Stdio::piped());
+            cmd.args(["--cache=no", "--demuxer-lavf-format=ogg", "-"])
+                .stdin(Stdio::piped());
         }
     }
     let mut child = cmd.spawn().ok()?;
@@ -212,7 +245,14 @@ fn start(mpv: &Path, thing: i64, url: Option<&str>, volume: u32) -> Option<Playi
         });
         tx
     });
-    let mut p = Playing { _child: child, sock, url: url.map(str::to_string), pages, ogg: Ogg::new(thing as u32), volume };
+    let mut p = Playing {
+        _child: child,
+        sock,
+        url: url.map(str::to_string),
+        pages,
+        ogg: Ogg::new(thing as u32),
+        volume,
+    };
     if let Some(tx) = &p.pages {
         let _ = tx.send(p.ogg.headers());
     }
@@ -227,7 +267,11 @@ fn set_volume(p: &mut Playing, volume: u32) {
     let sock = p.sock.clone();
     tokio::spawn(async move {
         if let Ok(mut s) = tokio::net::UnixStream::connect(&sock).await {
-            let _ = s.write_all(format!("{{\"command\":[\"set_property\",\"volume\",{volume}]}}\n").as_bytes()).await;
+            let _ = s
+                .write_all(
+                    format!("{{\"command\":[\"set_property\",\"volume\",{volume}]}}\n").as_bytes(),
+                )
+                .await;
         }
     });
 }
@@ -271,7 +315,11 @@ const FRAME: u64 = 960;
 
 impl Ogg {
     pub fn new(serial: u32) -> Self {
-        Ogg { serial, seq: 0, granule: 0 }
+        Ogg {
+            serial,
+            seq: 0,
+            granule: 0,
+        }
     }
 
     pub fn headers(&mut self) -> Vec<u8> {
@@ -324,7 +372,11 @@ fn crc(data: &[u8]) -> u32 {
     for &b in data {
         c ^= (b as u32) << 24;
         for _ in 0..8 {
-            c = if c & 0x8000_0000 != 0 { (c << 1) ^ 0x04c1_1db7 } else { c << 1 };
+            c = if c & 0x8000_0000 != 0 {
+                (c << 1) ^ 0x04c1_1db7
+            } else {
+                c << 1
+            };
         }
     }
     c
@@ -361,7 +413,10 @@ mod tests {
     fn ogg_pages_count_up() {
         let mut o = Ogg::new(7);
         let h = o.headers();
-        assert!(h.starts_with(b"OggS") && h[5] == 0x02, "the first page begins the stream");
+        assert!(
+            h.starts_with(b"OggS") && h[5] == 0x02,
+            "the first page begins the stream"
+        );
         let p = o.packet(&[1u8; 300]);
         assert_eq!(&p[6..14], &960u64.to_le_bytes(), "granule counts samples");
         assert_eq!(&p[18..22], &2u32.to_le_bytes(), "third page");

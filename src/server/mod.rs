@@ -4,8 +4,8 @@
 pub mod accounts;
 pub mod backup;
 mod db;
-mod game;
 pub mod federation;
+mod game;
 mod gardens;
 pub mod islands;
 pub mod names;
@@ -51,7 +51,12 @@ pub const MAX_QUEUED: usize = 500;
 
 impl ClientTx {
     pub fn new(tx: UnboundedSender<ToClient>) -> ClientTx {
-        ClientTx { tx, audio_queued: Arc::default(), queued: Arc::default(), swamped: Arc::default() }
+        ClientTx {
+            tx,
+            audio_queued: Arc::default(),
+            queued: Arc::default(),
+            swamped: Arc::default(),
+        }
     }
 
     /// Queue a message. The error (the connection's gone) carries the message
@@ -96,20 +101,57 @@ impl ClientTx {
 }
 
 pub enum Event {
-    Join { id: u64, bot: bool, invite: Option<String>, token: Option<String>, back: bool, tz: Option<String>, tx: ClientTx },
+    Join {
+        id: u64,
+        bot: bool,
+        invite: Option<String>,
+        token: Option<String>,
+        back: bool,
+        tz: Option<String>,
+        tx: ClientTx,
+    },
     /// Someone from another world, with a checked passport.
-    Visit { id: u64, passport: federation::Passport, tz: Option<String>, tx: ClientTx },
-    Cmd { id: u64, text: String },
+    Visit {
+        id: u64,
+        passport: federation::Passport,
+        tz: Option<String>,
+        tx: ClientTx,
+    },
+    Cmd {
+        id: u64,
+        text: String,
+    },
     /// Music from a browser playing a gramophone.
-    Audio { id: u64, frames: Vec<String>, title: Option<String> },
+    Audio {
+        id: u64,
+        frames: Vec<String>,
+        title: Option<String>,
+    },
     /// Songs picked for a jukebox, and a jukebox song finishing.
-    Queue { id: u64, thing: i64, songs: Vec<crate::protocol::Song> },
-    TrackDone { id: u64, thing: i64, key: String },
+    Queue {
+        id: u64,
+        thing: i64,
+        songs: Vec<crate::protocol::Song>,
+    },
+    TrackDone {
+        id: u64,
+        thing: i64,
+        key: String,
+    },
     /// What a radio's on, looked up elsewhere: None if nothing's known.
-    RadioNews { thing: i64, title: Option<String> },
-    Leave { id: u64 },
+    RadioNews {
+        thing: i64,
+        title: Option<String>,
+    },
+    Leave {
+        id: u64,
+    },
     /// Something an outside tool posted to a board's hook.
-    Hook { secret: String, text: String, reply: tokio::sync::oneshot::Sender<HookReply> },
+    Hook {
+        secret: String,
+        text: String,
+        reply: tokio::sync::oneshot::Sender<HookReply>,
+    },
     /// The server's been asked to stop (a redeploy): say so, then go.
     Shutdown,
 }
@@ -141,18 +183,34 @@ pub async fn run(
     let db = db::Db::open(db_path)?;
     let world = world::World::load_or_create(db, seed)?;
     // This world's public face, for other worlds checking its passports.
-    let info: Arc<Option<federation::WorldInfo>> =
-        Arc::new(url.as_deref().map(|u| federation::WorldInfo::new(u, &federation::world_key(&world.db).expect("a signing key"), world.db.meta(federation::NAME_KEY))));
+    let info: Arc<Option<federation::WorldInfo>> = Arc::new(url.as_deref().map(|u| {
+        federation::WorldInfo::new(
+            u,
+            &federation::world_key(&world.db).expect("a signing key"),
+            world.db.meta(federation::NAME_KEY),
+        )
+    }));
     let (events_tx, events_rx) = mpsc::unbounded_channel();
     if world.db.keeper_count() == 0 {
-        println!("🗝  No island keepers yet. Make yourself one: world.txt invite <YourName> --keeper --db {db_path}");
+        println!(
+            "🗝  No island keepers yet. Make yourself one: world.txt invite <YourName> --keeper --db {db_path}"
+        );
     }
     if let Some(i) = info.as_ref() {
-        println!("🌍 this world is {} (other worlds can check its passports at {}{})", i.name, i.url, federation::WELL_KNOWN);
+        println!(
+            "🌍 this world is {} (other worlds can check its passports at {}{})",
+            i.name,
+            i.url,
+            federation::WELL_KNOWN
+        );
     }
     tokio::spawn(game::run(world, events_rx, events_tx.clone(), url));
     if keep_backups > 0 {
-        tokio::spawn(backup::run_daily(db_path.to_string(), backup_dir, keep_backups));
+        tokio::spawn(backup::run_daily(
+            db_path.to_string(),
+            backup_dir,
+            keep_backups,
+        ));
     }
 
     // Stopping (Ctrl-C, or a host like Fly.io redeploying): tell everyone it's
@@ -166,7 +224,9 @@ pub async fn run(
     }
 
     let listener = TcpListener::bind(addr).await?;
-    println!("🌍 world.txt is open: browser http://{addr}  ·  terminal ws://{addr}  (db: {db_path})");
+    println!(
+        "🌍 world.txt is open: browser http://{addr}  ·  terminal ws://{addr}  (db: {db_path})"
+    );
     println!("💌 invite-only: world.txt invite <Name> makes an account and its magic link");
     let mut next_id = 1u64;
     loop {
@@ -207,7 +267,9 @@ async fn connection(
     if !is_websocket(&stream).await? {
         return serve_page(stream, &info, &events).await;
     }
-    let config = tokio_tungstenite::tungstenite::protocol::WebSocketConfig::default().max_message_size(Some(MAX_MESSAGE)).max_frame_size(Some(MAX_MESSAGE));
+    let config = tokio_tungstenite::tungstenite::protocol::WebSocketConfig::default()
+        .max_message_size(Some(MAX_MESSAGE))
+        .max_frame_size(Some(MAX_MESSAGE));
     let ws = tokio_tungstenite::accept_async_with_config(stream, Some(config)).await?;
     let (mut sink, mut source) = ws.split();
     let (raw_tx, mut rx) = mpsc::unbounded_channel::<ToClient>();
@@ -250,7 +312,11 @@ async fn connection(
             continue;
         };
         match parsed {
-            ToServer::Hello { passport: Some(p), tz, .. } if !joined => {
+            ToServer::Hello {
+                passport: Some(p),
+                tz,
+                ..
+            } if !joined => {
                 // Check it here, so the game never waits on another world.
                 let checked = match info.as_ref() {
                     Some(me) => federation::verify(&p, &me.url, accounts::now()).await,
@@ -259,23 +325,48 @@ async fn connection(
                 match checked {
                     Ok(passport) => {
                         joined = true;
-                        events.send(Event::Visit { id, passport, tz, tx: tx.clone() })?;
+                        events.send(Event::Visit {
+                            id,
+                            passport,
+                            tz,
+                            tx: tx.clone(),
+                        })?;
                     }
                     Err(e) => {
-                        let _ = tx.send(ToClient::Bye { reason: format!("🛂 Sorry: {e}.") });
+                        let _ = tx.send(ToClient::Bye {
+                            reason: format!("🛂 Sorry: {e}."),
+                        });
                         break;
                     }
                 }
             }
-            ToServer::Hello { bot, invite, token, back, tz, .. } if !joined => {
+            ToServer::Hello {
+                bot,
+                invite,
+                token,
+                back,
+                tz,
+                ..
+            } if !joined => {
                 joined = true;
-                events.send(Event::Join { id, bot, invite, token, back, tz, tx: tx.clone() })?;
+                events.send(Event::Join {
+                    id,
+                    bot,
+                    invite,
+                    token,
+                    back,
+                    tz,
+                    tx: tx.clone(),
+                })?;
             }
             ToServer::Cmd { text } if joined => {
                 if pace.take(std::time::Instant::now()) {
                     events.send(Event::Cmd { id, text })?;
                 } else if pace.warn() {
-                    let line = crate::protocol::Line::col(crate::protocol::Col::Dim, "🐢 Slow down a little: the island can't keep up. Try again in a moment.");
+                    let line = crate::protocol::Line::col(
+                        crate::protocol::Col::Dim,
+                        "🐢 Slow down a little: the island can't keep up. Try again in a moment.",
+                    );
                     let _ = tx.send(ToClient::Lines { lines: vec![line] });
                 }
             }
@@ -299,7 +390,10 @@ async fn connection(
     // queue never runs dry by itself: give it a moment to send any last
     // goodbye, then let it go, and the connection with it.
     let mut writer = writer;
-    if tokio::time::timeout(std::time::Duration::from_secs(2), &mut writer).await.is_err() {
+    if tokio::time::timeout(std::time::Duration::from_secs(2), &mut writer)
+        .await
+        .is_err()
+    {
         writer.abort();
     }
     Ok(())
@@ -320,12 +414,17 @@ struct Pace {
 
 impl Pace {
     fn new(now: std::time::Instant) -> Pace {
-        Pace { tokens: PACE_BURST, at: now, warned: false }
+        Pace {
+            tokens: PACE_BURST,
+            at: now,
+            warned: false,
+        }
     }
 
     /// Whether a command may go through now.
     fn take(&mut self, now: std::time::Instant) -> bool {
-        self.tokens = (self.tokens + now.duration_since(self.at).as_secs_f64() * PACE_PER_SEC).min(PACE_BURST);
+        self.tokens = (self.tokens + now.duration_since(self.at).as_secs_f64() * PACE_PER_SEC)
+            .min(PACE_BURST);
         self.at = now;
         if self.tokens >= 1.0 {
             self.tokens -= 1.0;
@@ -369,7 +468,9 @@ const ICON_192: &[u8] = include_bytes!("../../web/icon-192.png");
 pub fn page_version() -> &'static str {
     static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     VERSION.get_or_init(|| {
-        let hash = PAGE.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ b as u64).wrapping_mul(0x0100_0000_01b3));
+        let hash = PAGE.bytes().fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+            (h ^ b as u64).wrapping_mul(0x0100_0000_01b3)
+        });
         format!("{hash:016x}")
     })
 }
@@ -400,12 +501,28 @@ fn manifest(info: &Option<federation::WorldInfo>) -> String {
 
 /// The page, wearing the world's name if it has one.
 fn page(info: &Option<federation::WorldInfo>) -> String {
-    let page = PAGE.replacen(r#"<meta name="world-page" content="">"#, &format!(r#"<meta name="world-page" content="{}">"#, page_version()), 1);
+    let page = PAGE.replacen(
+        r#"<meta name="world-page" content="">"#,
+        &format!(r#"<meta name="world-page" content="{}">"#, page_version()),
+        1,
+    );
     match info {
         Some(i) if i.name != federation::host(&i.url) => {
-            let name = i.name.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
-            page.replacen("<title>world.txt</title>", &format!("<title>{name} · world.txt</title>"), 1)
-                .replacen("<h1>✨ world.txt ✨</h1>", &format!("<h1>✨ {name} ✨</h1>"), 1)
+            let name = i
+                .name
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;");
+            page.replacen(
+                "<title>world.txt</title>",
+                &format!("<title>{name} · world.txt</title>"),
+                1,
+            )
+            .replacen(
+                "<h1>✨ world.txt ✨</h1>",
+                &format!("<h1>✨ {name} ✨</h1>"),
+                1,
+            )
         }
         _ => page,
     }
@@ -488,14 +605,28 @@ fn hook_text(body: &[u8]) -> Option<String> {
         let v: serde_json::Value = serde_json::from_str(raw).ok()?;
         let s = |k: &str| v.get(k).and_then(|t| t.as_str()).map(str::to_string);
         // Pingdom-style alerts: {"current_state": "DOWN", "description": "…"}.
-        let state = s("current_state").map(|st| format!("{st} {}", s("description").or_else(|| s("check_name")).unwrap_or_default()));
-        ["text", "content", "message"].iter().find_map(|k| s(k)).or(state).or_else(|| semaphore(&v))?
+        let state = s("current_state").map(|st| {
+            format!(
+                "{st} {}",
+                s("description")
+                    .or_else(|| s("check_name"))
+                    .unwrap_or_default()
+            )
+        });
+        ["text", "content", "message"]
+            .iter()
+            .find_map(|k| s(k))
+            .or(state)
+            .or_else(|| semaphore(&v))?
     } else {
         raw.to_string()
     };
     let text = crate::links::from_slack(&text);
     // One tidy line: no control characters, runs of space squashed.
-    let text: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let text: String = text
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
     let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
     (!text.is_empty()).then_some(text)
 }
@@ -504,52 +635,121 @@ fn hook_text(body: &[u8]) -> Option<String> {
 /// "project": {"name": …}, "revision": {"branch": {"name": …}}, …}, said as
 /// "failed [web main](https://<org>.semaphoreci.com/workflows/<id>): the commit".
 fn semaphore(v: &serde_json::Value) -> Option<String> {
-    let s = |path: &str| v.pointer(path).and_then(|t| t.as_str()).filter(|t| !t.is_empty());
+    let s = |path: &str| {
+        v.pointer(path)
+            .and_then(|t| t.as_str())
+            .filter(|t| !t.is_empty())
+    };
     let result = s("/pipeline/result")?;
-    let what = [s("/project/name"), s("/revision/branch/name").or(s("/revision/tag/name"))].into_iter().flatten().collect::<Vec<_>>().join(" ");
+    let what = [
+        s("/project/name"),
+        s("/revision/branch/name").or(s("/revision/tag/name")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(" ");
     let what = match (s("/organization/name"), s("/workflow/id")) {
-        (Some(org), Some(id)) if !what.is_empty() => format!("[{what}](https://{org}.semaphoreci.com/workflows/{id})"),
+        (Some(org), Some(id)) if !what.is_empty() => {
+            format!("[{what}](https://{org}.semaphoreci.com/workflows/{id})")
+        }
         _ => what,
     };
-    let commit = s("/revision/commit_message").and_then(|m| m.lines().next()).map(|m| format!(": {m}")).unwrap_or_default();
+    let commit = s("/revision/commit_message")
+        .and_then(|m| m.lines().next())
+        .map(|m| format!(": {m}"))
+        .unwrap_or_default();
     Some(format!("{result} {what}{commit}"))
 }
 
-async fn serve_page(mut stream: TcpStream, info: &Option<federation::WorldInfo>, events: &UnboundedSender<Event>) -> anyhow::Result<()> {
+async fn serve_page(
+    mut stream: TcpStream,
+    info: &Option<federation::WorldInfo>,
+    events: &UnboundedSender<Event>,
+) -> anyhow::Result<()> {
     use tokio::io::AsyncWriteExt;
-    let read = tokio::time::timeout(std::time::Duration::from_secs(10), read_request(&mut stream)).await;
-    let text = |status: &'static str, body: &str| (status, "text/plain; charset=utf-8", format!("{body}\n").into_bytes());
+    let read = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        read_request(&mut stream),
+    )
+    .await;
+    let text = |status: &'static str, body: &str| {
+        (
+            status,
+            "text/plain; charset=utf-8",
+            format!("{body}\n").into_bytes(),
+        )
+    };
     let (status, ctype, body) = match read {
         Err(_) | Ok(Err(ReadError::Bad)) => text("400 Bad Request", "that didn't make sense, babe"),
-        Ok(Err(ReadError::TooBig)) => text("413 Payload Too Large", "that's a lot, babe: keep it under 16KB"),
+        Ok(Err(ReadError::TooBig)) => text(
+            "413 Payload Too Large",
+            "that's a lot, babe: keep it under 16KB",
+        ),
         Ok(Ok(req)) => match (req.method.as_str(), req.path.as_str(), info) {
             ("POST", p, _) if p.starts_with("/hook/") => {
-                let secret = p.trim_start_matches("/hook/").split(['?', '#']).next().unwrap_or("").to_string();
+                let secret = p
+                    .trim_start_matches("/hook/")
+                    .split(['?', '#'])
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
                 match hook_text(&req.body) {
-                    None => text("400 Bad Request", "nothing to post: send some text, or JSON with \"text\""),
+                    None => text(
+                        "400 Bad Request",
+                        "nothing to post: send some text, or JSON with \"text\"",
+                    ),
                     Some(t) => {
                         let (reply, answer) = tokio::sync::oneshot::channel();
-                        events.send(Event::Hook { secret, text: t, reply })?;
+                        events.send(Event::Hook {
+                            secret,
+                            text: t,
+                            reply,
+                        })?;
                         match answer.await {
                             Ok(HookReply::Posted) => text("200 OK", "posted 📌"),
                             Ok(HookReply::Progressed) => text("200 OK", "noted ✨"),
-                            Ok(HookReply::NotProgress) => text("400 Bad Request", "send how far along it is: 37/100, 37%, '3 of 10 photos', or clear"),
-                            Ok(HookReply::NotStatus) => text("400 Bad Request", "send up or down (or ok, failed, passed…), with any words after it, or clear"),
-                            Ok(HookReply::TooFast) => text("429 Too Many Requests", "one at a time, babe: wait a couple of seconds"),
-                            Ok(HookReply::Unknown) | Err(_) => text("404 Not Found", "no hook here (it may have been stopped)"),
+                            Ok(HookReply::NotProgress) => text(
+                                "400 Bad Request",
+                                "send how far along it is: 37/100, 37%, '3 of 10 photos', or clear",
+                            ),
+                            Ok(HookReply::NotStatus) => text(
+                                "400 Bad Request",
+                                "send up or down (or ok, failed, passed…), with any words after it, or clear",
+                            ),
+                            Ok(HookReply::TooFast) => text(
+                                "429 Too Many Requests",
+                                "one at a time, babe: wait a couple of seconds",
+                            ),
+                            Ok(HookReply::Unknown) | Err(_) => {
+                                text("404 Not Found", "no hook here (it may have been stopped)")
+                            }
                         }
                     }
                 }
             }
-            (_, "/" | "/index.html", _) => ("200 OK", "text/html; charset=utf-8", page(info).into_bytes()),
-            (_, "/manifest.webmanifest", _) => ("200 OK", "application/manifest+json", manifest(info).into_bytes()),
+            (_, "/" | "/index.html", _) => (
+                "200 OK",
+                "text/html; charset=utf-8",
+                page(info).into_bytes(),
+            ),
+            (_, "/manifest.webmanifest", _) => (
+                "200 OK",
+                "application/manifest+json",
+                manifest(info).into_bytes(),
+            ),
             (_, "/icon-192.png", _) => ("200 OK", "image/png", ICON_192.to_vec()),
             (_, "/icon-512.png", _) => ("200 OK", "image/png", ICON_512.to_vec()),
-            (_, federation::WELL_KNOWN, Some(info)) => ("200 OK", "application/json", serde_json::to_vec(info)?),
+            (_, federation::WELL_KNOWN, Some(info)) => {
+                ("200 OK", "application/json", serde_json::to_vec(info)?)
+            }
             _ => text("404 Not Found", "nothing here, babe"),
         },
     };
-    let head = format!("HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+    let head = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
     stream.write_all(head.as_bytes()).await?;
     stream.write_all(&body).await?;
     stream.shutdown().await?;
@@ -565,7 +765,10 @@ pub fn invites(db_path: &str) -> anyhow::Result<()> {
         println!("💌 no invites yet");
     }
     for (user, nick, expires, used_at) in list {
-        println!("💌 {nick} ({user}): {}", accounts::invite_state(expires, used_at, now));
+        println!(
+            "💌 {nick} ({user}): {}",
+            accounts::invite_state(expires, used_at, now)
+        );
     }
     Ok(())
 }
@@ -596,8 +799,14 @@ pub fn recommended_stations() -> Vec<(String, String, Option<String>)> {
         .filter_map(|l| {
             let mut parts = l.split('|').map(str::trim);
             let name = parts.next().filter(|n| !n.is_empty())?.to_string();
-            let url = parts.next().filter(|u| u.starts_with("https://"))?.to_string();
-            let guide = parts.next().filter(|g| g.starts_with("https://")).map(str::to_string);
+            let url = parts
+                .next()
+                .filter(|u| u.starts_with("https://"))?
+                .to_string();
+            let guide = parts
+                .next()
+                .filter(|g| g.starts_with("https://"))
+                .map(str::to_string);
             Some((name, url, guide))
         })
         .collect()
@@ -609,9 +818,18 @@ pub fn add_stations(db_path: &str) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
     let list = recommended_stations();
     for (name, url, guide) in &list {
-        db.set_station(&game::clean_station_name(name), url, guide.as_deref(), "world.txt", accounts::now())?;
+        db.set_station(
+            &game::clean_station_name(name),
+            url,
+            guide.as_deref(),
+            "world.txt",
+            accounts::now(),
+        )?;
     }
-    println!("📻 {} stations on the list now. In the world: stations, then tune radio <station>", db.stations()?.len());
+    println!(
+        "📻 {} stations on the list now. In the world: stations, then tune radio <station>",
+        db.stations()?.len()
+    );
     Ok(())
 }
 
@@ -623,27 +841,41 @@ pub fn rename(db_path: &str, name: &str) -> anyhow::Result<()> {
         anyhow::bail!("a world name needs a letter or two, e.g. world.txt rename \"Willow Bank\"");
     }
     db.set_meta(federation::NAME_KEY, &name)?;
-    println!("🌍 this world is called {name} now. Restart it (or run service install again) for it to show.");
+    println!(
+        "🌍 this world is called {name} now. Restart it (or run service install again) for it to show."
+    );
     Ok(())
 }
 
 /// `world.txt invite <nickname> [--keeper]`: a new account and its magic link.
-pub fn invite(db_path: &str, nickname: &str, keeper: bool, url: Option<&str>) -> anyhow::Result<()> {
+pub fn invite(
+    db_path: &str,
+    nickname: &str,
+    keeper: bool,
+    url: Option<&str>,
+) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
     let nick = names_clean(nickname);
     if nick.is_empty() {
         anyhow::bail!("nicknames need a letter or two");
     }
     if !db.matching_users(&nick)?.is_empty() {
-        anyhow::bail!("someone's already called {nick}. For their new device: world.txt link {nick}");
+        anyhow::bail!(
+            "someone's already called {nick}. For their new device: world.txt link {nick}"
+        );
     }
     let user = accounts::create_account(&db, &nick, keeper)?;
     let token = accounts::issue_invite(&db, &user)?;
     let role = if keeper { " (island keeper)" } else { "" };
-    println!("💌 {nick} is {user}{role}. Their magic link (one use, within {} days):", accounts::INVITE_DAYS);
+    println!(
+        "💌 {nick} is {user}{role}. Their magic link (one use, within {} days):",
+        accounts::INVITE_DAYS
+    );
     println!("   {}", accounts::link(url, &token));
     if url.is_none() {
-        println!("   (replace <world address> with how they reach the world, or pass --url / WORLD_URL)");
+        println!(
+            "   (replace <world address> with how they reach the world, or pass --url / WORLD_URL)"
+        );
     }
     for l in accounts::how_to_join(url, &token) {
         println!("   {l}");
@@ -656,7 +888,11 @@ pub fn link(db_path: &str, name: &str, url: Option<&str>) -> anyhow::Result<()> 
     let db = db::Db::open(db_path)?;
     let user = one_user(&db, name)?;
     let token = accounts::issue_invite(&db, &user)?;
-    println!("💌 A new link for {} ({user}), one use, within {} days:", db.nickname(&user).unwrap_or_default(), accounts::INVITE_DAYS);
+    println!(
+        "💌 A new link for {} ({user}), one use, within {} days:",
+        db.nickname(&user).unwrap_or_default(),
+        accounts::INVITE_DAYS
+    );
     println!("   {}", accounts::link(url, &token));
     for l in accounts::how_to_join(url, &token) {
         println!("   {l}");
@@ -670,14 +906,24 @@ fn one_user(db: &db::Db, name: &str) -> anyhow::Result<String> {
     match found.as_slice() {
         [] => anyhow::bail!("there's nobody called {name}"),
         [one] => Ok(one.clone()),
-        many => anyhow::bail!("'{name}' could be any of: {} (use their username)", many.join(", ")),
+        many => anyhow::bail!(
+            "'{name}' could be any of: {} (use their username)",
+            many.join(", ")
+        ),
     }
 }
 
 fn names_clean(raw: &str) -> String {
-    let n: String = raw.trim().chars().filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_').take(16).collect();
+    let n: String = raw
+        .trim()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .take(16)
+        .collect();
     let mut c = n.chars();
-    c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+    c.next()
+        .map(|f| f.to_uppercase().chain(c).collect())
+        .unwrap_or_default()
 }
 
 /// `world.txt promote <name>`: the server's machine can always make a keeper.
@@ -685,7 +931,10 @@ pub fn promote(db_path: &str, name: &str) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
     let user = one_user(&db, name)?;
     db.set_keeper(&user, true)?;
-    println!("🗝  {} ({user}) is an island keeper now.", db.nickname(&user).unwrap_or_default());
+    println!(
+        "🗝  {} ({user}) is an island keeper now.",
+        db.nickname(&user).unwrap_or_default()
+    );
     Ok(())
 }
 
@@ -693,12 +942,21 @@ pub fn promote(db_path: &str, name: &str) -> anyhow::Result<()> {
 /// existing Island Journal (safe to run again).
 pub fn backfill_journal(db_path: &str) -> anyhow::Result<()> {
     let db = db::Db::open(db_path)?;
-    let Some(board) = db.things()?.into_iter().find(|t| t.kind.as_deref() == Some("journal")).map(|t| t.id) else {
-        println!("There's no Island Journal yet: it's put up (and filled in) the first time the world starts.");
+    let Some(board) = db
+        .things()?
+        .into_iter()
+        .find(|t| t.kind.as_deref() == Some("journal"))
+        .map(|t| t.id)
+    else {
+        println!(
+            "There's no Island Journal yet: it's put up (and filled in) the first time the world starts."
+        );
         return Ok(());
     };
     let added = game::backfill_journal(&db, board)?;
-    println!("📖 wrote {added} past discoveries into the Island Journal (earlier weeks are in its archive).");
+    println!(
+        "📖 wrote {added} past discoveries into the Island Journal (earlier weeks are in its archive)."
+    );
     Ok(())
 }
 
@@ -711,7 +969,13 @@ mod tests {
         let v = page_version();
         assert_eq!(v.len(), 16);
         assert!(page(&None).contains(&format!(r#"<meta name="world-page" content="{v}">"#)));
-        let json = serde_json::to_string(&crate::protocol::ToClient::Welcome { token: None, user: "u".into(), nickname: "Sam".into(), page: Some(v.into()) }).unwrap();
+        let json = serde_json::to_string(&crate::protocol::ToClient::Welcome {
+            token: None,
+            user: "u".into(),
+            nickname: "Sam".into(),
+            page: Some(v.into()),
+        })
+        .unwrap();
         assert!(json.contains(v));
     }
 
@@ -722,9 +986,19 @@ mod tests {
         let mut names = std::collections::HashSet::new();
         for (name, url, guide) in &list {
             assert!(names.insert(name.to_lowercase()), "{name} twice");
-            assert_eq!(name, &game::clean_station_name(name), "{name} isn't a tidy name");
-            assert!(url.starts_with("https://") && !url.contains(' '), "{name}: {url}");
-            assert!(guide.as_deref().is_none_or(|g| g.starts_with("https://")), "{name}");
+            assert_eq!(
+                name,
+                &game::clean_station_name(name),
+                "{name} isn't a tidy name"
+            );
+            assert!(
+                url.starts_with("https://") && !url.contains(' '),
+                "{name}: {url}"
+            );
+            assert!(
+                guide.as_deref().is_none_or(|g| g.starts_with("https://")),
+                "{name}"
+            );
         }
     }
 
@@ -732,16 +1006,30 @@ mod tests {
     fn music_for_a_stalled_listener_is_dropped_but_words_still_go() {
         let (raw, mut rx) = mpsc::unbounded_channel();
         let tx = ClientTx::new(raw);
-        let audio = || ToClient::Audio { thing: 1, frames: vec!["AAAA".into()], gain: 1.0, title: None };
+        let audio = || ToClient::Audio {
+            thing: 1,
+            frames: vec!["AAAA".into()],
+            gain: 1.0,
+            title: None,
+        };
         for _ in 0..MAX_AUDIO_QUEUED + 10 {
             tx.send(audio()).unwrap();
         }
-        tx.send(ToClient::Bye { reason: "still gets through".into() }).unwrap();
+        tx.send(ToClient::Bye {
+            reason: "still gets through".into(),
+        })
+        .unwrap();
         let mut queued = Vec::new();
         while let Ok(m) = rx.try_recv() {
             queued.push(m);
         }
-        assert_eq!(queued.iter().filter(|m| matches!(m, ToClient::Audio { .. })).count(), MAX_AUDIO_QUEUED);
+        assert_eq!(
+            queued
+                .iter()
+                .filter(|m| matches!(m, ToClient::Audio { .. }))
+                .count(),
+            MAX_AUDIO_QUEUED
+        );
         assert!(matches!(queued.last(), Some(ToClient::Bye { .. })));
         // Once the writer catches up, music flows again.
         for m in &queued {
@@ -752,7 +1040,19 @@ mod tests {
     }
 
     fn status() -> ToClient {
-        ToClient::Status { place: String::new(), weather: String::new(), clock: String::new(), map: vec![], here: vec![], humans: 1, people: vec![], progress: vec![], lights: vec![], sounds: Default::default(), actions: vec![] }
+        ToClient::Status {
+            place: String::new(),
+            weather: String::new(),
+            clock: String::new(),
+            map: vec![],
+            here: vec![],
+            humans: 1,
+            people: vec![],
+            progress: vec![],
+            lights: vec![],
+            sounds: Default::default(),
+            actions: vec![],
+        }
     }
     fn words() -> ToClient {
         ToClient::Lines { lines: vec![] }
@@ -782,11 +1082,27 @@ mod tests {
 
     #[test]
     fn hooks_take_plain_text_or_slack_or_discord_json() {
-        assert_eq!(hook_text(b"pizza is here \xF0\x9F\x8D\x95").as_deref(), Some("pizza is here 🍕"));
-        assert_eq!(hook_text(br#"{"text":"the kettle has boiled"}"#).as_deref(), Some("the kettle has boiled"));
-        assert_eq!(hook_text(br#"{"content":"hi from discord","username":"x"}"#).as_deref(), Some("hi from discord"));
-        assert_eq!(hook_text(b"two\nlines\r\n  and   spaces").as_deref(), Some("two lines and spaces"));
-        assert_eq!(hook_text(br#"{"check_name":"site","current_state":"DOWN","description":"timeout"}"#).as_deref(), Some("DOWN timeout"));
+        assert_eq!(
+            hook_text(b"pizza is here \xF0\x9F\x8D\x95").as_deref(),
+            Some("pizza is here 🍕")
+        );
+        assert_eq!(
+            hook_text(br#"{"text":"the kettle has boiled"}"#).as_deref(),
+            Some("the kettle has boiled")
+        );
+        assert_eq!(
+            hook_text(br#"{"content":"hi from discord","username":"x"}"#).as_deref(),
+            Some("hi from discord")
+        );
+        assert_eq!(
+            hook_text(b"two\nlines\r\n  and   spaces").as_deref(),
+            Some("two lines and spaces")
+        );
+        assert_eq!(
+            hook_text(br#"{"check_name":"site","current_state":"DOWN","description":"timeout"}"#)
+                .as_deref(),
+            Some("DOWN timeout")
+        );
         assert_eq!(
             hook_text(br#"{"version":"1.0.0","organization":{"name":"acme","id":"o"},"project":{"name":"web","id":"p"},"revision":{"tag":null,"branch":{"name":"main"},"commit_message":"Fix the thing\n\nmore"},"workflow":{"id":"w1"},"pipeline":{"state":"done","result":"failed"}}"#).as_deref(),
             Some("failed [web main](https://acme.semaphoreci.com/workflows/w1): Fix the thing")
@@ -800,11 +1116,17 @@ mod tests {
     fn commands_go_at_a_gentle_pace() {
         let start = std::time::Instant::now();
         let mut pace = Pace::new(start);
-        assert!((0..20).all(|_| pace.take(start)), "a rush of twenty is fine");
+        assert!(
+            (0..20).all(|_| pace.take(start)),
+            "a rush of twenty is fine"
+        );
         assert!(!pace.take(start), "the twenty-first waits");
         assert!(pace.warn() && !pace.warn(), "said once, not every time");
         let later = start + std::time::Duration::from_millis(500);
-        assert!(pace.take(later) && pace.take(later), "two more half a second later");
+        assert!(
+            pace.take(later) && pace.take(later),
+            "two more half a second later"
+        );
         assert!(!pace.take(later));
         assert!(pace.warn(), "running out again is said again");
     }
@@ -816,14 +1138,25 @@ mod tests {
         let addr = listener.local_addr().unwrap();
         let client = tokio::spawn(async move {
             let mut c = TcpStream::connect(addr).await.unwrap();
-            c.write_all(b"POST /hook/abc HTTP/1.1\r\nHost: x\r\nContent-Length: 11\r\n\r\nhello").await.unwrap();
+            c.write_all(b"POST /hook/abc HTTP/1.1\r\nHost: x\r\nContent-Length: 11\r\n\r\nhello")
+                .await
+                .unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             c.write_all(b" world").await.unwrap();
             c
         });
         let (mut s, _) = listener.accept().await.unwrap();
-        let Ok(req) = read_request(&mut s).await else { panic!("couldn't read it") };
-        assert_eq!(req, Request { method: "POST".into(), path: "/hook/abc".into(), body: b"hello world".to_vec() });
+        let Ok(req) = read_request(&mut s).await else {
+            panic!("couldn't read it")
+        };
+        assert_eq!(
+            req,
+            Request {
+                method: "POST".into(),
+                path: "/hook/abc".into(),
+                body: b"hello world".to_vec()
+            }
+        );
         drop(client.await);
     }
 

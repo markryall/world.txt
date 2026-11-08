@@ -49,7 +49,9 @@ impl Jukebox {
     /// if they have more.
     fn next(&mut self) -> Option<(u64, Queued)> {
         while let Some(who) = self.turns.pop_front() {
-            let Some(q) = self.songs.get_mut(&who) else { continue };
+            let Some(q) = self.songs.get_mut(&who) else {
+                continue;
+            };
             let Some(song) = q.pop_front() else { continue };
             if q.is_empty() {
                 self.songs.remove(&who);
@@ -87,7 +89,11 @@ impl Jukebox {
 impl Game {
     fn jukebox_here(&self, id: u64) -> Option<i64> {
         let p = self.players.get(&id)?;
-        self.world.things.iter().find(|t| t.x == p.x && t.y == p.y && t.kind.as_deref() == Some(KIND)).map(|t| t.id)
+        self.world
+            .things
+            .iter()
+            .find(|t| t.x == p.x && t.y == p.y && t.kind.as_deref() == Some(KIND))
+            .map(|t| t.id)
     }
 
     pub(super) fn has_jukebox_here(&self, id: u64) -> bool {
@@ -96,18 +102,30 @@ impl Game {
 
     /// Would `skip` mean a jukebox song (one playing here, or their own)?
     pub(super) fn juke_skippable(&self, id: u64) -> bool {
-        let here = self.jukebox_here(id).and_then(|t| self.jukes.get(&t)).is_some_and(|j| j.now.is_some());
-        here || self.jukes.values().any(|j| j.now.as_ref().is_some_and(|n| n.host == id))
+        let here = self
+            .jukebox_here(id)
+            .and_then(|t| self.jukes.get(&t))
+            .is_some_and(|j| j.now.is_some());
+        here || self
+            .jukes
+            .values()
+            .any(|j| j.now.as_ref().is_some_and(|n| n.host == id))
     }
 
     /// `add songs`: open the song picker in this browser.
     pub(super) fn cmd_add_songs(&mut self, id: u64) -> anyhow::Result<()> {
         let Some(thing) = self.jukebox_here(id) else {
-            self.say1(id, Line::plain("There's no jukebox here. Try 'make a jukebox'!"));
+            self.say1(
+                id,
+                Line::plain("There's no jukebox here. Try 'make a jukebox'!"),
+            );
             return Ok(());
         };
         if self.players[&id].bot {
-            self.say1(id, Line::plain("Jukeboxes play songs from someone's own computer, in the browser."));
+            self.say1(
+                id,
+                Line::plain("Jukeboxes play songs from someone's own computer, in the browser."),
+            );
             return Ok(());
         }
         if let Some(p) = self.players.get(&id) {
@@ -119,15 +137,24 @@ impl Game {
 
     /// Songs a browser has picked for a jukebox (titles only).
     pub(super) fn queue_songs(&mut self, id: u64, thing: i64, songs: Vec<Song>) {
-        let Some(p) = self.players.get(&id) else { return };
-        let near = self.world.things.iter().any(|t| t.id == thing && t.kind.as_deref() == Some(KIND) && t.x == p.x && t.y == p.y);
+        let Some(p) = self.players.get(&id) else {
+            return;
+        };
+        let near =
+            self.world.things.iter().any(|t| {
+                t.id == thing && t.kind.as_deref() == Some(KIND) && t.x == p.x && t.y == p.y
+            });
         if !near {
             self.say1(id, Line::plain("Stand at the jukebox to add songs."));
             return;
         }
         let songs: Vec<Queued> = songs
             .into_iter()
-            .filter(|s| !s.key.is_empty() && s.key.len() <= 40 && s.key.chars().all(|c| c.is_ascii_alphanumeric()))
+            .filter(|s| {
+                !s.key.is_empty()
+                    && s.key.len() <= 40
+                    && s.key.chars().all(|c| c.is_ascii_alphanumeric())
+            })
             .filter_map(|s| clean_title(&s.title).map(|title| Queued { key: s.key, title }))
             .collect();
         let added = self.jukes.entry(thing).or_default().add(id, songs);
@@ -139,9 +166,23 @@ impl Game {
         };
         self.say1(id, Line::col(Col::Pink, msg));
         if added > 0
-            && let Some((x, y)) = self.world.things.iter().find(|t| t.id == thing).map(|t| (t.x, t.y)) {
-                self.tell_here(x, y, id, Line::col(Col::Pink, format!("📀 {who} adds some songs to the jukebox.")));
-            }
+            && let Some((x, y)) = self
+                .world
+                .things
+                .iter()
+                .find(|t| t.id == thing)
+                .map(|t| (t.x, t.y))
+        {
+            self.tell_here(
+                x,
+                y,
+                id,
+                Line::col(
+                    Col::Pink,
+                    format!("📀 {who} adds some songs to the jukebox."),
+                ),
+            );
+        }
         if self.jukes.get(&thing).is_some_and(|j| j.now.is_none()) {
             self.juke_next(thing);
         }
@@ -159,7 +200,9 @@ impl Game {
         // At most one pass through the queue, in case everyone's busy.
         let tries = self.jukes.get(&thing).map_or(0, |j| j.turns.len());
         for _ in 0..=tries {
-            let Some(juke) = self.jukes.get_mut(&thing) else { return };
+            let Some(juke) = self.jukes.get_mut(&thing) else {
+                return;
+            };
             let Some((host, song)) = juke.next() else {
                 // Nothing left: the listeners can let go.
                 for p in self.players.values() {
@@ -177,14 +220,37 @@ impl Game {
                 }
                 continue;
             }
-            juke.now = Some(Playing { host, key: song.key.clone(), title: song.title.clone(), heard: Instant::now() });
-            self.spins.insert(thing, Spin { host, title: Some(song.title.clone()), jukebox: true });
+            juke.now = Some(Playing {
+                host,
+                key: song.key.clone(),
+                title: song.title.clone(),
+                heard: Instant::now(),
+            });
+            self.spins.insert(
+                thing,
+                Spin {
+                    host,
+                    title: Some(song.title.clone()),
+                    jukebox: true,
+                },
+            );
             let who = self.players[&host].name.clone();
             if let Some(p) = self.players.get(&host) {
-                let _ = p.tx.send(ToClient::JukeTurn { thing, key: song.key });
-                let _ = p.tx.send(ToClient::Lines { lines: vec![Line::col(Col::Pink, format!("📀 Your turn! The jukebox is playing {}.", song.title))] });
+                let _ = p.tx.send(ToClient::JukeTurn {
+                    thing,
+                    key: song.key,
+                });
+                let _ = p.tx.send(ToClient::Lines {
+                    lines: vec![Line::col(
+                        Col::Pink,
+                        format!("📀 Your turn! The jukebox is playing {}.", song.title),
+                    )],
+                });
             }
-            let line = Line::new().c(Col::Pink, "🎶 Now playing on the jukebox: ").b(Col::Pink, song.title).c(Col::Pink, format!(" (from {who})"));
+            let line = Line::new()
+                .c(Col::Pink, "🎶 Now playing on the jukebox: ")
+                .b(Col::Pink, song.title)
+                .c(Col::Pink, format!(" (from {who})"));
             self.tell_earshot(thing, host, line);
             return;
         }
@@ -192,7 +258,11 @@ impl Game {
 
     /// A browser's song finished.
     pub(super) fn track_done(&mut self, id: u64, thing: i64, key: &str) {
-        let playing = self.jukes.get(&thing).and_then(|j| j.now.as_ref()).is_some_and(|n| n.host == id && n.key == key);
+        let playing = self
+            .jukes
+            .get(&thing)
+            .and_then(|j| j.now.as_ref())
+            .is_some_and(|n| n.host == id && n.key == key);
         if playing {
             self.juke_next(thing);
         }
@@ -210,11 +280,19 @@ impl Game {
         let quiet: Vec<i64> = self
             .jukes
             .iter()
-            .filter(|(_, j)| j.now.as_ref().is_some_and(|n| n.heard.elapsed() > QUIET_FOR))
+            .filter(|(_, j)| {
+                j.now
+                    .as_ref()
+                    .is_some_and(|n| n.heard.elapsed() > QUIET_FOR)
+            })
             .map(|(t, _)| *t)
             .collect();
         for thing in quiet {
-            self.tell_earshot(thing, u64::MAX, Line::col(Col::Dim, "📀 The jukebox skips: that song's gone quiet."));
+            self.tell_earshot(
+                thing,
+                u64::MAX,
+                Line::col(Col::Dim, "📀 The jukebox skips: that song's gone quiet."),
+            );
             self.juke_next(thing);
         }
     }
@@ -222,20 +300,46 @@ impl Game {
     /// `jukebox`: what's playing and what's coming.
     pub(super) fn cmd_jukebox(&mut self, id: u64) -> anyhow::Result<()> {
         let Some(thing) = self.jukebox_here(id) else {
-            self.say1(id, Line::plain("There's no jukebox here. Try 'make a jukebox'!"));
+            self.say1(
+                id,
+                Line::plain("There's no jukebox here. Try 'make a jukebox'!"),
+            );
             return Ok(());
         };
-        let name = |pid: &u64| self.players.get(pid).map_or("someone".to_string(), |p| p.name.clone());
+        let name = |pid: &u64| {
+            self.players
+                .get(pid)
+                .map_or("someone".to_string(), |p| p.name.clone())
+        };
         let mut lines = vec![Line::new().b(Col::Magenta, "📀 The jukebox")];
         let juke = self.jukes.get(&thing);
         match juke.and_then(|j| j.now.as_ref()) {
-            Some(n) => lines.push(Line::new().c(Col::Pink, "  now: ").b(Col::Pink, &n.title).c(Col::Dim, format!(" (from {})", name(&n.host)))),
-            None => lines.push(Line::col(Col::Dim, "  Nothing playing. 'add songs' to start it off!")),
+            Some(n) => lines.push(
+                Line::new()
+                    .c(Col::Pink, "  now: ")
+                    .b(Col::Pink, &n.title)
+                    .c(Col::Dim, format!(" (from {})", name(&n.host))),
+            ),
+            None => lines.push(Line::col(
+                Col::Dim,
+                "  Nothing playing. 'add songs' to start it off!",
+            )),
         }
         if let Some(j) = juke {
             // The order they'll come in: one each, round and round.
-            let mut queues: Vec<(u64, Vec<&str>)> =
-                j.turns.iter().map(|w| (*w, j.songs.get(w).map(|q| q.iter().map(|s| s.title.as_str()).collect()).unwrap_or_default())).collect();
+            let mut queues: Vec<(u64, Vec<&str>)> = j
+                .turns
+                .iter()
+                .map(|w| {
+                    (
+                        *w,
+                        j.songs
+                            .get(w)
+                            .map(|q| q.iter().map(|s| s.title.as_str()).collect())
+                            .unwrap_or_default(),
+                    )
+                })
+                .collect();
             let mut upcoming = Vec::new();
             while upcoming.len() < 8 && queues.iter().any(|(_, q)| !q.is_empty()) {
                 for (w, q) in queues.iter_mut() {
@@ -245,7 +349,12 @@ impl Game {
                 }
             }
             for (i, (w, title)) in upcoming.iter().enumerate() {
-                lines.push(Line::new().c(Col::Dim, format!("  {}. ", i + 1)).c(Col::Yellow, *title).c(Col::Dim, format!(" (from {})", name(w))));
+                lines.push(
+                    Line::new()
+                        .c(Col::Dim, format!("  {}. ", i + 1))
+                        .c(Col::Yellow, *title)
+                        .c(Col::Dim, format!(" (from {})", name(w))),
+                );
             }
         }
         lines.push(Line::col(Col::Dim, "  add songs · skip · unqueue"));
@@ -255,21 +364,41 @@ impl Game {
 
     /// `skip`: the song's owner, or a keeper.
     pub(super) fn cmd_skip_song(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some(thing) = self.jukebox_here(id).or_else(|| self.jukes.iter().find(|(_, j)| j.now.as_ref().is_some_and(|n| n.host == id)).map(|(t, _)| *t)) else {
+        let Some(thing) = self.jukebox_here(id).or_else(|| {
+            self.jukes
+                .iter()
+                .find(|(_, j)| j.now.as_ref().is_some_and(|n| n.host == id))
+                .map(|(t, _)| *t)
+        }) else {
             self.say1(id, Line::plain("There's no jukebox here."));
             return Ok(());
         };
-        let Some(host) = self.jukes.get(&thing).and_then(|j| j.now.as_ref()).map(|n| n.host) else {
+        let Some(host) = self
+            .jukes
+            .get(&thing)
+            .and_then(|j| j.now.as_ref())
+            .map(|n| n.host)
+        else {
             self.say1(id, Line::plain("Nothing's playing."));
             return Ok(());
         };
         if host != id && !self.is_keeper(&self.user(id)) {
-            let owner = self.players.get(&host).map_or("whoever chose it".to_string(), |p| p.name.clone());
-            self.say1(id, Line::plain(format!("It's {owner}'s song, so only {owner} can skip it.")));
+            let owner = self
+                .players
+                .get(&host)
+                .map_or("whoever chose it".to_string(), |p| p.name.clone());
+            self.say1(
+                id,
+                Line::plain(format!("It's {owner}'s song, so only {owner} can skip it.")),
+            );
             return Ok(());
         }
         let who = self.players[&id].name.clone();
-        self.tell_earshot(thing, u64::MAX, Line::col(Col::Dim, format!("📀 {who} skips to the next song.")));
+        self.tell_earshot(
+            thing,
+            u64::MAX,
+            Line::col(Col::Dim, format!("📀 {who} skips to the next song.")),
+        );
         self.juke_next(thing);
         Ok(())
     }
@@ -288,7 +417,12 @@ impl Game {
 
     /// Someone left: their songs go, and if one was playing, the next comes on.
     pub(super) fn juke_leave(&mut self, id: u64) {
-        let playing: Vec<i64> = self.jukes.iter().filter(|(_, j)| j.now.as_ref().is_some_and(|n| n.host == id)).map(|(t, _)| *t).collect();
+        let playing: Vec<i64> = self
+            .jukes
+            .iter()
+            .filter(|(_, j)| j.now.as_ref().is_some_and(|n| n.host == id))
+            .map(|(t, _)| *t)
+            .collect();
         for j in self.jukes.values_mut() {
             j.remove(id);
         }
@@ -317,7 +451,13 @@ mod tests {
     use super::*;
 
     fn songs(names: &[&str]) -> Vec<Queued> {
-        names.iter().map(|n| Queued { key: n.to_string(), title: n.to_string() }).collect()
+        names
+            .iter()
+            .map(|n| Queued {
+                key: n.to_string(),
+                title: n.to_string(),
+            })
+            .collect()
     }
 
     #[test]
@@ -335,7 +475,12 @@ mod tests {
         let mut j = Jukebox::default();
         j.add(1, songs(&["p1", "p2"]));
         let (host, first) = j.next().unwrap();
-        j.now = Some(Playing { host, key: first.key, title: first.title, heard: Instant::now() });
+        j.now = Some(Playing {
+            host,
+            key: first.key,
+            title: first.title,
+            heard: Instant::now(),
+        });
         j.add(2, songs(&["s1"]));
         let order: Vec<String> = std::iter::from_fn(|| j.next().map(|(_, s)| s.title)).collect();
         assert_eq!(order, ["s1", "p2"]);
@@ -345,7 +490,13 @@ mod tests {
     fn nobody_can_flood_it_and_leaving_takes_your_songs() {
         let mut j = Jukebox::default();
         let many: Vec<String> = (0..30).map(|i| format!("x{i}")).collect();
-        assert_eq!(j.add(1, songs(&many.iter().map(String::as_str).collect::<Vec<_>>())), MAX_QUEUED);
+        assert_eq!(
+            j.add(
+                1,
+                songs(&many.iter().map(String::as_str).collect::<Vec<_>>())
+            ),
+            MAX_QUEUED
+        );
         assert_eq!(j.add(1, songs(&["more"])), 0);
         j.add(2, songs(&["s1"]));
         assert_eq!(j.remove(1), MAX_QUEUED);

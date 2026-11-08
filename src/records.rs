@@ -22,7 +22,9 @@ const GRAMOPHONE_MAX: usize = 500;
 /// every 200ms.
 const BATCH: usize = 50;
 const SEND_EVERY: Duration = Duration::from_millis(200);
-const AUDIO: &[&str] = &["mp3", "m4a", "aac", "flac", "ogg", "opus", "wav", "aiff", "aif", "alac", "wma"];
+const AUDIO: &[&str] = &[
+    "mp3", "m4a", "aac", "flac", "ogg", "opus", "wav", "aiff", "aif", "alac", "wma",
+];
 
 /// What the record player has to tell the client.
 #[derive(Debug)]
@@ -47,7 +49,14 @@ pub struct Records {
 impl Records {
     pub fn new() -> (Self, mpsc::UnboundedReceiver<Played>) {
         let (tx, rx) = mpsc::unbounded_channel();
-        (Records { ffmpeg: find("ffmpeg"), tx, playing: None }, rx)
+        (
+            Records {
+                ffmpeg: find("ffmpeg"),
+                tx,
+                playing: None,
+            },
+            rx,
+        )
     }
 
     pub fn can_play(&self) -> bool {
@@ -73,7 +82,9 @@ impl Records {
     fn start(&mut self, files: Vec<PathBuf>, turn: Option<(i64, String)>) {
         self.stop();
         let Some(ffmpeg) = self.ffmpeg.clone() else {
-            let _ = self.tx.send(Played::Note(format!("🎶 To play songs from the terminal: {INSTALL}, then world.txt play again.")));
+            let _ = self.tx.send(Played::Note(format!(
+                "🎶 To play songs from the terminal: {INSTALL}, then world.txt play again."
+            )));
             if let Some((thing, key)) = turn {
                 let _ = self.tx.send(Played::Done { thing, key });
             }
@@ -92,7 +103,9 @@ impl Records {
                         any |= play(&ffmpeg, f, &tx).await;
                     }
                     if !any {
-                        let _ = tx.send(Played::Note("🎶 None of those would play. 'stop music' to stop.".into()));
+                        let _ = tx.send(Played::Note(
+                            "🎶 None of those would play. 'stop music' to stop.".into(),
+                        ));
                         break;
                     }
                 },
@@ -109,7 +122,10 @@ impl Drop for Records {
 
 /// The song's name, from its file.
 pub fn title(path: &Path) -> String {
-    path.file_stem().map_or_else(|| "a song".to_string(), |s| s.to_string_lossy().chars().take(200).collect())
+    path.file_stem().map_or_else(
+        || "a song".to_string(),
+        |s| s.to_string_lossy().chars().take(200).collect(),
+    )
 }
 
 /// Play one file to the world; false if it wouldn't play at all.
@@ -118,15 +134,34 @@ async fn play(ffmpeg: &Path, file: &Path, tx: &mpsc::UnboundedSender<Played>) ->
     let child = Command::new(ffmpeg)
         .args(["-nostdin", "-loglevel", "error", "-re", "-i"])
         .arg(file)
-        .args(["-vn", "-ac", "2", "-ar", "48000", "-c:a", "libopus", "-b:a", "96k", "-frame_duration", "20", "-f", "ogg", "pipe:1"])
+        .args([
+            "-vn",
+            "-ac",
+            "2",
+            "-ar",
+            "48000",
+            "-c:a",
+            "libopus",
+            "-b:a",
+            "96k",
+            "-frame_duration",
+            "20",
+            "-f",
+            "ogg",
+            "pipe:1",
+        ])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true)
         .spawn();
     let Ok(mut child) = child else { return false };
-    let Some(mut out) = child.stdout.take() else { return false };
-    let _ = tx.send(Played::Track { title: title.clone() });
+    let Some(mut out) = child.stdout.take() else {
+        return false;
+    };
+    let _ = tx.send(Played::Track {
+        title: title.clone(),
+    });
     let mut ogg = OggReader::default();
     let mut pending: Vec<String> = Vec::new();
     let mut sent = false;
@@ -149,7 +184,10 @@ async fn play(ffmpeg: &Path, file: &Path, tx: &mpsc::UnboundedSender<Played>) ->
     }
     if !pending.is_empty() {
         sent = true;
-        let _ = tx.send(Played::Frames { frames: pending, title: title.clone() });
+        let _ = tx.send(Played::Frames {
+            frames: pending,
+            title: title.clone(),
+        });
     }
     let _ = child.wait().await;
     if !sent {
@@ -163,11 +201,19 @@ async fn play(ffmpeg: &Path, file: &Path, tx: &mpsc::UnboundedSender<Played>) ->
 pub fn songs(raw: &str, max: usize) -> Result<Vec<PathBuf>, String> {
     let raw = raw.trim();
     let whole = expand(raw);
-    let words = if whole.exists() { vec![whole] } else { split(raw).iter().map(|w| expand(w)).collect() };
+    let words = if whole.exists() {
+        vec![whole]
+    } else {
+        split(raw).iter().map(|w| expand(w)).collect()
+    };
     let mut out = Vec::new();
     for w in words {
         if w.is_dir() {
-            let mut inside: Vec<PathBuf> = std::fs::read_dir(&w).map_err(|e| format!("Couldn't look in {}: {e}", w.display()))?.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| is_audio(p)).collect();
+            let mut inside: Vec<PathBuf> = std::fs::read_dir(&w)
+                .map_err(|e| format!("Couldn't look in {}: {e}", w.display()))?
+                .filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| is_audio(p))
+                .collect();
             inside.sort();
             out.extend(inside);
         } else if w.is_file() {
@@ -184,12 +230,16 @@ pub fn songs(raw: &str, max: usize) -> Result<Vec<PathBuf>, String> {
 }
 
 fn is_audio(p: &Path) -> bool {
-    p.is_file() && p.extension().and_then(|e| e.to_str()).is_some_and(|e| AUDIO.contains(&e.to_lowercase().as_str()))
+    p.is_file()
+        && p.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| AUDIO.contains(&e.to_lowercase().as_str()))
 }
 
 fn expand(w: &str) -> PathBuf {
     match w.strip_prefix("~/") {
-        Some(rest) => std::env::var_os("HOME").map_or_else(|| PathBuf::from(w), |h| PathBuf::from(h).join(rest)),
+        Some(rest) => std::env::var_os("HOME")
+            .map_or_else(|| PathBuf::from(w), |h| PathBuf::from(h).join(rest)),
         None => PathBuf::from(w),
     }
 }
@@ -223,9 +273,16 @@ fn base64(bytes: &[u8]) -> String {
     const ABC: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
-        let n = chunk.iter().enumerate().fold(0u32, |n, (i, &b)| n | (b as u32) << (16 - 8 * i));
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &b)| n | (b as u32) << (16 - 8 * i));
         for i in 0..4 {
-            out.push(if i <= chunk.len() { ABC[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
+            out.push(if i <= chunk.len() {
+                ABC[(n >> (18 - 6 * i) & 63) as usize] as char
+            } else {
+                '='
+            });
         }
     }
     out
@@ -278,7 +335,8 @@ impl OggReader {
             }
             let mut at = 27 + segs;
             for l in lacing {
-                self.packet.extend_from_slice(&self.buf[at..at + l as usize]);
+                self.packet
+                    .extend_from_slice(&self.buf[at..at + l as usize]);
                 at += l as usize;
                 if l < 255 {
                     let p = std::mem::take(&mut self.packet);
@@ -334,15 +392,39 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("world-records-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("Album One")).unwrap();
-        for f in ["Album One/02 b.mp3", "Album One/01 a.flac", "Album One/cover.jpg", "A Little Tune.mp3"] {
+        for f in [
+            "Album One/02 b.mp3",
+            "Album One/01 a.flac",
+            "Album One/cover.jpg",
+            "A Little Tune.mp3",
+        ] {
             std::fs::write(dir.join(f), b"").unwrap();
         }
         let d = dir.display();
-        let names = |v: Vec<PathBuf>| v.iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect::<Vec<_>>();
-        assert_eq!(names(songs(&format!("{d}/Album One"), 20).unwrap()), ["01 a.flac", "02 b.mp3"], "a folder's songs, in order");
-        assert_eq!(names(songs(&format!("{d}/A Little Tune.mp3"), 20).unwrap()), ["A Little Tune.mp3"], "spaces without quoting");
-        assert_eq!(names(songs(&format!(r"{d}/A\ Little\ Tune.mp3 '{d}/Album One'"), 20).unwrap()).len(), 3);
-        assert_eq!(songs(&format!("{d}/Album One"), 1).unwrap().len(), 1, "within the limit");
+        let names = |v: Vec<PathBuf>| {
+            v.iter()
+                .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            names(songs(&format!("{d}/Album One"), 20).unwrap()),
+            ["01 a.flac", "02 b.mp3"],
+            "a folder's songs, in order"
+        );
+        assert_eq!(
+            names(songs(&format!("{d}/A Little Tune.mp3"), 20).unwrap()),
+            ["A Little Tune.mp3"],
+            "spaces without quoting"
+        );
+        assert_eq!(
+            names(songs(&format!(r"{d}/A\ Little\ Tune.mp3 '{d}/Album One'"), 20).unwrap()).len(),
+            3
+        );
+        assert_eq!(
+            songs(&format!("{d}/Album One"), 1).unwrap().len(),
+            1,
+            "within the limit"
+        );
         assert!(songs(&format!("{d}/nope.mp3"), 20).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }

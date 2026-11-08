@@ -71,7 +71,9 @@ impl State {
     /// what's in the box stays, as if typed).
     fn set_actions(&mut self, actions: Vec<Action>) {
         if self.picked.is_some() {
-            self.picked = actions.iter().position(|a| a.run.as_ref().or(a.fill.as_ref()) == Some(&self.input));
+            self.picked = actions
+                .iter()
+                .position(|a| a.run.as_ref().or(a.fill.as_ref()) == Some(&self.input));
         }
         self.actions = actions;
     }
@@ -92,7 +94,8 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
     let mut terminal = ratatui::init();
     let mut events = EventStream::new();
     let mut st = State::default();
-    let (mut speakers, mut played, first) = crate::speakers::Speakers::new(sound_on, "world.txt play again");
+    let (mut speakers, mut played, first) =
+        crate::speakers::Speakers::new(sound_on, "world.txt play again");
     // What the speakers have for the world, sent at the top of each turn.
     let mut outbox: Vec<ToServer> = Vec::new();
     st.take(first, &mut outbox);
@@ -205,13 +208,19 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
 
     ratatui::restore();
     let _ = sink.close().await;
-    println!("{}", st.closed.unwrap_or_else(|| "✧ You drift out of the world. Come back soon. 💜".into()));
+    println!(
+        "{}",
+        st.closed
+            .unwrap_or_else(|| "✧ You drift out of the world. Come back soon. 💜".into())
+    );
     result
 }
 
 fn draw(f: &mut Frame, st: &mut State) {
-    let [main, input] = Layout::vertical([Constraint::Min(5), Constraint::Length(3)]).areas(f.area());
-    let [log_area, side] = Layout::horizontal([Constraint::Min(30), Constraint::Length(34)]).areas(main);
+    let [main, input] =
+        Layout::vertical([Constraint::Min(5), Constraint::Length(3)]).areas(f.area());
+    let [log_area, side] =
+        Layout::horizontal([Constraint::Min(30), Constraint::Length(34)]).areas(main);
 
     // The log, pinned to the bottom unless scrolled.
     let text = Text::from(st.log.iter().map(to_rline).collect::<Vec<_>>());
@@ -221,21 +230,39 @@ fn draw(f: &mut Frame, st: &mut State) {
     let visible = log_area.height.saturating_sub(2);
     let max_scroll = total.saturating_sub(visible);
     st.scroll = st.scroll.min(max_scroll);
-    let title = if st.scroll > 0 { " ✨ world.txt  (scrolled ↑) " } else { " ✨ world.txt " };
+    let title = if st.scroll > 0 {
+        " ✨ world.txt  (scrolled ↑) "
+    } else {
+        " ✨ world.txt "
+    };
     f.render_widget(
         para.scroll((max_scroll - st.scroll, 0)).block(
-            Block::default().borders(Borders::ALL).border_style(dim()).title(RSpan::styled(title, magenta())),
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(dim())
+                .title(RSpan::styled(title, magenta())),
         ),
         log_area,
     );
 
     // Side panel.
     let mut side_lines: Vec<RLine> = vec![
-        RLine::from(RSpan::styled(st.place.clone(), magenta().add_modifier(Modifier::BOLD))),
-        RLine::from(RSpan::styled(st.weather.clone(), Style::default().fg(colour(Col::Blue)))),
+        RLine::from(RSpan::styled(
+            st.place.clone(),
+            magenta().add_modifier(Modifier::BOLD),
+        )),
+        RLine::from(RSpan::styled(
+            st.weather.clone(),
+            Style::default().fg(colour(Col::Blue)),
+        )),
         RLine::from(RSpan::styled(st.clock.clone(), dim())),
         // The real date and time here, which event times are in.
-        RLine::from(RSpan::styled(chrono::Local::now().format("🕰 %a %-d %b, %-I:%M%P · your time").to_string(), dim())),
+        RLine::from(RSpan::styled(
+            chrono::Local::now()
+                .format("🕰 %a %-d %b, %-I:%M%P · your time")
+                .to_string(),
+            dim(),
+        )),
         RLine::default(),
     ];
     side_lines.extend(st.map.iter().map(|l| to_rline(l).centered()));
@@ -249,7 +276,11 @@ fn draw(f: &mut Frame, st: &mut State) {
     // Progress bars from boards you follow or are near: ▓▓▓▓░░░░ Pizza 37%
     // Two with the same label (on different boards) say where they are.
     let where_ = |label: &str, place: &str, shared: &std::collections::HashSet<&str>| {
-        if shared.contains(label) && !place.is_empty() { format!("{label} · {place}") } else { label.to_string() }
+        if shared.contains(label) && !place.is_empty() {
+            format!("{label} · {place}")
+        } else {
+            label.to_string()
+        }
     };
     let shared_bars = crate::protocol::shared_labels(st.progress.iter().map(|b| b.label.as_str()));
     let shared_lights = crate::protocol::shared_labels(st.lights.iter().map(|l| l.label.as_str()));
@@ -265,14 +296,21 @@ fn draw(f: &mut Frame, st: &mut State) {
     }
     // Up-or-down lights: ● Surf down · flat as a millpond
     for l in &st.lights {
-        let (col, word) = if l.up { (Col::Green, "up") } else { (Col::Red, "down") };
+        let (col, word) = if l.up {
+            (Col::Green, "up")
+        } else {
+            (Col::Red, "down")
+        };
         let mut spans = vec![
             RSpan::styled("● ", Style::default().fg(colour(col))),
             RSpan::raw(format!("{} ", where_(&l.label, &l.place, &shared_lights))),
             RSpan::styled(word, Style::default().fg(colour(col))),
         ];
         if let Some(n) = l.note.as_ref().filter(|_| !l.up) {
-            spans.push(RSpan::styled(format!(" · {}", crate::links::labels(n)), dim()));
+            spans.push(RSpan::styled(
+                format!(" · {}", crate::links::labels(n)),
+                dim(),
+            ));
         }
         side_lines.push(RLine::from(spans));
     }
@@ -283,24 +321,46 @@ fn draw(f: &mut Frame, st: &mut State) {
     if !st.actions.is_empty() {
         side_lines.push(RLine::from(RSpan::styled("You could (Tab):", dim())));
         for (i, a) in st.actions.iter().enumerate().take(SHOWN) {
-            let style = if st.picked == Some(i) { magenta().add_modifier(Modifier::BOLD | Modifier::REVERSED) } else { Style::default().fg(colour(Col::Pink)) };
-            side_lines.push(RLine::from(vec![RSpan::raw("  "), RSpan::styled(a.label.clone(), style)]));
+            let style = if st.picked == Some(i) {
+                magenta().add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else {
+                Style::default().fg(colour(Col::Pink))
+            };
+            side_lines.push(RLine::from(vec![
+                RSpan::raw("  "),
+                RSpan::styled(a.label.clone(), style),
+            ]));
         }
         if st.actions.len() > SHOWN {
-            let more = st.picked.filter(|&i| i >= SHOWN).map_or_else(|| format!("  +{} more", st.actions.len() - SHOWN), |i| format!("  {}", st.actions[i].label));
-            side_lines.push(RLine::from(RSpan::styled(more, if st.picked.is_some_and(|i| i >= SHOWN) { magenta().add_modifier(Modifier::BOLD | Modifier::REVERSED) } else { dim() })));
+            let more = st.picked.filter(|&i| i >= SHOWN).map_or_else(
+                || format!("  +{} more", st.actions.len() - SHOWN),
+                |i| format!("  {}", st.actions[i].label),
+            );
+            side_lines.push(RLine::from(RSpan::styled(
+                more,
+                if st.picked.is_some_and(|i| i >= SHOWN) {
+                    magenta().add_modifier(Modifier::BOLD | Modifier::REVERSED)
+                } else {
+                    dim()
+                },
+            )));
         }
         side_lines.push(RLine::default());
     }
     if let Some(h) = &st.hint {
         side_lines.push(RLine::from(RSpan::styled(
             h.clone(),
-            Style::default().fg(colour(Col::Yellow)).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(colour(Col::Yellow))
+                .add_modifier(Modifier::BOLD),
         )));
         side_lines.push(RLine::from(RSpan::styled("(skip to hide)", dim())));
         side_lines.push(RLine::default());
     }
-    side_lines.push(RLine::from(RSpan::styled("PgUp/PgDn scroll · Esc leave", dim())));
+    side_lines.push(RLine::from(RSpan::styled(
+        "PgUp/PgDn scroll · Esc leave",
+        dim(),
+    )));
     f.render_widget(
         Paragraph::new(side_lines)
             .wrap(Wrap { trim: true })
@@ -368,12 +428,23 @@ mod tests {
     use super::*;
 
     fn act(label: &str, run: Option<&str>, fill: Option<&str>) -> Action {
-        Action { label: label.into(), run: run.map(Into::into), fill: fill.map(Into::into) }
+        Action {
+            label: label.into(),
+            run: run.map(Into::into),
+            fill: fill.map(Into::into),
+        }
     }
 
     #[test]
     fn tab_goes_round_what_you_could_do() {
-        let mut st = State { actions: vec![act("👋 wave", Some("wave"), None), act("💬 Sam…", None, Some("@Sam ")), act("📖 read", Some("read"), None)], ..Default::default() };
+        let mut st = State {
+            actions: vec![
+                act("👋 wave", Some("wave"), None),
+                act("💬 Sam…", None, Some("@Sam ")),
+                act("📖 read", Some("read"), None),
+            ],
+            ..Default::default()
+        };
         st.pick(false);
         assert_eq!(st.input, "wave");
         st.pick(false);
@@ -387,7 +458,11 @@ mod tests {
 
     #[test]
     fn tab_leaves_your_own_typing_alone() {
-        let mut st = State { actions: vec![act("👋 wave", Some("wave"), None)], input: "hello th".into(), ..Default::default() };
+        let mut st = State {
+            actions: vec![act("👋 wave", Some("wave"), None)],
+            input: "hello th".into(),
+            ..Default::default()
+        };
         st.pick(false);
         assert_eq!(st.input, "hello th");
         assert_eq!(st.picked, None);
@@ -395,9 +470,18 @@ mod tests {
 
     #[test]
     fn new_actions_follow_or_forget_the_pick() {
-        let mut st = State { actions: vec![act("👋 wave", Some("wave"), None), act("📖 read", Some("read"), None)], ..Default::default() };
+        let mut st = State {
+            actions: vec![
+                act("👋 wave", Some("wave"), None),
+                act("📖 read", Some("read"), None),
+            ],
+            ..Default::default()
+        };
         st.pick(false);
-        st.set_actions(vec![act("🎣 fish", Some("fish"), None), act("👋 wave", Some("wave"), None)]);
+        st.set_actions(vec![
+            act("🎣 fish", Some("fish"), None),
+            act("👋 wave", Some("wave"), None),
+        ]);
         assert_eq!(st.picked, Some(1), "followed to where it went");
         st.pick(false);
         assert_eq!(st.input, "fish");

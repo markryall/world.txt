@@ -5,7 +5,6 @@ use super::Game;
 use crate::protocol::{Col, Line};
 use crate::server::nature::{self, Kind, Species};
 
-
 #[derive(Clone, Copy)]
 pub enum Need {
     /// Any find of this kind.
@@ -22,34 +21,99 @@ pub struct Recipe {
 use Need::*;
 
 pub const RECIPES: &[Recipe] = &[
-    Recipe { makes: "flower_crown", needs: &[(Any(Kind::Flower), 3)] },
-    Recipe { makes: "bouquet", needs: &[(Any(Kind::Flower), 5)] },
-    Recipe { makes: "wind_chime", needs: &[(Any(Kind::Shell), 3)] },
-    Recipe { makes: "dreamcatcher", needs: &[(Any(Kind::Feather), 2), (Any(Kind::Flower), 1)] },
-    Recipe { makes: "crystal_lantern", needs: &[(Exactly("quartz"), 1), (Exactly("pebble"), 2)] },
-    Recipe { makes: "mushroom_soup", needs: &[(Any(Kind::Mushroom), 3)] },
-    Recipe { makes: "shell_necklace", needs: &[(Any(Kind::Shell), 2), (Exactly("sea_glass"), 1)] },
-    Recipe { makes: "cairn", needs: &[(Exactly("pebble"), 5)] },
-    Recipe { makes: "conch_horn", needs: &[(Exactly("conch"), 1)] },
-    Recipe { makes: "leaf_crown", needs: &[(Any(Kind::Leaf), 3)] },
+    Recipe {
+        makes: "flower_crown",
+        needs: &[(Any(Kind::Flower), 3)],
+    },
+    Recipe {
+        makes: "bouquet",
+        needs: &[(Any(Kind::Flower), 5)],
+    },
+    Recipe {
+        makes: "wind_chime",
+        needs: &[(Any(Kind::Shell), 3)],
+    },
+    Recipe {
+        makes: "dreamcatcher",
+        needs: &[(Any(Kind::Feather), 2), (Any(Kind::Flower), 1)],
+    },
+    Recipe {
+        makes: "crystal_lantern",
+        needs: &[(Exactly("quartz"), 1), (Exactly("pebble"), 2)],
+    },
+    Recipe {
+        makes: "mushroom_soup",
+        needs: &[(Any(Kind::Mushroom), 3)],
+    },
+    Recipe {
+        makes: "shell_necklace",
+        needs: &[(Any(Kind::Shell), 2), (Exactly("sea_glass"), 1)],
+    },
+    Recipe {
+        makes: "cairn",
+        needs: &[(Exactly("pebble"), 5)],
+    },
+    Recipe {
+        makes: "conch_horn",
+        needs: &[(Exactly("conch"), 1)],
+    },
+    Recipe {
+        makes: "leaf_crown",
+        needs: &[(Any(Kind::Leaf), 3)],
+    },
     Recipe {
         makes: "garland",
-        needs: &[(Any(Kind::Flower), 1), (Any(Kind::Feather), 1), (Any(Kind::Shell), 1), (Any(Kind::Stone), 1)],
+        needs: &[
+            (Any(Kind::Flower), 1),
+            (Any(Kind::Feather), 1),
+            (Any(Kind::Shell), 1),
+            (Any(Kind::Stone), 1),
+        ],
     },
 ];
 
 /// Things for a home, made from finds: place one and it's part of the room.
 pub const FURNITURE: &[Recipe] = &[
-    Recipe { makes: "feather_cushion", needs: &[(Any(Kind::Feather), 3)] },
-    Recipe { makes: "toadstool_stool", needs: &[(Exactly("fly_agaric"), 1), (Any(Kind::Leaf), 1)] },
-    Recipe { makes: "leaf_rug", needs: &[(Any(Kind::Leaf), 5)] },
-    Recipe { makes: "door_wreath", needs: &[(Any(Kind::Flower), 2), (Any(Kind::Leaf), 2)] },
-    Recipe { makes: "vase_of_flowers", needs: &[(Exactly("sea_glass"), 1), (Any(Kind::Flower), 3)] },
-    Recipe { makes: "shell_mirror", needs: &[(Exactly("sea_glass"), 2), (Any(Kind::Shell), 2)] },
-    Recipe { makes: "pinecone_lamp", needs: &[(Exactly("pinecone"), 2), (Exactly("firefly"), 1)] },
-    Recipe { makes: "driftwood_table", needs: &[(Exactly("driftwood"), 2), (Any(Kind::Stone), 1)] },
-    Recipe { makes: "pebble_doorstop", needs: &[(Exactly("pebble"), 2), (Any(Kind::Feather), 1)] },
-    Recipe { makes: "butterfly_bush", needs: &[(Any(Kind::Butterfly), 2), (Any(Kind::Flower), 2)] },
+    Recipe {
+        makes: "feather_cushion",
+        needs: &[(Any(Kind::Feather), 3)],
+    },
+    Recipe {
+        makes: "toadstool_stool",
+        needs: &[(Exactly("fly_agaric"), 1), (Any(Kind::Leaf), 1)],
+    },
+    Recipe {
+        makes: "leaf_rug",
+        needs: &[(Any(Kind::Leaf), 5)],
+    },
+    Recipe {
+        makes: "door_wreath",
+        needs: &[(Any(Kind::Flower), 2), (Any(Kind::Leaf), 2)],
+    },
+    Recipe {
+        makes: "vase_of_flowers",
+        needs: &[(Exactly("sea_glass"), 1), (Any(Kind::Flower), 3)],
+    },
+    Recipe {
+        makes: "shell_mirror",
+        needs: &[(Exactly("sea_glass"), 2), (Any(Kind::Shell), 2)],
+    },
+    Recipe {
+        makes: "pinecone_lamp",
+        needs: &[(Exactly("pinecone"), 2), (Exactly("firefly"), 1)],
+    },
+    Recipe {
+        makes: "driftwood_table",
+        needs: &[(Exactly("driftwood"), 2), (Any(Kind::Stone), 1)],
+    },
+    Recipe {
+        makes: "pebble_doorstop",
+        needs: &[(Exactly("pebble"), 2), (Any(Kind::Feather), 1)],
+    },
+    Recipe {
+        makes: "butterfly_bush",
+        needs: &[(Any(Kind::Butterfly), 2), (Any(Kind::Flower), 2)],
+    },
 ];
 
 /// Every recipe, crafts first, then things for a home.
@@ -75,10 +139,18 @@ pub(super) fn need_label(need: Need, n: i64) -> String {
         },
         Exactly(id) => {
             let name = nature::by_id(id).map_or(id, |s| s.name);
-            return if n == 1 { name.to_string() } else { format!("{n} × {name}") };
+            return if n == 1 {
+                name.to_string()
+            } else {
+                format!("{n} × {name}")
+            };
         }
     };
-    if n == 1 { format!("1 {one}") } else { format!("{n} {many}") }
+    if n == 1 {
+        format!("1 {one}")
+    } else {
+        format!("{n} {many}")
+    }
 }
 
 fn fits(need: Need, s: &Species) -> bool {
@@ -95,9 +167,14 @@ pub fn plan(recipe: &Recipe, satchel: &[(String, i64)]) -> Option<Vec<(&'static 
 }
 
 /// The same, for any list of needs (a building's, say).
-pub fn plan_needs(needs: &[(Need, i64)], satchel: &[(String, i64)]) -> Option<Vec<(&'static str, i64)>> {
-    let mut left: Vec<(&'static Species, i64)> =
-        satchel.iter().filter_map(|(id, n)| nature::by_id(id).map(|s| (s, *n))).collect();
+pub fn plan_needs(
+    needs: &[(Need, i64)],
+    satchel: &[(String, i64)],
+) -> Option<Vec<(&'static str, i64)>> {
+    let mut left: Vec<(&'static Species, i64)> = satchel
+        .iter()
+        .filter_map(|(id, n)| nature::by_id(id).map(|s| (s, *n)))
+        .collect();
     let mut needs: Vec<(Need, i64)> = needs.to_vec();
     needs.sort_by_key(|(n, _)| matches!(n, Any(_)));
     let mut used: Vec<(&'static str, i64)> = Vec::new();
@@ -107,7 +184,9 @@ pub fn plan_needs(needs: &[(Need, i64)], satchel: &[(String, i64)]) -> Option<Ve
             nature::Rarity::Uncommon => 1,
             nature::Rarity::Rare => 2,
         };
-        let mut options: Vec<usize> = (0..left.len()).filter(|&i| fits(need, left[i].0) && left[i].1 > 0).collect();
+        let mut options: Vec<usize> = (0..left.len())
+            .filter(|&i| fits(need, left[i].0) && left[i].1 > 0)
+            .collect();
         options.sort_by_key(|&i| (rank(left[i].0), -left[i].1));
         for i in options {
             let take = n.min(left[i].1);
@@ -127,7 +206,9 @@ pub fn plan_needs(needs: &[(Need, i64)], satchel: &[(String, i64)]) -> Option<Ve
 
 impl Game {
     pub(super) fn cmd_recipes(&mut self, id: u64) -> anyhow::Result<()> {
-        let Some((_, _, _name)) = self.here(id) else { return Ok(()) };
+        let Some((_, _, _name)) = self.here(id) else {
+            return Ok(());
+        };
         let user = self.user(id);
         let satchel = self.world.db.satchel(&user)?;
         let mut lines = vec![Line::new().b(Col::Magenta, "✂️ Things you can craft")];
@@ -135,24 +216,37 @@ impl Game {
             if i == RECIPES.len() {
                 lines.push(Line::new().b(Col::Magenta, "🪑 For your home"));
             }
-            let Some(s) = nature::by_id(r.makes) else { continue };
+            let Some(s) = nature::by_id(r.makes) else {
+                continue;
+            };
             let needs: Vec<String> = r.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
             let ready = plan(r, &satchel).is_some();
             lines.push(
                 Line::new()
-                    .c(if ready { Col::Green } else { Col::Dim }, if ready { "  ✓ " } else { "    " })
+                    .c(
+                        if ready { Col::Green } else { Col::Dim },
+                        if ready { "  ✓ " } else { "    " },
+                    )
                     .b(if ready { Col::Yellow } else { Col::Plain }, s.name)
                     .c(Col::Dim, format!("  ← {}", needs.join(" + "))),
             );
         }
-        lines.push(Line::col(Col::Dim, "  craft <name> to make one. Placed crafts come alive!"));
-        lines.push(Line::col(Col::Dim, "  For food, make a campfire and type cook."));
+        lines.push(Line::col(
+            Col::Dim,
+            "  craft <name> to make one. Placed crafts come alive!",
+        ));
+        lines.push(Line::col(
+            Col::Dim,
+            "  For food, make a campfire and type cook.",
+        ));
         self.send(id, lines);
         Ok(())
     }
 
     pub(super) fn cmd_craft(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
-        let Some((x, y, name)) = self.here(id) else { return Ok(()) };
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
         let user = self.user(id);
         let w = crate::server::world::strip_article(what.trim()).to_lowercase();
         if w.is_empty() {
@@ -162,21 +256,54 @@ impl Game {
             .filter_map(|r| nature::by_id(r.makes).map(|s| (r, s)))
             .find(|(_, s)| s.name.contains(&w) || s.id == w.replace(' ', "_"))
         else {
-            self.say1(id, Line::plain(format!("You don't know how to craft '{w}'. Type recipes to see what you can make.")));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "You don't know how to craft '{w}'. Type recipes to see what you can make."
+                )),
+            );
             return Ok(());
         };
         let satchel = self.world.db.satchel(&user)?;
         let Some(used) = plan(recipe, &satchel) else {
-            let needs: Vec<String> = recipe.needs.iter().map(|(n, c)| need_label(*n, *c)).collect();
-            self.say1(id, Line::plain(format!("A {} needs {}. Keep gathering! 🧺", s.name, needs.join(" + "))));
+            let needs: Vec<String> = recipe
+                .needs
+                .iter()
+                .map(|(n, c)| need_label(*n, *c))
+                .collect();
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "A {} needs {}. Keep gathering! 🧺",
+                    s.name,
+                    needs.join(" + ")
+                )),
+            );
             return Ok(());
         };
         for (sid, n) in &used {
             self.world.db.satchel_add(&user, sid, -n)?;
         }
         self.world.db.satchel_add(&user, s.id, 1)?;
-        self.say1(id, Line::new().c(Col::Yellow, "✂️ You craft ").b(Col::Yellow, nature::a(s.name)).c(Col::Yellow, "! It's in your satchel: place it, or give it to someone."));
-        self.tell_here(x, y, id, Line::col(Col::Yellow, format!("✂️ {name} crafts {}.", nature::a(s.name))));
+        self.say1(
+            id,
+            Line::new()
+                .c(Col::Yellow, "✂️ You craft ")
+                .b(Col::Yellow, nature::a(s.name))
+                .c(
+                    Col::Yellow,
+                    "! It's in your satchel: place it, or give it to someone.",
+                ),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(
+                Col::Yellow,
+                format!("✂️ {name} crafts {}.", nature::a(s.name)),
+            ),
+        );
         Ok(())
     }
 }
@@ -212,9 +339,15 @@ mod tests {
 
     #[test]
     fn exact_needs_are_kept_for_themselves() {
-        let necklace = RECIPES.iter().find(|r| r.makes == "shell_necklace").unwrap();
+        let necklace = RECIPES
+            .iter()
+            .find(|r| r.makes == "shell_necklace")
+            .unwrap();
         // The sea glass must go to the "exactly" slot, not be counted as an "any shell".
         let used = plan(necklace, &bag(&[("sea_glass", 1), ("cockle", 2)])).unwrap();
-        assert!(used.contains(&("sea_glass", 1)) && used.contains(&("cockle", 2)), "{used:?}");
+        assert!(
+            used.contains(&("sea_glass", 1)) && used.contains(&("cockle", 2)),
+            "{used:?}"
+        );
     }
 }

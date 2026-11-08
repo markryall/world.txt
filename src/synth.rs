@@ -39,8 +39,21 @@ pub struct Synth {
 impl Synth {
     pub fn start(mpv: &Path) -> Option<Synth> {
         let mut child = Command::new(mpv)
-            .args(["--no-video", "--no-terminal", "--idle=no", "--audio-display=no", "--cache=no", "--volume=100"])
-            .args(["--demuxer=rawaudio", "--demuxer-rawaudio-format=s16le", "--demuxer-rawaudio-rate=48000", "--demuxer-rawaudio-channels=1", "-"])
+            .args([
+                "--no-video",
+                "--no-terminal",
+                "--idle=no",
+                "--audio-display=no",
+                "--cache=no",
+                "--volume=100",
+            ])
+            .args([
+                "--demuxer=rawaudio",
+                "--demuxer-rawaudio-format=s16le",
+                "--demuxer-rawaudio-rate=48000",
+                "--demuxer-rawaudio-channels=1",
+                "-",
+            ])
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -87,7 +100,6 @@ impl Synth {
             m.levels = s;
         }
     }
-
 }
 
 impl Drop for Synth {
@@ -98,7 +110,10 @@ impl Drop for Synth {
 }
 
 fn seed() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64) | 1
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(1, |d| d.as_nanos() as u64)
+        | 1
 }
 
 /// A tune's notes: (MIDI note, or None for a rest; beats), and the tempo.
@@ -106,7 +121,10 @@ fn seed() -> u64 {
 pub fn parse_tune(text: &str) -> (f32, Vec<(Option<i32>, f32)>) {
     let mut bpm = 120.0;
     let mut notes = Vec::new();
-    for w in text.split(|c: char| c.is_whitespace() || c == ',').filter(|w| !w.is_empty()) {
+    for w in text
+        .split(|c: char| c.is_whitespace() || c == ',')
+        .filter(|w| !w.is_empty())
+    {
         if let Some(t) = w.strip_prefix('@')
             && t.len() <= 3
             && let Ok(n) = t.parse::<u32>()
@@ -202,7 +220,12 @@ struct Bed {
 
 impl Bed {
     fn new(filter: Biquad, tau: f32) -> Self {
-        Bed { filter, gain: 0.0, target: 0.0, tau }
+        Bed {
+            filter,
+            gain: 0.0,
+            target: 0.0,
+            tau,
+        }
     }
 }
 
@@ -221,9 +244,21 @@ enum Voice {
     /// A hummed note: triangle wave, held, then let go.
     Note { start: u64, freq: f32, ring: f32 },
     /// A puff of filtered noise: crackles and thunder.
-    Burst { start: u64, filter: Biquad, peak: f32, attack: f32, decay: f32 },
+    Burst {
+        start: u64,
+        filter: Biquad,
+        peak: f32,
+        attack: f32,
+        decay: f32,
+    },
     /// A chirp, sliding up.
-    Chirp { start: u64, from: f32, to: f32, len: f32, peak: f32 },
+    Chirp {
+        start: u64,
+        from: f32,
+        to: f32,
+        len: f32,
+        peak: f32,
+    },
     /// A cricket's pulse.
     Pulse { start: u64, freq: f32, peak: f32 },
 }
@@ -273,7 +308,11 @@ impl Mix {
             let len = beats * beat;
             if let Some(m) = midi {
                 let freq = 440.0 * 2f32.powf((m - 69) as f32 / 12.0);
-                self.voices.push(Voice::Note { start: self.at(t), freq, ring: (len * 0.9).max(0.08) });
+                self.voices.push(Voice::Note {
+                    start: self.at(t),
+                    freq,
+                    ring: (len * 0.9).max(0.08),
+                });
             }
             t += len;
         }
@@ -308,7 +347,13 @@ impl Mix {
         } else if self.now >= self.waves_next {
             let peak = waves * WAVES * (0.6 + self.random() * 0.4);
             let (rise, fall) = (2.0 + self.random(), 4.0 + self.random() * 2.0);
-            self.wave = Some(Wave { start: self.now, from: (self.waves.gain, 700.0), peak, rise, fall });
+            self.wave = Some(Wave {
+                start: self.now,
+                from: (self.waves.gain, 700.0),
+                peak,
+                rise,
+                fall,
+            });
             let gap = rise + fall + self.random() * 2.0;
             self.waves_next = self.at(gap);
         }
@@ -351,7 +396,13 @@ impl Mix {
             let f = 1000.0 + self.random() * 3000.0;
             let peak = (0.3 + self.random() * 0.7) * FIRE * fire;
             let decay = 0.02 + self.random() * 0.05;
-            self.voices.push(Voice::Burst { start: self.at(0.05), filter: Biquad::bandpass(f, 1.5), peak, attack: 0.002, decay });
+            self.voices.push(Voice::Burst {
+                start: self.at(0.05),
+                filter: Biquad::bandpass(f, 1.5),
+                peak,
+                attack: 0.002,
+                decay,
+            });
             let gap = 0.04 + self.random() * 0.3;
             self.fire_next = self.at(gap);
         }
@@ -360,10 +411,22 @@ impl Mix {
     fn rumble(&mut self, level: f32) {
         let f1 = 110.0 + self.random() * 90.0;
         let d1 = 3.5 + self.random() * 2.0;
-        self.voices.push(Voice::Burst { start: self.at(0.05), filter: Biquad::lowpass(f1, 0.7), peak: THUNDER * level, attack: 0.4, decay: d1 });
+        self.voices.push(Voice::Burst {
+            start: self.at(0.05),
+            filter: Biquad::lowpass(f1, 0.7),
+            peak: THUNDER * level,
+            attack: 0.4,
+            decay: d1,
+        });
         let f2 = 80.0 + self.random() * 40.0;
         let later = 0.65 + self.random();
-        self.voices.push(Voice::Burst { start: self.at(later), filter: Biquad::lowpass(f2, 0.7), peak: THUNDER * level * 0.6, attack: 0.8, decay: 2.5 });
+        self.voices.push(Voice::Burst {
+            start: self.at(later),
+            filter: Biquad::lowpass(f2, 0.7),
+            peak: THUNDER * level * 0.6,
+            attack: 0.8,
+            decay: 2.5,
+        });
     }
 
     fn chirps(&mut self, level: f32) {
@@ -374,7 +437,13 @@ impl Mix {
             let len = 0.05 + self.random() * 0.07;
             let from = base * (0.9 + self.random() * 0.3);
             let to = base * (1.2 + self.random() * 0.4);
-            self.voices.push(Voice::Chirp { start: self.at(t), from, to, len, peak: BIRDS * level });
+            self.voices.push(Voice::Chirp {
+                start: self.at(t),
+                from,
+                to,
+                len,
+                peak: BIRDS * level,
+            });
             t += len + 0.03 + self.random() * 0.08;
         }
     }
@@ -382,7 +451,11 @@ impl Mix {
     fn cricket(&mut self, level: f32) {
         let freq = 4200.0 + self.random() * 600.0;
         for i in 0..3 {
-            self.voices.push(Voice::Pulse { start: self.at(0.05 + 0.045 * i as f32), freq, peak: CRICKETS * level });
+            self.voices.push(Voice::Pulse {
+                start: self.at(0.05 + 0.045 * i as f32),
+                freq,
+                peak: CRICKETS * level,
+            });
         }
     }
 
@@ -400,10 +473,16 @@ impl Mix {
                 let t = (self.now - w.start) as f32 / RATE;
                 let (g, f) = if t < w.rise {
                     let k = t / w.rise;
-                    (w.from.0 + (w.peak - w.from.0) * k, w.from.1 + (1000.0 - w.from.1) * k)
+                    (
+                        w.from.0 + (w.peak - w.from.0) * k,
+                        w.from.1 + (1000.0 - w.from.1) * k,
+                    )
                 } else {
                     let k = ((t - w.rise) / w.fall).min(1.0);
-                    (w.peak + (w.peak * 0.15 - w.peak) * k, 1000.0 + (350.0 - 1000.0) * k)
+                    (
+                        w.peak + (w.peak * 0.15 - w.peak) * k,
+                        1000.0 + (350.0 - 1000.0) * k,
+                    )
                 };
                 self.waves.gain = g;
                 wave_freq = Some(f);
@@ -455,7 +534,10 @@ impl Mix {
 impl Voice {
     fn start(&self) -> u64 {
         match self {
-            Voice::Note { start, .. } | Voice::Burst { start, .. } | Voice::Chirp { start, .. } | Voice::Pulse { start, .. } => *start,
+            Voice::Note { start, .. }
+            | Voice::Burst { start, .. }
+            | Voice::Chirp { start, .. }
+            | Voice::Pulse { start, .. } => *start,
         }
     }
 
@@ -482,29 +564,53 @@ impl Voice {
                 let p = (t * *freq).fract();
                 Some(env * (4.0 * (p - 0.5).abs() - 1.0))
             }
-            Voice::Burst { filter, peak, attack, decay, .. } => {
+            Voice::Burst {
+                filter,
+                peak,
+                attack,
+                decay,
+                ..
+            } => {
                 if t > *attack + *decay {
                     return None;
                 }
-                let env = if t < *attack { *peak * t / *attack } else { *peak * (0.0001 / *peak).powf((t - *attack) / *decay) };
+                let env = if t < *attack {
+                    *peak * t / *attack
+                } else {
+                    *peak * (0.0001 / *peak).powf((t - *attack) / *decay)
+                };
                 let n = mix.random() * 2.0 - 1.0;
                 Some(filter.run(n) * env)
             }
-            Voice::Chirp { from, to, len, peak, .. } => {
+            Voice::Chirp {
+                from,
+                to,
+                len,
+                peak,
+                ..
+            } => {
                 if t > *len {
                     return None;
                 }
                 // Phase of an exponential sweep from `from` to `to`.
                 let k = (*to / *from).ln() / *len;
                 let phase = *from * ((k * t).exp() - 1.0) / k;
-                let env = if t < 0.01 { *peak * t / 0.01 } else { *peak * (0.0001 / *peak).powf((t - 0.01) / (*len - 0.01)) };
+                let env = if t < 0.01 {
+                    *peak * t / 0.01
+                } else {
+                    *peak * (0.0001 / *peak).powf((t - 0.01) / (*len - 0.01))
+                };
                 Some(env * (std::f32::consts::TAU * phase).sin())
             }
             Voice::Pulse { freq, peak, .. } => {
                 if t > 0.02 {
                     return None;
                 }
-                let env = if t < 0.004 { *peak * t / 0.004 } else { *peak * (1.0 - (t - 0.004) / 0.016) };
+                let env = if t < 0.004 {
+                    *peak * t / 0.004
+                } else {
+                    *peak * (1.0 - (t - 0.004) / 0.016)
+                };
                 Some(env * (std::f32::consts::TAU * *freq * t).sin())
             }
         }
@@ -526,8 +632,17 @@ impl Biquad {
         let alpha = w.sin() / (2.0 * q.max(0.1));
         let cos = w.cos();
         let a0 = 1.0 + alpha;
-        let b = if band { [alpha, 0.0, -alpha] } else { [(1.0 - cos) / 2.0, 1.0 - cos, (1.0 - cos) / 2.0] };
-        Biquad { b: b.map(|v| v / a0), a: [-2.0 * cos / a0, (1.0 - alpha) / a0], x: [0.0; 2], y: [0.0; 2] }
+        let b = if band {
+            [alpha, 0.0, -alpha]
+        } else {
+            [(1.0 - cos) / 2.0, 1.0 - cos, (1.0 - cos) / 2.0]
+        };
+        Biquad {
+            b: b.map(|v| v / a0),
+            a: [-2.0 * cos / a0, (1.0 - alpha) / a0],
+            x: [0.0; 2],
+            y: [0.0; 2],
+        }
     }
 
     fn lowpass(freq: f32, q: f32) -> Self {
@@ -546,7 +661,9 @@ impl Biquad {
     }
 
     fn run(&mut self, x: f32) -> f32 {
-        let y = self.b[0] * x + self.b[1] * self.x[0] + self.b[2] * self.x[1] - self.a[0] * self.y[0] - self.a[1] * self.y[1];
+        let y = self.b[0] * x + self.b[1] * self.x[0] + self.b[2] * self.x[1]
+            - self.a[0] * self.y[0]
+            - self.a[1] * self.y[1];
         self.x = [x, self.x[0]];
         self.y = [y, self.y[0]];
         y
@@ -561,9 +678,23 @@ mod tests {
     fn reads_tunes_like_the_browser() {
         let (bpm, notes) = parse_tune("@90 C E/ G- _ F#5 Bb3// A. hello");
         assert_eq!(bpm, 90.0);
-        assert_eq!(notes, vec![(Some(60), 1.0), (Some(64), 0.5), (Some(67), 2.0), (None, 1.0), (Some(78), 1.0), (Some(58), 0.25), (Some(69), 1.5)]);
+        assert_eq!(
+            notes,
+            vec![
+                (Some(60), 1.0),
+                (Some(64), 0.5),
+                (Some(67), 2.0),
+                (None, 1.0),
+                (Some(78), 1.0),
+                (Some(58), 0.25),
+                (Some(69), 1.5)
+            ]
+        );
         assert_eq!(parse_tune("@999 C").0, 240.0);
-        assert!(parse_tune("Cat hello C7").1.is_empty(), "words aren't notes");
+        assert!(
+            parse_tune("Cat hello C7").1.is_empty(),
+            "words aren't notes"
+        );
     }
 
     fn loudness(mix: &mut Mix, secs: f32) -> f32 {
@@ -591,7 +722,10 @@ mod tests {
     #[test]
     fn rain_comes_and_goes() {
         let mut m = Mix::new(7);
-        m.levels = Sounds { rain: 1.0, ..Default::default() };
+        m.levels = Sounds {
+            rain: 1.0,
+            ..Default::default()
+        };
         let p = loudness(&mut m, 6.0);
         assert!(p > 0.02 && p < 0.5, "{p}");
         m.levels = Sounds::default();
@@ -602,7 +736,15 @@ mod tests {
     #[test]
     fn everything_at_once_stays_in_bounds() {
         let mut m = Mix::new(11);
-        m.levels = Sounds { rain: 1.0, thunder: 1.0, wind: 1.0, waves: 1.0, birds: 1.0, crickets: 1.0, fire: 1.0 };
+        m.levels = Sounds {
+            rain: 1.0,
+            thunder: 1.0,
+            wind: 1.0,
+            waves: 1.0,
+            birds: 1.0,
+            crickets: 1.0,
+            fire: 1.0,
+        };
         m.tune("C E G C5");
         let p = loudness(&mut m, 30.0);
         assert!(p.is_finite() && p > 0.05 && p < 1.0, "{p}");
@@ -612,7 +754,11 @@ mod tests {
     fn sound_off_is_silent() {
         let mut m = Mix::new(3);
         m.on = false;
-        m.levels = Sounds { rain: 1.0, birds: 1.0, ..Default::default() };
+        m.levels = Sounds {
+            rain: 1.0,
+            birds: 1.0,
+            ..Default::default()
+        };
         m.tune("C E G");
         assert!(loudness(&mut m, 3.0) < 1e-6);
     }

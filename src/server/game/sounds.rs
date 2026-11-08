@@ -28,13 +28,26 @@ impl Game {
         let winter = Clock::season() == Season::Winter;
         let phase = Clock::phase();
         let ground = self.world.terrain(ox, oy);
-        let around: Vec<T> = DIRS.iter().map(|d| self.world.terrain(ox + d.2, oy + d.3)).collect();
+        let around: Vec<T> = DIRS
+            .iter()
+            .map(|d| self.world.terrain(ox + d.2, oy + d.3))
+            .collect();
         let near = |t: T| ground == t || around.contains(&t);
         // Snow falls silently, and rooms keep most of the weather out.
         let roof: f64 = if indoors { 0.35 } else { 1.0 };
 
-        let rain = if winter || wet <= 0.3 { 0.0 } else if wet > 0.55 { 1.0 } else { 0.4 };
-        let thunder = if !winter && wet > STORMY { roof.max(0.5) } else { 0.0 };
+        let rain = if winter || wet <= 0.3 {
+            0.0
+        } else if wet > 0.55 {
+            1.0
+        } else {
+            0.4
+        };
+        let thunder = if !winter && wet > STORMY {
+            roof.max(0.5)
+        } else {
+            0.0
+        };
 
         let gusty = (self.world.weather.speed() - 0.15) / 0.35;
         let open = if indoors {
@@ -52,7 +65,10 @@ impl Game {
             0.0
         } else if sea(&ground) || around.iter().any(sea) {
             1.0
-        } else if (-2..=2).flat_map(|dy| (-2..=2).map(move |dx| (dx, dy))).any(|(dx, dy)| sea(&self.world.terrain(ox + dx, oy + dy))) {
+        } else if (-2..=2)
+            .flat_map(|dy| (-2..=2).map(move |dx| (dx, dy)))
+            .any(|(dx, dy)| sea(&self.world.terrain(ox + dx, oy + dy)))
+        {
             0.5
         } else {
             0.0

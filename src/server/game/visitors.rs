@@ -9,7 +9,9 @@ use crate::server::{accounts, federation, names};
 
 impl Game {
     fn here_name(&self) -> String {
-        self.url.as_deref().map_or_else(|| "this world".to_string(), federation::host)
+        self.url
+            .as_deref()
+            .map_or_else(|| "this world".to_string(), federation::host)
     }
 
     pub(super) fn visit(&mut self, id: u64, p: federation::Passport, tx: ClientTx) {
@@ -19,14 +21,21 @@ impl Game {
         };
         match self.world.db.use_passport(&p.nonce, p.expires, now) {
             Ok(true) => {}
-            _ => return bye("🛂 That passport has already been used. Sail again from your home world!".into()),
+            _ => {
+                return bye(
+                    "🛂 That passport has already been used. Sail again from your home world!"
+                        .into(),
+                );
+            }
         }
         let name = p.visitor_name();
         let home = federation::normalise(&p.home);
         match self.world.db.visitor_status(&name).as_deref() {
-            Some("turned away") => {
-                bye(format!("🛂 The keepers of {} aren't taking visitors from {} just now.", self.here_name(), federation::host(&home)))
-            }
+            Some("turned away") => bye(format!(
+                "🛂 The keepers of {} aren't taking visitors from {} just now.",
+                self.here_name(),
+                federation::host(&home)
+            )),
             Some("admitted") => self.admit_now(id, &p, tx),
             _ if self.world.db.is_trusted(&home) => self.admit_now(id, &p, tx),
             _ => {
@@ -34,7 +43,10 @@ impl Game {
                 let here = self.here_name();
                 let mut lines = vec![
                     Line::new().b(Col::Blue, format!("⛵ Welcome to {here}, {}!", p.nickname)),
-                    Line::col(Col::Blue, "🛂 You're waiting on the dock while the island keepers are asked to let you in. Hang on..."),
+                    Line::col(
+                        Col::Blue,
+                        "🛂 You're waiting on the dock while the island keepers are asked to let you in. Hang on...",
+                    ),
                 ];
                 if !self.players.values().any(|o| self.is_keeper(&o.user)) {
                     lines.push(Line::col(Col::Dim, "No keepers are here right now, so it might be a while. Once you're let in, you're in for good."));
@@ -56,9 +68,21 @@ impl Game {
         } else {
             self.world.db.set_nickname(&name, &p.nickname)
         };
-        let Ok(token) = accounts::new_secret() else { return };
-        if made.and_then(|_| self.world.db.set_visitor(&name, &federation::normalise(&p.home), "admitted", now)).and_then(|_| self.world.db.add_device(&name, &names::hash(&token), now)).is_err() {
-            let _ = tx.send(ToClient::Bye { reason: "🛂 Something went wobbly at the dock. Try sailing again?".into() });
+        let Ok(token) = accounts::new_secret() else {
+            return;
+        };
+        if made
+            .and_then(|_| {
+                self.world
+                    .db
+                    .set_visitor(&name, &federation::normalise(&p.home), "admitted", now)
+            })
+            .and_then(|_| self.world.db.add_device(&name, &names::hash(&token), now))
+            .is_err()
+        {
+            let _ = tx.send(ToClient::Bye {
+                reason: "🛂 Something went wobbly at the dock. Try sailing again?".into(),
+            });
             return;
         }
         let hash = names::hash(&token);
@@ -77,13 +101,22 @@ impl Game {
             .map(|(p, _)| {
                 let name = p.visitor_name();
                 Line::new()
-                    .c(Col::Yellow, format!("🛂 {} ({name}) has sailed in from {} and would like to visit: ", p.nickname, federation::host(&p.home)))
+                    .c(
+                        Col::Yellow,
+                        format!(
+                            "🛂 {} ({name}) has sailed in from {} and would like to visit: ",
+                            p.nickname,
+                            federation::host(&p.home)
+                        ),
+                    )
                     .b(Col::Yellow, format!("admit {name}"))
                     .c(Col::Dim, format!(" · turn away {name}"))
             })
             .collect();
         for o in self.players.values().filter(|o| self.is_keeper(&o.user)) {
-            let _ = o.tx.send(ToClient::Lines { lines: lines.clone() });
+            let _ = o.tx.send(ToClient::Lines {
+                lines: lines.clone(),
+            });
         }
     }
 
@@ -91,7 +124,9 @@ impl Game {
         let w = who.trim().to_lowercase();
         self.waiting
             .iter()
-            .find(|(_, (p, _))| p.visitor_name().to_lowercase() == w || p.nickname.to_lowercase() == w)
+            .find(|(_, (p, _))| {
+                p.visitor_name().to_lowercase() == w || p.nickname.to_lowercase() == w
+            })
             .map(|(&id, _)| id)
     }
 
@@ -102,17 +137,41 @@ impl Game {
         }
         if let Some(vid) = self.waiting_match(who) {
             let (p, tx) = self.waiting.remove(&vid).expect("just found");
-            self.say1(id, Line::col(Col::Green, format!("🛂 You let {} ({}) in. Welcome them!", p.nickname, p.visitor_name())));
+            self.say1(
+                id,
+                Line::col(
+                    Col::Green,
+                    format!(
+                        "🛂 You let {} ({}) in. Welcome them!",
+                        p.nickname,
+                        p.visitor_name()
+                    ),
+                ),
+            );
             self.admit_now(vid, &p, tx);
             return Ok(());
         }
         let name = who.trim().to_lowercase();
         let Some(home) = self.world.db.visitor_home(&name) else {
-            self.say1(id, Line::plain(format!("Nobody called '{}' is waiting. ('visitors' lists them)", who.trim())));
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "Nobody called '{}' is waiting. ('visitors' lists them)",
+                    who.trim()
+                )),
+            );
             return Ok(());
         };
-        self.world.db.set_visitor(&name, &home, "admitted", accounts::now())?;
-        self.say1(id, Line::col(Col::Green, format!("🛂 {name} can come straight in next time they sail here.")));
+        self.world
+            .db
+            .set_visitor(&name, &home, "admitted", accounts::now())?;
+        self.say1(
+            id,
+            Line::col(
+                Col::Green,
+                format!("🛂 {name} can come straight in next time they sail here."),
+            ),
+        );
         Ok(())
     }
 
@@ -126,45 +185,80 @@ impl Game {
             Some(vid) => {
                 let (p, tx) = self.waiting.remove(&vid).expect("just found");
                 let _ = tx.send(ToClient::Bye {
-                    reason: format!("🛂 The keepers of {} can't have visitors just now. Sail home safely! ⛵", self.here_name()),
+                    reason: format!(
+                        "🛂 The keepers of {} can't have visitors just now. Sail home safely! ⛵",
+                        self.here_name()
+                    ),
                 });
                 (p.visitor_name(), federation::normalise(&p.home))
             }
             None => {
                 let name = who.to_lowercase();
                 let Some(home) = self.world.db.visitor_home(&name) else {
-                    self.say1(id, Line::plain(format!("No visitor called '{who}'. ('visitors' lists them)")));
+                    self.say1(
+                        id,
+                        Line::plain(format!(
+                            "No visitor called '{who}'. ('visitors' lists them)"
+                        )),
+                    );
                     return Ok(());
                 };
                 (name, home)
             }
         };
-        self.world.db.set_visitor(&name, &home, "turned away", accounts::now())?;
-        self.send_off(&name, "🛂 The island keepers have asked you to sail home. ⛵");
-        self.say1(id, Line::col(Col::Yellow, format!("🛂 {name} won't be let in. ('admit {name}' if you change your mind)")));
+        self.world
+            .db
+            .set_visitor(&name, &home, "turned away", accounts::now())?;
+        self.send_off(
+            &name,
+            "🛂 The island keepers have asked you to sail home. ⛵",
+        );
+        self.say1(
+            id,
+            Line::col(
+                Col::Yellow,
+                format!("🛂 {name} won't be let in. ('admit {name}' if you change your mind)"),
+            ),
+        );
         Ok(())
     }
 
     pub(super) fn cmd_visitors(&mut self, id: u64) -> anyhow::Result<()> {
         let mut lines = vec![Line::new().b(Col::Magenta, "🛂 Visitors from other worlds")];
         for (p, _) in self.waiting.values() {
-            lines.push(Line::new().t("  ").b(Col::Yellow, p.nickname.clone()).c(Col::Dim, format!(" {}", p.visitor_name())).c(Col::Yellow, "  waiting at the dock now"));
+            lines.push(
+                Line::new()
+                    .t("  ")
+                    .b(Col::Yellow, p.nickname.clone())
+                    .c(Col::Dim, format!(" {}", p.visitor_name()))
+                    .c(Col::Yellow, "  waiting at the dock now"),
+            );
         }
         for (name, home, status) in self.world.db.visitors()? {
             if self.waiting.values().any(|(p, _)| p.visitor_name() == name) {
                 continue;
             }
-            let here = if self.players.values().any(|o| o.user == name) { "  ☺ here" } else { "" };
+            let here = if self.players.values().any(|o| o.user == name) {
+                "  ☺ here"
+            } else {
+                ""
+            };
             lines.push(
                 Line::new()
                     .t("  ")
                     .b(Col::Cyan, self.world.nick(&name))
-                    .c(Col::Dim, format!(" {name} · from {} · {status}", federation::host(&home)))
+                    .c(
+                        Col::Dim,
+                        format!(" {name} · from {} · {status}", federation::host(&home)),
+                    )
                     .c(Col::Green, here),
             );
         }
         if lines.len() == 1 {
-            lines.push(Line::col(Col::Dim, "  Nobody has sailed in from another world yet."));
+            lines.push(Line::col(
+                Col::Dim,
+                "  Nobody has sailed in from another world yet.",
+            ));
         }
         self.send(id, lines);
         Ok(())
@@ -173,26 +267,48 @@ impl Game {
     pub(super) fn cmd_trust(&mut self, id: u64, address: &str, trust: bool) -> anyhow::Result<()> {
         let me = self.user(id);
         if !self.is_keeper(&me) {
-            self.say1(id, Line::plain("Only island keepers can choose which worlds to trust."));
+            self.say1(
+                id,
+                Line::plain("Only island keepers can choose which worlds to trust."),
+            );
             return Ok(());
         }
         let address = address.trim();
         if address.is_empty() {
-            self.say1(id, Line::plain(if trust { "Trust which world? e.g. 'trust ryall.island'" } else { "Stop trusting which world?" }));
+            self.say1(
+                id,
+                Line::plain(if trust {
+                    "Trust which world? e.g. 'trust ryall.island'"
+                } else {
+                    "Stop trusting which world?"
+                }),
+            );
             return Ok(());
         }
         let host = federation::host(address);
-        let changed = self.world.db.set_trusted(address, &me, trust, accounts::now())?;
+        let changed = self
+            .world
+            .db
+            .set_trusted(address, &me, trust, accounts::now())?;
         let msg = match (trust, changed) {
-            (true, true) => format!("🤝 People from {host} can come straight in now, no waiting at the dock."),
+            (true, true) => {
+                format!("🤝 People from {host} can come straight in now, no waiting at the dock.")
+            }
             (true, false) => format!("{host} is already trusted."),
-            (false, true) => format!("Visitors from {host} will wait at the dock to be let in again."),
+            (false, true) => {
+                format!("Visitors from {host} will wait at the dock to be let in again.")
+            }
             (false, false) => format!("{host} wasn't trusted anyway."),
         };
         self.say1(id, Line::col(Col::Green, msg));
         // Anyone from there already waiting can come in now.
         if trust {
-            let waiting: Vec<u64> = self.waiting.iter().filter(|(_, (p, _))| federation::host(&p.home) == host).map(|(&w, _)| w).collect();
+            let waiting: Vec<u64> = self
+                .waiting
+                .iter()
+                .filter(|(_, (p, _))| federation::host(&p.home) == host)
+                .map(|(&w, _)| w)
+                .collect();
             for w in waiting {
                 if let Some((p, tx)) = self.waiting.remove(&w) {
                     self.admit_now(w, &p, tx);
@@ -206,13 +322,28 @@ impl Game {
         let mut lines = vec![Line::new().b(Col::Magenta, "🤝 Trusted worlds")];
         let trusted = self.world.db.trusted_worlds()?;
         if trusted.is_empty() {
-            lines.push(Line::col(Col::Dim, "  None yet: everyone from other worlds waits at the dock for a keeper."));
+            lines.push(Line::col(
+                Col::Dim,
+                "  None yet: everyone from other worlds waits at the dock for a keeper.",
+            ));
         }
         for (host, by) in trusted {
-            lines.push(Line::new().t("  ").b(Col::Cyan, host).c(Col::Dim, format!("  (trusted by {})", self.world.nick(&by))));
+            lines.push(
+                Line::new()
+                    .t("  ")
+                    .b(Col::Cyan, host)
+                    .c(Col::Dim, format!("  (trusted by {})", self.world.nick(&by))),
+            );
         }
         if let Some(me) = &self.url {
-            lines.push(Line::col(Col::Dim, format!("  This world is {}: friends sail here with 'sail to {}'.", federation::host(me), federation::host(me))));
+            lines.push(Line::col(
+                Col::Dim,
+                format!(
+                    "  This world is {}: friends sail here with 'sail to {}'.",
+                    federation::host(me),
+                    federation::host(me)
+                ),
+            ));
         }
         self.send(id, lines);
         Ok(())
@@ -226,16 +357,26 @@ impl Game {
         if dest.eq_ignore_ascii_case("home") && user.contains('@') {
             let home = self.world.db.visitor_home(&user).unwrap_or_default();
             if home.is_empty() {
-                self.say1(id, Line::plain("You can't remember the way home! Ask a keeper."));
+                self.say1(
+                    id,
+                    Line::plain("You can't remember the way home! Ask a keeper."),
+                );
                 return Ok(true);
             }
-            self.say1(id, Line::col(Col::Blue, format!("⛵ You row out for home, to {}...", federation::host(&home))));
+            self.say1(
+                id,
+                Line::col(
+                    Col::Blue,
+                    format!("⛵ You row out for home, to {}...", federation::host(&home)),
+                ),
+            );
             if let Some(p) = self.players.get(&id) {
                 let _ = p.tx.send(ToClient::Travel { url: home });
             }
             return Ok(true);
         }
-        let looks_like_a_world = dest.contains('.') || dest.contains(':') || dest.starts_with("http");
+        let looks_like_a_world =
+            dest.contains('.') || dest.contains(':') || dest.starts_with("http");
         if !looks_like_a_world {
             return Ok(false);
         }
@@ -244,10 +385,22 @@ impl Game {
             return Ok(true);
         };
         if user.contains('@') {
-            self.say1(id, Line::plain("You're a visitor here: sail home first, and set off from your own world."));
+            self.say1(
+                id,
+                Line::plain(
+                    "You're a visitor here: sail home first, and set off from your own world.",
+                ),
+            );
             return Ok(true);
         }
-        let dest = federation::normalise(if dest.contains("://") { dest.to_string() } else { format!("https://{dest}") }.as_str());
+        let dest = federation::normalise(
+            if dest.contains("://") {
+                dest.to_string()
+            } else {
+                format!("https://{dest}")
+            }
+            .as_str(),
+        );
         if dest == federation::normalise(&me) {
             self.say1(id, Line::plain("You're already here! 💅"));
             return Ok(true);
@@ -261,9 +414,20 @@ impl Game {
             nonce: accounts::new_secret()?,
         };
         let token = passport.sign(&federation::world_key(&self.world.db)?)?;
-        self.say1(id, Line::col(Col::Blue, format!("⛵ You stamp your passport and row out to sea, towards {}...", federation::host(&dest))));
+        self.say1(
+            id,
+            Line::col(
+                Col::Blue,
+                format!(
+                    "⛵ You stamp your passport and row out to sea, towards {}...",
+                    federation::host(&dest)
+                ),
+            ),
+        );
         if let Some(p) = self.players.get(&id) {
-            let _ = p.tx.send(ToClient::Travel { url: format!("{dest}/#passport={token}") });
+            let _ = p.tx.send(ToClient::Travel {
+                url: format!("{dest}/#passport={token}"),
+            });
         }
         Ok(true)
     }

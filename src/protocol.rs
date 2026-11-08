@@ -41,7 +41,13 @@ pub struct Span {
 
 impl Span {
     fn new(t: impl Into<String>, c: Col, b: bool) -> Self {
-        Span { t: t.into(), c, b, run: None, fill: None }
+        Span {
+            t: t.into(),
+            c,
+            b,
+            run: None,
+            fill: None,
+        }
     }
 }
 
@@ -69,20 +75,29 @@ impl Line {
     }
     /// Bold coloured words that run `cmd` when tapped.
     pub fn run(mut self, col: Col, text: impl Into<String>, cmd: impl Into<String>) -> Self {
-        self.0.push(Span { run: Some(cmd.into()), ..Span::new(text, col, true) });
+        self.0.push(Span {
+            run: Some(cmd.into()),
+            ..Span::new(text, col, true)
+        });
         self
     }
     /// Coloured words that put `fill` in the command box when tapped, ready
     /// to finish or change.
     pub fn fill(mut self, col: Col, text: impl Into<String>, fill: impl Into<String>) -> Self {
-        self.0.push(Span { fill: Some(fill.into()), ..Span::new(text, col, false) });
+        self.0.push(Span {
+            fill: Some(fill.into()),
+            ..Span::new(text, col, false)
+        });
         self
     }
     /// Someone's name, which sets you up to message them when tapped.
     pub fn who(mut self, name: impl Into<String>) -> Self {
         let name = name.into();
         let fill = format!("@{name} ");
-        self.0.push(Span { fill: Some(fill), ..Span::new(name, Col::Cyan, true) });
+        self.0.push(Span {
+            fill: Some(fill),
+            ..Span::new(name, Col::Cyan, true)
+        });
         self
     }
     pub fn plain(text: impl Into<String>) -> Self {
@@ -125,7 +140,11 @@ pub fn circle_line(parts: &[CirclePart]) -> Line {
     let mut line = Line::new().c(Col::Pink, "🎶");
     for (i, p) in parts.iter().enumerate() {
         line = line.c(Col::Dim, if i == 0 { " " } else { " · " });
-        line = if p.you { line.b(Col::Pink, "you") } else { line.c(Col::Cyan, &p.name) };
+        line = if p.you {
+            line.b(Col::Pink, "you")
+        } else {
+            line.c(Col::Cyan, &p.name)
+        };
         if p.of > 1 {
             line = line.c(Col::Dim, format!(" {}/{}", p.section, p.of));
         }
@@ -167,7 +186,11 @@ impl Bar {
     }
     /// What goes beside it: "37%", or "3/10" when it's counting things.
     pub fn amount(&self) -> String {
-        if self.total == 100 { format!("{}%", self.done) } else { format!("{}/{}", self.done, self.total) }
+        if self.total == 100 {
+            format!("{}%", self.done)
+        } else {
+            format!("{}/{}", self.done, self.total)
+        }
     }
 }
 
@@ -200,7 +223,9 @@ pub struct Light {
 }
 
 /// Labels shared by more than one of these, which need their place beside them.
-pub fn shared_labels<'a>(labels: impl Iterator<Item = &'a str>) -> std::collections::HashSet<&'a str> {
+pub fn shared_labels<'a>(
+    labels: impl Iterator<Item = &'a str>,
+) -> std::collections::HashSet<&'a str> {
     let mut seen = std::collections::HashSet::new();
     let mut twice = std::collections::HashSet::new();
     for l in labels {
@@ -310,9 +335,7 @@ pub enum ToClient {
         page: Option<String>,
     },
     /// Go to another world (or back home): the browser should open this.
-    Travel {
-        url: String,
-    },
+    Travel { url: String },
     /// Connection refused (e.g. name taken).
     Bye { reason: String },
     /// You're playing music on this gramophone: start sending it (browser).
@@ -321,11 +344,20 @@ pub enum ToClient {
     SpinStop { thing: i64 },
     /// Music from a gramophone in earshot: Opus frames (base64), and how loud
     /// it is where you stand (0 to 1).
-    Audio { thing: i64, frames: Vec<String>, gain: f32, title: Option<String> },
+    Audio {
+        thing: i64,
+        frames: Vec<String>,
+        gain: f32,
+        title: Option<String>,
+    },
     /// That gramophone has stopped.
     AudioEnd { thing: i64 },
     /// A radio you can hear (url and how loud), or can't any more (no url).
-    Radio { thing: i64, url: Option<String>, gain: f32 },
+    Radio {
+        thing: i64,
+        url: Option<String>,
+        gain: f32,
+    },
     /// Open the song picker for this jukebox.
     JukeAdd { thing: i64 },
     /// Your turn on the jukebox: play this song (by its key) to everyone nearby.
@@ -370,7 +402,9 @@ pub enum ToServer {
         #[serde(default)]
         tz: Option<String>,
     },
-    Cmd { text: String },
+    Cmd {
+        text: String,
+    },
     /// Music for the gramophone this browser is playing: Opus frames (base64),
     /// and what's playing.
     Audio {
@@ -379,15 +413,32 @@ pub enum ToServer {
         title: Option<String>,
     },
     /// Songs picked for a jukebox (titles only).
-    Queue { thing: i64, songs: Vec<Song> },
+    Queue {
+        thing: i64,
+        songs: Vec<Song>,
+    },
     /// This browser's jukebox song has finished.
-    TrackDone { thing: i64, key: String },
+    TrackDone {
+        thing: i64,
+        key: String,
+    },
 }
 
 /// A board as plain lines, for clients that show it in their log. `None`
 /// for live additions, which arrive as ordinary lines too.
 pub fn board_lines(msg: &ToClient) -> Option<Vec<Line>> {
-    let ToClient::Board { title, mode, notes, more, page, weeks, .. } = msg else { return None };
+    let ToClient::Board {
+        title,
+        mode,
+        notes,
+        more,
+        page,
+        weeks,
+        ..
+    } = msg
+    else {
+        return None;
+    };
     if *mode == BoardMode::New {
         return None;
     }
@@ -399,7 +450,10 @@ pub fn board_lines(msg: &ToClient) -> Option<Vec<Line>> {
         }
     }
     if notes.is_empty() {
-        out.push(Line::col(Col::Dim, "  Nothing here yet. Be the first: post hello!"));
+        out.push(Line::col(
+            Col::Dim,
+            "  Nothing here yet. Be the first: post hello!",
+        ));
     }
     for n in notes {
         out.push(
@@ -428,10 +482,18 @@ mod tests {
     fn taps_travel_only_when_there_are_any() {
         use super::{Col, Line};
         let plain = serde_json::to_string(&Line::col(Col::Pink, "hi")).unwrap();
-        assert_eq!(plain, r#"[{"t":"hi","c":"pink"}]"#, "a plain span is just as it was");
-        let line = Line::new().who("Sam").run(Col::Pink, "the canon", "hum along canon tune");
+        assert_eq!(
+            plain, r#"[{"t":"hi","c":"pink"}]"#,
+            "a plain span is just as it was"
+        );
+        let line = Line::new()
+            .who("Sam")
+            .run(Col::Pink, "the canon", "hum along canon tune");
         let json = serde_json::to_string(&line).unwrap();
-        assert!(json.contains(r#""fill":"@Sam ""#) && json.contains(r#""run":"hum along canon tune""#), "{json}");
+        assert!(
+            json.contains(r#""fill":"@Sam ""#) && json.contains(r#""run":"hum along canon tune""#),
+            "{json}"
+        );
         let back: Line = serde_json::from_str(r#"[{"t":"hi","c":"pink"}]"#).unwrap();
         assert!(back.0[0].run.is_none() && back.0[0].fill.is_none());
     }
@@ -439,8 +501,18 @@ mod tests {
     #[test]
     fn a_circle_turn_reads_as_one_line() {
         use super::{CirclePart, circle_line};
-        let part = |name: &str, you, section, of| CirclePart { name: name.into(), you, section, of, tune: "@110 C".into() };
-        let line = circle_line(&[part("Poppy", false, 1, 1), part("Sam", false, 9, 10), part("Kiri", true, 8, 10)]);
+        let part = |name: &str, you, section, of| CirclePart {
+            name: name.into(),
+            you,
+            section,
+            of,
+            tune: "@110 C".into(),
+        };
+        let line = circle_line(&[
+            part("Poppy", false, 1, 1),
+            part("Sam", false, 9, 10),
+            part("Kiri", true, 8, 10),
+        ]);
         let text: String = line.0.iter().map(|s| s.t.as_str()).collect();
         assert_eq!(text, "🎶 Poppy · Sam 9/10 · you 8/10");
     }
