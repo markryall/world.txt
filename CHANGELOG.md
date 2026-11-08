@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Islands in Emacs
+`emacs/world-txt.el` takes you into a world from Emacs, or into several at
+once, each in its own buffer. Join one from a magic link, and after that pick
+it from a list to connect or jump straight back in, then disconnect when
+you've had enough. There's tappable text, TAB for what you could do, and a
+side panel with the map and weather. Sound works just as it does in the
+terminal (`sound on`, hums, radios, `play music ~/Music/Rumours`), because
+it's the same sound: Emacs runs it with the new `world.txt sound`.
+
 ### Suggestions that know when to stop
 The row of things you could do has a ✕ to put it away (✨ brings it back, and
 each device remembers), and once you've patted your companion it stops

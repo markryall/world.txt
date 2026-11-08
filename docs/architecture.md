@@ -12,6 +12,7 @@ radios) make sound. For where each file lives, see
 flowchart LR
     B[Browser<br/>web/index.html] <-- websocket JSON --> C1[connection task]
     T[Terminal client<br/>src/client.rs] <-- websocket JSON --> C2[connection task]
+    E[Emacs<br/>emacs/world-txt.el] <-- websocket JSON --> C2
     R[AI resident<br/>src/agent.rs] <-- websocket JSON --> C3[connection task]
     H[Outside tool<br/>a doorbell, a pizza tracker] -- HTTP POST /hook/… --> P[page and hook handler]
     C1 & C2 & C3 & P -- Event --> G[the game task<br/>src/server/game.rs]
@@ -400,7 +401,16 @@ for something else to drive instead, such as a Claude Code session
   notes, filtered noise for rain, wind and waves, and the one-off chirps,
   crackles and rumbles, written as raw samples to one more mpv that stays
   open, a moment ahead of real time. Sound starts off, as in the browser
-  (`sound on` in the client).
+  (`sound on` in the client). All of that lives in `src/speakers.rs`, which
+  takes what the world says and what's typed, and hands back lines to show
+  and messages for the world, so another client can have the same sound.
+- **Emacs** (`emacs/world-txt.el`) draws the same log and panel in a buffer
+  for each world. Its sound is `world.txt sound`: the same speakers in a
+  process of their own, one per world, over stdin and stdout a line at a
+  time. Emacs passes it everything the world sends, as it came, and
+  everything typed as `typed <text>`. It answers `say <line>` to show and
+  `send <json>` for the world, which is how `sound on` and `play music`
+  stay on your computer and everything else goes on to the world.
 
 ## Running a world
 

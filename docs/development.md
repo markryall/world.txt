@@ -16,6 +16,8 @@ For how it all fits together (the game loop, the protocol, sound), see
 - `src/server/`: networking (`mod.rs`), the game loop and commands (`game.rs`),
   the island (`world.rs`, `terrain.rs`), weather and clock (`weather.rs`), SQLite (`db.rs`)
 - `src/client.rs`: the ratatui terminal client
+- `src/speakers.rs`: a client's sound (`src/sound.rs`, `src/synth.rs`) and record player (`src/records.rs`), shared by the terminal and `world.txt sound`
+- `emacs/world-txt.el`: the Emacs client, which runs `world.txt sound` for its sound
 - `src/server/nature.rs` and `src/server/game/gather.rs`: things to find, and gathering
 - `src/server/game/boards.rs`: noticeboards, their hooks and the Island Journal
 - `src/server/gardens.rs` and `src/server/game/growing.rs`: plantings that grow over real days

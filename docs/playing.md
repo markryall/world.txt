@@ -47,6 +47,37 @@ You can play your own songs from the terminal too, with
 Dragging files in from Finder works, and so do quotes around a path with
 spaces. Keep the terminal open until your songs have played.
 
+### In Emacs
+
+`emacs/world-txt.el` is a world.txt client for Emacs, with a buffer for each
+world and as many worlds as you like. It needs the `websocket` package (from
+MELPA), and `world.txt` itself installed for sound. Then:
+
+- `M-x world-txt-join` takes a magic link (paste the whole thing) and a name
+  for the world, say `pancake-cove`. It remembers the world, so after that
+- `M-x world-txt` picks one: it connects if you aren't there, or takes you
+  straight back if you are. The list shows which ones you're in, and how
+  much has been said since you last looked.
+- `M-x world-txt-disconnect` wanders off. The buffer stays, so you can read
+  back through it, and `C-c C-r` comes back.
+
+Emacs shares device tokens with `world.txt play`, so a world you've joined
+from the terminal only needs its address (`wss://…`) in `world-txt-join`.
+
+In a world's buffer, RET says or does what you've typed, or taps the words
+under point. TAB steps through what you could do, like the terminal's side
+panel, and M-p and M-n go back through what you've typed. `C-c C-p` shows or
+hides the panel (map, weather, who's about), and `C-c C-w` goes to another
+world. A dropped connection or a restarting world comes back by itself.
+
+Sound works just as it does in the terminal, because it's the same sound:
+Emacs runs `world.txt sound` for each world you're in. `sound on` (or
+`world-txt-sound-on-start`, to always start with it on) brings hums, circles,
+radios, gramophones and the island's weather and wildlife through mpv, and
+`play music ~/Music/Rumours` at a gramophone plays your own songs. Each world
+has its own sound, so two worlds at once means two lots of birdsong.
+Disconnecting from a world stops its sound.
+
 On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
 menu) makes the island an app of its own: its own icon, full screen, no
 browser bars.

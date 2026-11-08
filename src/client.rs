@@ -38,6 +38,16 @@ struct State {
 const SHOWN: usize = 8;
 
 impl State {
+    /// What the speakers said: lines for the log, messages for the world.
+    fn take(&mut self, outs: Vec<crate::speakers::Out>, outbox: &mut Vec<ToServer>) {
+        for o in outs {
+            match o {
+                crate::speakers::Out::Say(l) => self.log.push(l),
+                crate::speakers::Out::Send(m) => outbox.push(m),
+            }
+        }
+    }
+
     /// Tab (or Shift+Tab, going back) puts the next thing you could do in
     /// the box, ready for Enter. Only over an empty box or one Tab filled:
     /// never over something you've typed.
@@ -82,33 +92,32 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
     let mut terminal = ratatui::init();
     let mut events = EventStream::new();
     let mut st = State::default();
-    let mut sound = crate::sound::Sound::new();
-    let mut told_sound = false;
-    if sound_on && let Err(e) = sound.set_on(true) {
-        st.log.push(Line::col(Col::Pink, e));
-    }
-    let (mut records, mut played) = crate::records::Records::new();
-    let mut deck = Deck::default();
+    let (mut speakers, mut played, first) = crate::speakers::Speakers::new(sound_on, "world.txt play again");
+    // What the speakers have for the world, sent at the top of each turn.
+    let mut outbox: Vec<ToServer> = Vec::new();
+    st.take(first, &mut outbox);
 
     let result: anyhow::Result<()> = async {
-        loop {
+        'turns: loop {
+            for m in outbox.drain(..) {
+                if sink.send(Message::Text(serde_json::to_string(&m)?.into())).await.is_err() {
+                    break 'turns;
+                }
+            }
             terminal.draw(|f| draw(f, &mut st))?;
             tokio::select! {
                 msg = source.next() => match msg {
                     Some(Ok(Message::Text(t))) => {
-                        match serde_json::from_str::<ToClient>(t.as_str()) {
-                            Ok(ToClient::Lines { lines }) => {
-                                for l in &lines {
-                                    if let Some(tune) = hummed(l) {
-                                        sound.tune(tune);
-                                    }
-                                }
+                        let Ok(msg) = serde_json::from_str::<ToClient>(t.as_str()) else { continue };
+                        // Sound first: hums, music in earshot, the record player.
+                        st.take(speakers.heard(&msg), &mut outbox);
+                        match msg {
+                            ToClient::Lines { lines } => {
                                 st.log.extend(lines);
                                 let excess = st.log.len().saturating_sub(2000);
                                 st.log.drain(..excess);
                             }
-                            Ok(ToClient::Status { place, weather, clock, map, here, progress, lights, actions, sounds, .. }) => {
-                                sound.levels(sounds);
+                            ToClient::Status { place, weather, clock, map, here, progress, lights, actions, .. } => {
                                 st.set_actions(actions);
                                 st.progress = progress;
                                 st.lights = lights;
@@ -118,94 +127,33 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
                                 st.map = map;
                                 st.here = here;
                             }
-                            Ok(ToClient::Hint { text, .. }) => st.hint = text,
-                            // No sound here: one short line a turn says who's humming.
-                            Ok(ToClient::Circle { parts, .. }) if !parts.is_empty() => {
-                                for p in &parts {
-                                    sound.tune(&p.tune);
-                                }
-                                st.log.push(crate::protocol::circle_line(&parts));
-                            }
-                            Ok(ToClient::Circle { .. }) => {}
-                            Ok(ToClient::Travel { url }) => st.log.push(crate::protocol::Line::new()
+                            ToClient::Hint { text, .. } => st.hint = text,
+                            // One short line a turn says who's humming.
+                            ToClient::Circle { parts, .. } if !parts.is_empty() => st.log.push(crate::protocol::circle_line(&parts)),
+                            ToClient::Travel { url } => st.log.push(crate::protocol::Line::new()
                                 .c(crate::protocol::Col::Blue, "⛵ Visiting other worlds happens in a browser: open ")
                                 .b(crate::protocol::Col::Yellow, url)),
-                            Ok(msg @ ToClient::Board { .. }) => {
+                            msg @ ToClient::Board { .. } => {
                                 if let Some(lines) = crate::protocol::board_lines(&msg) {
                                     st.log.extend(lines);
                                     st.scroll = 0;
                                 }
                             }
-                            Ok(msg @ ToClient::Bye { .. }) => {
+                            msg @ ToClient::Bye { .. } => {
                                 crate::identity::on_sign_in("player", server, &msg);
                                 if let ToClient::Bye { reason } = msg { st.closed = Some(reason); }
                             }
-                            Ok(msg @ ToClient::Welcome { .. }) => crate::identity::on_sign_in("player", server, &msg),
-                            Ok(ToClient::Restarting) => {
+                            msg @ ToClient::Welcome { .. } => crate::identity::on_sign_in("player", server, &msg),
+                            ToClient::Restarting => {
                                 st.closed = Some("🌙 The world is restarting, just for a moment. Run world.txt play again in a few seconds.".into());
                             }
-                            // Music in earshot, through mpv if there is one.
-                            Ok(ToClient::Radio { thing, url, gain }) => {
-                                let heard = sound.radio(thing, url.as_deref(), gain);
-                                tell_sound(&mut st, &mut told_sound, heard, "📻 There's a radio playing nearby.");
-                            }
-                            Ok(ToClient::Audio { thing, frames, gain, .. }) => {
-                                let heard = sound.audio(thing, &frames, gain);
-                                tell_sound(&mut st, &mut told_sound, heard, "🎶 There's music playing nearby.");
-                            }
-                            Ok(ToClient::AudioEnd { thing }) => sound.end(thing),
-                            // Playing your own songs: you're the record player.
-                            Ok(ToClient::SpinStart { thing }) => {
-                                deck.spin = Some(thing);
-                                match deck.want_play.take() {
-                                    Some(files) => records.gramophone(files),
-                                    None => st.log.push(Line::col(Col::Pink, "🎶 Which songs? play music <a file or a folder> (dragging them in works too)")),
-                                }
-                            }
-                            Ok(ToClient::SpinStop { thing }) => {
-                                if deck.spin == Some(thing) {
-                                    deck.spin = None;
-                                    records.stop();
-                                }
-                            }
-                            Ok(ToClient::JukeAdd { thing }) => {
-                                deck.jukebox = Some(thing);
-                                match deck.want_queue.take() {
-                                    Some(songs) => {
-                                        let msg = serde_json::to_string(&ToServer::Queue { thing, songs })?;
-                                        if sink.send(Message::Text(msg.into())).await.is_err() { break; }
-                                    }
-                                    None => st.log.push(Line::col(Col::Pink, format!("📀 Which songs? add songs <files or a folder> (up to {})", crate::records::JUKEBOX_MAX))),
-                                }
-                            }
-                            Ok(ToClient::JukeTurn { thing, key }) => match deck.queued.remove(&key) {
-                                Some(path) => records.jukebox(path, thing, key),
-                                None => {
-                                    let msg = serde_json::to_string(&ToServer::TrackDone { thing, key })?;
-                                    if sink.send(Message::Text(msg.into())).await.is_err() { break; }
-                                }
-                            },
-                            Ok(ToClient::JukeStop { .. }) => records.stop(),
-                            Err(_) => {}
+                            _ => {}
                         }
                     }
                     Some(Ok(_)) => {}
                     _ => break,
                 },
-                Some(p) = played.recv() => {
-                    use crate::records::Played;
-                    let msg = match p {
-                        Played::Track { title } => { st.log.push(Line::col(Col::Pink, format!("🎶 Playing {title}"))); None }
-                        Played::Note(text) => { st.log.push(Line::col(Col::Pink, text)); None }
-                        Played::Frames { frames, title } => Some(ToServer::Audio { frames, title: Some(title) }),
-                        Played::Done { thing, key } => Some(ToServer::TrackDone { thing, key }),
-                    };
-                    if let Some(m) = msg
-                        && sink.send(Message::Text(serde_json::to_string(&m)?.into())).await.is_err()
-                    {
-                        break;
-                    }
-                }
+                Some(p) = played.recv() => st.take(speakers.played(p), &mut outbox),
                 ev = events.next() => {
                     let Some(Ok(Event::Key(key))) = ev else { continue };
                     if key.kind != KeyEventKind::Press { continue }
@@ -224,25 +172,11 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
                                 st.history.push(text.clone());
                                 st.hist = st.history.len();
                                 st.scroll = 0;
-                                // Songs from this computer: the world only hears the start.
-                                let to_world = match local(&text) {
-                                    Some(Local::PlayMusic(paths)) => deck.play_music(&paths, &mut records, &mut st),
-                                    Some(Local::AddSongs(paths)) => deck.add_songs(&paths, &records, &mut st),
-                                    Some(Local::Sound(on)) => {
-                                        let on = on.unwrap_or(!sound.is_on());
-                                        let said = match sound.set_on(on) {
-                                            Ok(()) if on => "🔊 Sound on: music, hums and the island's own sounds. 'sound off' to stop.".to_string(),
-                                            Ok(()) => "🔇 Sound off.".to_string(),
-                                            Err(e) => e,
-                                        };
-                                        st.log.push(Line::col(Col::Pink, said));
-                                        None
-                                    }
-                                    None => Some(ToServer::Cmd { text }),
-                                };
-                                let Some(to_world) = to_world else { continue };
-                                let msg = serde_json::to_string(&to_world)?;
-                                if sink.send(Message::Text(msg.into())).await.is_err() { break; }
+                                // Sound and songs from this computer stay here.
+                                match speakers.typed(&text) {
+                                    Some(outs) => st.take(outs, &mut outbox),
+                                    None => outbox.push(ToServer::Cmd { text }),
+                                }
                             }
                         }
                         KeyCode::Up if st.hist > 0 => {
@@ -273,121 +207,6 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
     let _ = sink.close().await;
     println!("{}", st.closed.unwrap_or_else(|| "✧ You drift out of the world. Come back soon. 💜".into()));
     result
-}
-
-/// Typed commands the terminal handles itself, at least to begin with.
-#[derive(Debug, PartialEq)]
-enum Local {
-    /// play music ~/Music/Rumours
-    PlayMusic(String),
-    /// add songs a.mp3 b.mp3
-    AddSongs(String),
-    /// sound on, sound off, or just sound to flip it.
-    Sound(Option<bool>),
-}
-
-fn local(text: &str) -> Option<Local> {
-    let t = text.trim();
-    match t.to_lowercase().as_str() {
-        "sound" => return Some(Local::Sound(None)),
-        "sound on" => return Some(Local::Sound(Some(true))),
-        "sound off" => return Some(Local::Sound(Some(false))),
-        _ => {}
-    }
-    let (verb, rest) = t.split_once(char::is_whitespace)?;
-    let (what, paths) = rest.trim_start().split_once(char::is_whitespace)?;
-    let (verb, what, paths) = (verb.to_lowercase(), what.to_lowercase(), paths.trim().to_string());
-    if paths.is_empty() {
-        return None;
-    }
-    match (verb.as_str(), what.as_str()) {
-        ("play" | "wind", "music" | "songs" | "records") => Some(Local::PlayMusic(paths)),
-        ("add" | "queue", "songs" | "music") => Some(Local::AddSongs(paths)),
-        _ => None,
-    }
-}
-
-/// The record player's side of things: which gramophone or jukebox you're
-/// at, and the songs waiting to go on.
-#[derive(Default)]
-struct Deck {
-    /// The gramophone you've wound up.
-    spin: Option<i64>,
-    want_play: Option<Vec<std::path::PathBuf>>,
-    /// The jukebox you last added songs to, and what you've queued, by key.
-    jukebox: Option<i64>,
-    want_queue: Option<Vec<crate::protocol::Song>>,
-    queued: std::collections::HashMap<String, std::path::PathBuf>,
-}
-
-impl Deck {
-    /// `play music <songs>`: wind up the gramophone first if it isn't.
-    fn play_music(&mut self, paths: &str, records: &mut crate::records::Records, st: &mut State) -> Option<ToServer> {
-        let files = self.songs(paths, 500, records, st)?;
-        if self.spin.is_some() {
-            records.gramophone(files);
-            return None;
-        }
-        self.want_play = Some(files);
-        Some(ToServer::Cmd { text: "play music".into() })
-    }
-
-    /// `add songs <songs>`: only their titles go to the world.
-    fn add_songs(&mut self, paths: &str, records: &crate::records::Records, st: &mut State) -> Option<ToServer> {
-        let files = self.songs(paths, crate::records::JUKEBOX_MAX, records, st)?;
-        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
-        let songs: Vec<crate::protocol::Song> = files
-            .into_iter()
-            .enumerate()
-            .map(|(i, f)| {
-                let key = format!("t{stamp:x}{i}");
-                let title = crate::records::title(&f);
-                self.queued.insert(key.clone(), f);
-                crate::protocol::Song { key, title }
-            })
-            .collect();
-        match self.jukebox {
-            Some(thing) => Some(ToServer::Queue { thing, songs }),
-            None => {
-                self.want_queue = Some(songs);
-                Some(ToServer::Cmd { text: "add songs".into() })
-            }
-        }
-    }
-
-    fn songs(&self, paths: &str, max: usize, records: &crate::records::Records, st: &mut State) -> Option<Vec<std::path::PathBuf>> {
-        if !records.can_play() {
-            st.log.push(Line::col(Col::Pink, format!("🎶 To play songs from the terminal: {}, then world.txt play again.", crate::records::INSTALL)));
-            return None;
-        }
-        match crate::records::songs(paths, max) {
-            Ok(files) => Some(files),
-            Err(e) => {
-                st.log.push(Line::col(Col::Pink, format!("🎶 {e}")));
-                None
-            }
-        }
-    }
-}
-
-/// The first music you can't hear says how you could.
-fn tell_sound(st: &mut State, told: &mut bool, heard: crate::sound::Heard, what: &str) {
-    use crate::sound::Heard;
-    if *told || !matches!(heard, Heard::Off | Heard::NoPlayer) {
-        return;
-    }
-    *told = true;
-    st.log.push(match heard {
-        Heard::Off => Line::new().c(Col::Pink, format!("{what} Type ")).b(Col::Pink, "sound on").c(Col::Pink, " to hear it."),
-        _ => Line::new().c(Col::Pink, format!("{what} To hear it here: ")).b(Col::Pink, crate::sound::INSTALL).c(Col::Pink, ", then world.txt play again."),
-    });
-}
-
-/// A hum's tune, from the ♪ … ♪ in a line (as the browser finds it).
-fn hummed(l: &Line) -> Option<&str> {
-    let text = l.0.iter().find(|s| s.t.contains('♪'))?;
-    let inner = text.t.split_once("♪ ")?.1;
-    inner.rsplit_once(" ♪").map(|(t, _)| t)
 }
 
 fn draw(f: &mut Frame, st: &mut State) {
@@ -564,28 +383,6 @@ mod tests {
         assert_eq!(st.input, "wave", "and round again");
         st.pick(true);
         assert_eq!(st.input, "read", "Shift+Tab goes back");
-    }
-
-    #[test]
-    fn songs_from_here_stay_here() {
-        assert_eq!(local("play music ~/Music/Rumours"), Some(Local::PlayMusic("~/Music/Rumours".into())));
-        assert_eq!(local("Play  songs a.mp3 b.mp3"), Some(Local::PlayMusic("a.mp3 b.mp3".into())));
-        assert_eq!(local("add songs ~/Music/A\\ Little\\ Tune.mp3"), Some(Local::AddSongs("~/Music/A\\ Little\\ Tune.mp3".into())));
-        assert_eq!(local("play music"), None, "plain, it's for the world");
-        assert_eq!(local("add songs"), None);
-        assert_eq!(local("add Sam to picnic"), None);
-        assert_eq!(local("play"), None);
-        assert_eq!(local("Sound On"), Some(Local::Sound(Some(true))));
-        assert_eq!(local("sound"), Some(Local::Sound(None)));
-        assert_eq!(local("sound of the sea"), None);
-    }
-
-    #[test]
-    fn hums_are_found_in_lines() {
-        let l = Line::new().b(Col::Cyan, "Sam").c(Col::Dim, " hums ").c(Col::Pink, "♪ @90 C E G- ♪");
-        assert_eq!(hummed(&l), Some("@90 C E G-"));
-        assert_eq!(hummed(&Line::col(Col::Pink, "♪ You hear someone hums nearby.")), None);
-        assert_eq!(hummed(&Line::plain("hello")), None);
     }
 
     #[test]

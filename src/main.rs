@@ -8,6 +8,7 @@ mod records;
 mod server;
 mod service;
 mod sound;
+mod speakers;
 mod synth;
 
 use clap::{Parser, Subcommand};
@@ -64,6 +65,14 @@ enum Cmd {
         /// mpv); otherwise it's off until you type `sound on`.
         #[arg(long)]
         sound: bool,
+    },
+    /// Sound for a client that can't make its own (Emacs's world-txt.el):
+    /// what the world says goes in on stdin, a line at a time, and lines to
+    /// show and messages for the world come out on stdout.
+    Sound {
+        /// Start with sound on, rather than waiting for `sound on`.
+        #[arg(long)]
+        on: bool,
     },
     /// Bring an AI island resident to life (uses Claude Haiku 5.5).
     Agent {
@@ -221,6 +230,7 @@ async fn main() -> anyhow::Result<()> {
             Ok(())
         }
         Cmd::Play { server, invite, sound } => client::run(&server, invite, sound).await,
+        Cmd::Sound { on } => speakers::helper(on).await,
         Cmd::Agent { name, persona, server, daily_usd, state_dir, dry_run, invite } => {
             let persona = persona.unwrap_or_else(|| format!("personas/{}.md", name.to_lowercase()).into());
             agent::run(agent::Options { name, persona, server, daily_usd, state_dir, dry_run, invite }).await
