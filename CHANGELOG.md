@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### What you could do, in the terminal too
+The terminal client's side panel lists what you could do where you stand,
+just like the browser's row of buttons. Tab puts each one in the box in turn
+(Shift+Tab goes back), and Enter does it.
+
 ### Say hello to the island folk
 Meet one of the island folk and the row above the box offers a 👋 hello, and
 their name in the look text taps to look at them. No typing needed to make a

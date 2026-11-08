@@ -1,0 +1,13 @@
+name = "Actions in the terminal client"
+status = "done"
+description = """
+The browser shows Status.actions as a chip row and tappable words, but the terminal client ignores them. Show the actions in the terminal too, and let you pick one without typing the command, then (where it's simple) let you follow tappable words.
+
+
+
+## Done
+Side panel lists them under 'You could (Tab)'; Tab/Shift+Tab put each in the box, Enter runs it, never over your own typing. Tappable words left out: capturing the mouse would stop people selecting text to copy."""
+created_at = "2026-11-08T02:31:40.748704Z"
+updated_at = "2026-11-08T02:44:42.223743Z"
+tags = ["terminal"]
+priority = "medium"

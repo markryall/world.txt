@@ -1,6 +1,6 @@
 //! `world.txt play`: a cosy terminal client.
 
-use crate::protocol::{Col, Line, ToClient, ToServer};
+use crate::protocol::{Action, Col, Line, ToClient, ToServer};
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind, KeyModifiers};
 use futures_util::{SinkExt, StreamExt};
 use ratatui::{
@@ -23,12 +23,48 @@ struct State {
     progress: Vec<crate::protocol::Bar>,
     lights: Vec<crate::protocol::Light>,
     hint: Option<String>,
+    /// What you could do here, and which one Tab last put in the box.
+    actions: Vec<Action>,
+    picked: Option<usize>,
     input: String,
     history: Vec<String>,
     hist: usize,
     /// Lines scrolled up from the bottom.
     scroll: u16,
     closed: Option<String>,
+}
+
+/// At most this many actions listed in the side panel (Tab reaches them all).
+const SHOWN: usize = 8;
+
+impl State {
+    /// Tab (or Shift+Tab, going back) puts the next thing you could do in
+    /// the box, ready for Enter. Only over an empty box or one Tab filled:
+    /// never over something you've typed.
+    fn pick(&mut self, back: bool) {
+        let n = self.actions.len();
+        if n == 0 || (self.picked.is_none() && !self.input.is_empty()) {
+            return;
+        }
+        let i = match (self.picked, back) {
+            (None, false) => 0,
+            (None, true) => n - 1,
+            (Some(i), false) => (i + 1) % n,
+            (Some(i), true) => (i + n - 1) % n,
+        };
+        let a = &self.actions[i];
+        self.input = a.run.clone().or_else(|| a.fill.clone()).unwrap_or_default();
+        self.picked = Some(i);
+    }
+
+    /// New things to do: what Tab was on may have moved, or gone (then
+    /// what's in the box stays, as if typed).
+    fn set_actions(&mut self, actions: Vec<Action>) {
+        if self.picked.is_some() {
+            self.picked = actions.iter().position(|a| a.run.as_ref().or(a.fill.as_ref()) == Some(&self.input));
+        }
+        self.actions = actions;
+    }
 }
 
 pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
@@ -59,7 +95,8 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                                 let excess = st.log.len().saturating_sub(2000);
                                 st.log.drain(..excess);
                             }
-                            Ok(ToClient::Status { place, weather, clock, map, here, progress, lights, .. }) => {
+                            Ok(ToClient::Status { place, weather, clock, map, here, progress, lights, actions, .. }) => {
+                                st.set_actions(actions);
                                 st.progress = progress;
                                 st.lights = lights;
                                 st.place = place;
@@ -105,9 +142,12 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                     match key.code {
                         KeyCode::Char('c' | 'd') if ctrl => break,
                         KeyCode::Esc => break,
-                        KeyCode::Char(c) => st.input.push(c),
-                        KeyCode::Backspace => { st.input.pop(); }
+                        KeyCode::Tab => st.pick(false),
+                        KeyCode::BackTab => st.pick(true),
+                        KeyCode::Char(c) => { st.picked = None; st.input.push(c); }
+                        KeyCode::Backspace => { st.picked = None; st.input.pop(); }
                         KeyCode::Enter => {
+                            st.picked = None;
                             let text = std::mem::take(&mut st.input);
                             if !text.trim().is_empty() {
                                 st.history.push(text.clone());
@@ -118,10 +158,12 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                             }
                         }
                         KeyCode::Up if st.hist > 0 => {
+                            st.picked = None;
                             st.hist -= 1;
                             st.input = st.history[st.hist].clone();
                         }
                         KeyCode::Down => {
+                            st.picked = None;
                             st.hist = (st.hist + 1).min(st.history.len());
                             st.input = st.history.get(st.hist).cloned().unwrap_or_default();
                         }
@@ -215,6 +257,19 @@ fn draw(f: &mut Frame, st: &mut State) {
     if !st.progress.is_empty() || !st.lights.is_empty() {
         side_lines.push(RLine::default());
     }
+    // What you could do here: Tab puts each in the box.
+    if !st.actions.is_empty() {
+        side_lines.push(RLine::from(RSpan::styled("You could (Tab):", dim())));
+        for (i, a) in st.actions.iter().enumerate().take(SHOWN) {
+            let style = if st.picked == Some(i) { magenta().add_modifier(Modifier::BOLD | Modifier::REVERSED) } else { Style::default().fg(colour(Col::Pink)) };
+            side_lines.push(RLine::from(vec![RSpan::raw("  "), RSpan::styled(a.label.clone(), style)]));
+        }
+        if st.actions.len() > SHOWN {
+            let more = st.picked.filter(|&i| i >= SHOWN).map_or_else(|| format!("  +{} more", st.actions.len() - SHOWN), |i| format!("  {}", st.actions[i].label));
+            side_lines.push(RLine::from(RSpan::styled(more, if st.picked.is_some_and(|i| i >= SHOWN) { magenta().add_modifier(Modifier::BOLD | Modifier::REVERSED) } else { dim() })));
+        }
+        side_lines.push(RLine::default());
+    }
     if let Some(h) = &st.hint {
         side_lines.push(RLine::from(RSpan::styled(
             h.clone(),
@@ -283,5 +338,50 @@ fn colour(c: Col) -> Color {
         Col::Red => Color::Rgb(255, 107, 107),
         Col::Brown => Color::Rgb(192, 138, 90),
         Col::Grey => Color::Rgb(160, 160, 168),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn act(label: &str, run: Option<&str>, fill: Option<&str>) -> Action {
+        Action { label: label.into(), run: run.map(Into::into), fill: fill.map(Into::into) }
+    }
+
+    #[test]
+    fn tab_goes_round_what_you_could_do() {
+        let mut st = State { actions: vec![act("👋 wave", Some("wave"), None), act("💬 Sam…", None, Some("@Sam ")), act("📖 read", Some("read"), None)], ..Default::default() };
+        st.pick(false);
+        assert_eq!(st.input, "wave");
+        st.pick(false);
+        assert_eq!(st.input, "@Sam ", "a fill starts a command for you");
+        st.pick(false);
+        st.pick(false);
+        assert_eq!(st.input, "wave", "and round again");
+        st.pick(true);
+        assert_eq!(st.input, "read", "Shift+Tab goes back");
+    }
+
+    #[test]
+    fn tab_leaves_your_own_typing_alone() {
+        let mut st = State { actions: vec![act("👋 wave", Some("wave"), None)], input: "hello th".into(), ..Default::default() };
+        st.pick(false);
+        assert_eq!(st.input, "hello th");
+        assert_eq!(st.picked, None);
+    }
+
+    #[test]
+    fn new_actions_follow_or_forget_the_pick() {
+        let mut st = State { actions: vec![act("👋 wave", Some("wave"), None), act("📖 read", Some("read"), None)], ..Default::default() };
+        st.pick(false);
+        st.set_actions(vec![act("🎣 fish", Some("fish"), None), act("👋 wave", Some("wave"), None)]);
+        assert_eq!(st.picked, Some(1), "followed to where it went");
+        st.pick(false);
+        assert_eq!(st.input, "fish");
+        st.set_actions(vec![act("📖 read", Some("read"), None)]);
+        assert_eq!(st.picked, None, "gone");
+        st.pick(false);
+        assert_eq!(st.input, "fish", "so the box is left as it is");
     }
 }

@@ -21,6 +21,11 @@ who and help are always at the end. Tap instead of type, on a phone or not.
 The look text has taps too: a thing's name looks at it and ends with what
 you could do with it, and a person's name gets a message started.
 
+In the terminal client, the side panel lists what you could do under **You
+could (Tab)**. Tab puts the first one in the box and goes on to the next each
+time it's pressed (Shift+Tab goes back), so Enter does it, or finish one that
+needs more. Tab never touches something you've typed.
+
 On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
 menu) makes the island an app of its own: its own icon, full screen, no
 browser bars.
