@@ -1,0 +1,7 @@
+name = "Crisper icon on the home screen"
+status = "todo"
+description = """iPhones draw home screen icons at 180×180, and we only offer icon-192.png as the apple-touch-icon, so iOS shrinks it a little and the island's crisp little glyphs (clovers, hills, the @, the waves) go a touch soft. Purely cosmetic: draw a 180×180 version at that size (web/icon-180.png), serve it like the others (src/server/mod.rs), and point <link rel="apple-touch-icon"> at it. Maybe a /favicon.ico while we're there, for the bots and feed readers that ask for it."""
+created_at = "2026-11-08T11:47:41.096786Z"
+updated_at = "2026-11-08T11:47:41.096786Z"
+tags = ["phone"]
+priority = "low"
