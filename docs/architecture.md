@@ -388,7 +388,10 @@ for something else to drive instead, such as a Claude Code session
   the side panel with its minimap, board views, and all the sound above. It
   reconnects on its own after a redeploy and picks up where it left off.
 - **The terminal** (`src/client.rs`) is a ratatui app with the same log and
-  side panel, and no sound.
+  side panel. Music goes to mpv if it's installed (`src/sound.rs`): a radio's
+  stream by its URL, and gramophone frames wrapped in Ogg on mpv's stdin, with
+  the volume following you over mpv's control socket. Hums and the island's
+  own sounds stay browser-only.
 
 ## Running a world
 

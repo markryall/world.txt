@@ -1,0 +1,11 @@
+name = "Play your own songs from the terminal"
+status = "todo"
+description = "Playing a gramophone or taking your jukebox turn from the terminal: ffmpeg encodes a local file to Opus (the same framing the browser's encoder uses) and the client sends frames at real-time pace. A file path stands in for the browser's file picker (play music <path>, add songs <paths>). Needs ffmpeg, which brew install mpv already brings."
+created_at = "2026-11-08T02:55:14.934121Z"
+updated_at = "2026-11-08T02:55:14.934121Z"
+tags = [
+    "terminal",
+    "music",
+]
+priority = "medium"
+blocked_by = ["Listen in the terminal"]

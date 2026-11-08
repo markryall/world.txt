@@ -1,0 +1,16 @@
+name = "Listen in the terminal"
+status = "done"
+description = """
+The terminal client throws away Radio, Audio and AudioEnd. Hear them through an external player: radio is a URL (mpv --no-video, volume over its IPC socket as you walk), gramophone and jukebox are Opus frames (wrap in Ogg in Rust, pipe to mpv - or ffplay -). Prefer mpv, fall back to ffplay; with neither, stay silent as now, and the first time music plays nearby, one line says how to hear it: brew install mpv (which brings ffmpeg too), or apt install mpv on Linux. --quiet for silence anyway. Docs: playing.md, the README, and a caveat in the Homebrew formula.
+
+
+
+## Done
+mpv only (ffplay can't change volume while playing). Tested end to end: a browser's gramophone heard in the terminal (Ogg, stereo 48kHz), a radio getting quieter with distance and stopping out of earshot, and the install hint without mpv. Homebrew formula caveat still to add at the next release."""
+created_at = "2026-11-08T02:55:14.929751Z"
+updated_at = "2026-11-08T03:00:55.039742Z"
+tags = [
+    "terminal",
+    "music",
+]
+priority = "high"

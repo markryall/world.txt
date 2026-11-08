@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Music in the terminal
+The terminal client plays radios, gramophones and jukeboxes through mpv,
+louder as you walk up to them. Without mpv, the first music nearby says how to
+get it (`brew install mpv`); `world.txt play --quiet` stays silent.
+
 ### What you could do, in the terminal too
 The terminal client's side panel lists what you could do where you stand,
 just like the browser's row of buttons. Tab puts each one in the box in turn

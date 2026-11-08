@@ -67,7 +67,7 @@ impl State {
     }
 }
 
-pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
+pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::Result<()> {
     if invite.is_none() && crate::identity::load_token("player", server).is_none() {
         anyhow::bail!(
             "world.txt is invite-only 💌 Ask an island keeper for a magic link, then: world.txt play --invite <link or code>"
@@ -82,6 +82,8 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
     let mut terminal = ratatui::init();
     let mut events = EventStream::new();
     let mut st = State::default();
+    let mut sound = crate::sound::Sound::new(quiet);
+    let mut told_install = false;
 
     let result: anyhow::Result<()> = async {
         loop {
@@ -128,8 +130,18 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
                             Ok(ToClient::Restarting) => {
                                 st.closed = Some("🌙 The world is restarting, just for a moment. Run world.txt play again in a few seconds.".into());
                             }
-                            // Sound is for browsers.
-                            Ok(ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. }) | Err(_) => {}
+                            // Music in earshot, through mpv if there is one.
+                            Ok(ToClient::Radio { thing, url, gain }) => {
+                                let heard = sound.radio(thing, url.as_deref(), gain);
+                                tell_install(&mut st, &mut told_install, heard, "📻 There's a radio playing nearby.");
+                            }
+                            Ok(ToClient::Audio { thing, frames, gain, .. }) => {
+                                let heard = sound.audio(thing, &frames, gain);
+                                tell_install(&mut st, &mut told_install, heard, "🎶 There's music playing nearby.");
+                            }
+                            Ok(ToClient::AudioEnd { thing }) => sound.end(thing),
+                            // Playing your own songs is for browsers, for now.
+                            Ok(ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. }) | Err(_) => {}
                         }
                     }
                     Some(Ok(_)) => {}
@@ -185,6 +197,15 @@ pub async fn run(server: &str, invite: Option<String>) -> anyhow::Result<()> {
     let _ = sink.close().await;
     println!("{}", st.closed.unwrap_or_else(|| "✧ You drift out of the world. Come back soon. 💜".into()));
     result
+}
+
+/// The first music you can't hear says how you could.
+fn tell_install(st: &mut State, told: &mut bool, heard: crate::sound::Heard, what: &str) {
+    if heard != crate::sound::Heard::NoPlayer || *told {
+        return;
+    }
+    *told = true;
+    st.log.push(Line::new().c(Col::Pink, format!("{what} To hear it here: ")).b(Col::Pink, crate::sound::INSTALL).c(Col::Pink, ", then world.txt play again."));
 }
 
 fn draw(f: &mut Frame, st: &mut State) {

@@ -26,6 +26,12 @@ could (Tab)**. Tab puts the first one in the box and goes on to the next each
 time it's pressed (Shift+Tab goes back), so Enter does it, or finish one that
 needs more. Tab never touches something you've typed.
 
+The terminal client plays music too, through [mpv](https://mpv.io): radios,
+and gramophone and jukebox songs, getting louder as you walk up to them, just
+like in a browser. `brew install mpv` (or `apt install mpv`) and it's there;
+`world.txt play --quiet` keeps things silent anyway. Hums and the island's own
+sounds are still browser-only.
+
 On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
 menu) makes the island an app of its own: its own icon, full screen, no
 browser bars.

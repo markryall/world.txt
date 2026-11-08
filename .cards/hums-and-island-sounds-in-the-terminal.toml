@@ -1,0 +1,11 @@
+name = "Hums and island sounds in the terminal"
+status = "todo"
+description = "Hums, humming circles and the island's ambient sounds (rain, wind, waves, birds, crickets, fire) are made by the browser itself from notes and levels. A small synth in the client renders them to PCM for the player. Bigger than the others; worth it only if the first two land well."
+created_at = "2026-11-08T02:55:14.946870Z"
+updated_at = "2026-11-08T02:55:14.946870Z"
+tags = [
+    "terminal",
+    "music",
+]
+priority = "low"
+blocked_by = ["Listen in the terminal"]
