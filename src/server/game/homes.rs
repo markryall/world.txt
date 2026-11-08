@@ -143,6 +143,7 @@ impl Game {
             "🏡 This is your home now! The patch around you is yours to decorate."
         };
         self.say1(id, Line::new().b(Col::Magenta, msg));
+        self.happened(&user, super::since::HOME, x, y, "home");
         self.say1(id, Line::col(Col::Dim, "Type home to come back from anywhere · share it with a friend to build together · name it something special"));
         self.tell_here(
             x,
@@ -314,6 +315,9 @@ impl Game {
                 return Ok(());
             }
             self.world.paint_home(&user, colour.clone())?;
+            if let Some(c) = &colour {
+                self.happened(&user, super::since::PAINT, x, y, c);
+            }
             let at_home = self.world.home_at(x, y).is_some_and(|h| h.owner == user);
             match &colour {
                 Some(c) => {
@@ -474,6 +478,18 @@ impl Game {
             return;
         }
         let (visitor, user, owner) = (p.name.clone(), p.user.clone(), h.owner.clone());
+        // Now and then, not every step.
+        let key = (owner.clone(), user.clone());
+        if self
+            .doorbells
+            .get(&key)
+            .is_some_and(|t| t.elapsed() < DOORBELL_EVERY)
+        {
+            return;
+        }
+        self.doorbells.insert(key, std::time::Instant::now());
+        // Kept for the recap, in case they're away (see docs/rules.md).
+        self.happened(&user, super::since::VISIT, to.0, to.1, &owner);
         let Some((&oid, o)) = self.players.iter().find(|(_, o)| o.user == owner) else {
             return;
         };
@@ -486,15 +502,6 @@ impl Game {
         {
             return;
         }
-        let key = (owner, user);
-        if self
-            .doorbells
-            .get(&key)
-            .is_some_and(|t| t.elapsed() < DOORBELL_EVERY)
-        {
-            return;
-        }
-        self.doorbells.insert(key, std::time::Instant::now());
         self.say1(
             oid,
             Line::col(

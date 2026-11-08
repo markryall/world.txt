@@ -290,6 +290,27 @@ Your part (section 3 is next):
 and `hum along 2 D5- C#5- B4- A4- G4- F#4- G4- E4-` fixes it for next time
 round, with nobody missing a beat.
 
+## Coming back
+
+Nothing is lost for being away, and the island remembers what your friends
+got up to while you were gone. Come back after an hour or more and, after any
+mail, there's a few lines of what's new:
+
+```
+🏝 Since you were last here:
+  🏡 Poppy made a home on Mossy Holm, and painted it lilac.
+  🔨 Sam finished a cottage at The Duck Pond.
+  🪧 Lu named a spot The Willow Bank.
+  🌳 Lu's birch at The Village Green has grown into a tall birch.
+  📌 3 new notes on the noticeboard at The Village Green.
+  👣 Poppy dropped by your home.
+```
+
+Tap a line to walk there. It's only ever what anyone walking past could have
+seen, never anything of yours, and nothing from people you've muted. If
+nothing happened, it says nothing. [The rules](rules.md#whats-private-and-what-isnt)
+say exactly what's kept for it, and for how long.
+
 ## Homes
 
 `claim` makes the 3x3 patch around you your home (one each, not too close to

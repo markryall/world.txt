@@ -525,6 +525,7 @@ impl Game {
         };
         let place = self.world.place_title(x, y);
         let builder = self.world.nick(by);
+        self.happened(by, super::since::BUILT, x, y, plan.name);
         let ids: Vec<(u64, bool)> = self
             .players
             .iter()

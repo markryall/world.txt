@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### The island since you were last here
+Come back after an hour or more and you hear what your friends got up to
+while you were gone: homes made and painted, buildings finished, spots
+named, things made, gardens planted and grown, new notes on boards you
+follow, and who dropped by your home. A few lines at most, each one tappable
+to walk there, and nothing at all if nothing happened. Only what anyone
+walking past could have seen goes in, and the rules say exactly what the
+island keeps for it (a month of who did what out in the open, and visits to
+homes).
+
 ### Setting off from indoors
 `go` somewhere (a place, home, the dock, an event) or `join` a friend while
 you're inside a building now steps you out of the door first, rather than

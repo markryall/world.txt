@@ -1,0 +1,28 @@
+name = "The island since you were last here"
+status = "done"
+description = """
+Come back after a while and see what your friends got up to, so a quiet island still shows signs of people. Today's "while you were away" only covers your own mail and your own plants.
+
+On arrival, if you've been gone more than an hour, a short recap after the mail:
+
+  🏝 Since you were last here (2 days):
+    🏡 Poppy claimed a home by the duck pond, and painted it lilac.
+    🔨 Sam finished a cottage on Mossy Holm.
+    🪧 Someone named a spot The Willow Bank.
+    🌳 Lu's birch on the green has grown tall.
+    📌 3 new notes on the village noticeboard.
+    👣 Poppy dropped by your home.
+
+Each line is tappable (walk there, or read the board).
+
+Rules:
+- At most 6 lines, people you know first, then the newest. Nothing of your own, nothing from people you've muted.
+- Only things anyone walking past could already see: homes claimed or painted, buildings finished, places named or described, things made in the open, other people's plantings reaching a new stage, events planned, a note count for boards you follow, and visits to your home. Nothing from inside rooms, no messages and no bottles.
+- Grouped, not itemised: "Sam made 4 things around the beach", not four lines.
+- Nothing at all if nothing happened. Never "you missed…" in tone; never a count of days away as guilt.
+
+Needs: a small happenings log (at, who, kind, x, y, what), written at those few moments and kept 30 days, plus each player's last-here time (a column on players, set on disconnect). Things, homes and tile names don't carry a when or a who today, so the log is the simplest way. A new kind of record, so docs/rules.md says exactly what's kept and for how long, and playing.md gets a line."""
+created_at = "2026-11-08T20:50:20.000000Z"
+updated_at = "2026-11-08T21:01:29.000000Z"
+tags = ["belonging", "together"]
+priority = "high"

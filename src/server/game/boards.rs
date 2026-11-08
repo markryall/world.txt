@@ -14,7 +14,7 @@ use chrono::{Datelike, Local, NaiveDate, TimeZone};
 
 const PAGE: i64 = 10;
 const MAX_NOTE: usize = 280;
-const JOURNAL_KIND: &str = "journal";
+pub(super) const JOURNAL_KIND: &str = "journal";
 const BOARD_KIND: &str = "board";
 
 /// Where a player is reading, so `read more` knows what comes next.

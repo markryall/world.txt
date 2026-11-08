@@ -53,6 +53,23 @@ pub struct ThingRow {
     pub paint: Option<String>,
 }
 
+/// Something someone did out in the open, for the recap of what's
+/// happened since someone was last here.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HappeningRow {
+    pub at: i64,
+    pub who: String,
+    /// "home", "paint", "built", "named", "made" or "visit".
+    pub kind: String,
+    pub x: i64,
+    pub y: i64,
+    /// What: the thing, the name, the colour, or whose home was visited.
+    pub what: String,
+}
+
+/// How long happenings are kept.
+pub const HAPPENINGS_KEPT: i64 = 30 * 86_400;
+
 pub struct EventRow {
     pub id: i64,
     pub at: i64,
@@ -355,6 +372,15 @@ impl Db {
         let _ = conn.execute("ALTER TABLE hooks ADD COLUMN label TEXT", []);
         // Status hooks: up (1) or down (0), with `label` as what it last said.
         let _ = conn.execute("ALTER TABLE hooks ADD COLUMN up INTEGER", []);
+        // The island since you were last here: what people did out in the
+        // open (kept a month), and when each person was last on the island.
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS happenings (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, who TEXT NOT NULL,
+                 kind TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL, what TEXT NOT NULL);
+             CREATE INDEX IF NOT EXISTS happenings_at ON happenings (at);",
+        )?;
+        let _ = conn.execute("ALTER TABLE players ADD COLUMN last_here INTEGER", []);
         Ok(Db { conn })
     }
 
@@ -1638,6 +1664,70 @@ impl Db {
         Ok(())
     }
 
+    /// Note something done out in the open, letting go of any older than a month.
+    pub fn add_happening(&self, h: &HappeningRow) -> anyhow::Result<()> {
+        self.conn.execute(
+            "DELETE FROM happenings WHERE at < ?1",
+            [h.at - HAPPENINGS_KEPT],
+        )?;
+        self.conn.execute(
+            "INSERT INTO happenings (at, who, kind, x, y, what) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![h.at, h.who, h.kind, h.x, h.y, h.what],
+        )?;
+        Ok(())
+    }
+
+    /// Everything that's happened since a moment, newest first.
+    pub fn happenings_since(&self, since: i64) -> anyhow::Result<Vec<HappeningRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT at, who, kind, x, y, what FROM happenings WHERE at > ?1
+             ORDER BY at DESC, id DESC LIMIT 500",
+        )?;
+        let rows = stmt.query_map([since], |r| {
+            Ok(HappeningRow {
+                at: r.get(0)?,
+                who: r.get(1)?,
+                kind: r.get(2)?,
+                x: r.get(3)?,
+                y: r.get(4)?,
+                what: r.get(5)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// When someone was last on the island (set as they leave).
+    pub fn last_here(&self, name: &str) -> Option<i64> {
+        self.conn
+            .query_row(
+                "SELECT last_here FROM players WHERE name = ?1",
+                [name],
+                |r| r.get(0),
+            )
+            .ok()
+            .flatten()
+    }
+
+    pub fn set_last_here(&self, name: &str, at: i64) -> anyhow::Result<()> {
+        self.conn.execute(
+            "UPDATE players SET last_here = ?2 WHERE name = ?1",
+            params![name, at],
+        )?;
+        Ok(())
+    }
+
+    /// Notes on a board since a moment (and after the last one someone read),
+    /// by anyone but them.
+    pub fn notes_since(&self, board: i64, since: i64, after: i64, not_by: &str) -> i64 {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM notes WHERE board = ?1 AND at > ?2 AND id > ?3 AND author != ?4",
+                params![board, since, after, not_by],
+                |r| r.get(0),
+            )
+            .unwrap_or(0)
+    }
+
     pub fn save_player(&self, name: &str, x: i64, y: i64, tutorial: u8) -> anyhow::Result<()> {
         self.conn.execute(
             "INSERT INTO players (name, x, y, tutorial) VALUES (?1, ?2, ?3, ?4)
@@ -1905,6 +1995,51 @@ impl Db {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn happenings_are_kept_a_month_and_come_back_newest_first() {
+        let db = Db::open(":memory:").unwrap();
+        let h = |at: i64, what: &str| HappeningRow {
+            at,
+            who: "poppy".into(),
+            kind: "named".into(),
+            x: 1,
+            y: 2,
+            what: what.into(),
+        };
+        db.add_happening(&h(100, "The Old Oak")).unwrap();
+        db.add_happening(&h(200, "The Willow Bank")).unwrap();
+        let since: Vec<String> = db
+            .happenings_since(100)
+            .unwrap()
+            .into_iter()
+            .map(|h| h.what)
+            .collect();
+        assert_eq!(since, vec!["The Willow Bank"]);
+        db.add_happening(&h(100 + HAPPENINGS_KEPT + 1, "The Duck Pond"))
+            .unwrap();
+        let all: Vec<String> = db
+            .happenings_since(0)
+            .unwrap()
+            .into_iter()
+            .map(|h| h.what)
+            .collect();
+        assert_eq!(
+            all,
+            vec!["The Duck Pond", "The Willow Bank"],
+            "older than a month is let go"
+        );
+    }
+
+    #[test]
+    fn last_here_is_remembered() {
+        let db = Db::open(":memory:").unwrap();
+        assert_eq!(db.last_here("sam"), None);
+        db.save_player("sam", 1, 2, 0).unwrap();
+        assert_eq!(db.last_here("sam"), None);
+        db.set_last_here("sam", 500).unwrap();
+        assert_eq!(db.last_here("sam"), Some(500));
+    }
 
     #[test]
     fn songs_are_kept_replaced_and_forgotten() {

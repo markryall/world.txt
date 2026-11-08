@@ -34,6 +34,7 @@ mod songbook;
 mod sounds;
 pub(crate) use radio::clean_station_name;
 mod sailing;
+mod since;
 mod together;
 mod travel;
 mod visitors;
@@ -330,6 +331,7 @@ impl Game {
                     p.ambient_quiet = 0;
                 }
                 let before = self.snapshot(id);
+                let newest = self.newest_thing();
                 if let Err(e) = self.command(id, text.trim()) {
                     eprintln!("command error: {e}");
                     self.send(
@@ -340,6 +342,7 @@ impl Game {
                 if let Some(act) = self.what_happened(id, text.trim(), before) {
                     self.progress(id, act);
                 }
+                self.note_made(id, newest);
             }
         }
     }
@@ -647,6 +650,7 @@ impl Game {
             return;
         }
         let saved = self.world.db.player(&user);
+        let last_here = self.world.db.last_here(&user);
         // Invited accounts start off the map, until their first arrival.
         let first_time = !bot
             && saved.is_none_or(|s| s.0 < 0 && crate::server::world::room_of(s.0, s.1).is_none());
@@ -764,6 +768,11 @@ impl Game {
         if !bot {
             self.garden_news(id);
         }
+        if let Some(last) =
+            last_here.filter(|&l| !bot && !first_time && !back && now - l >= since::AWAY)
+        {
+            self.since_news(id, last);
+        }
         if first_time {
             // They're here now: a dropped connection before their first step
             // shouldn't make them new all over again.
@@ -803,6 +812,8 @@ impl Game {
             // Residents keep no position or progress.
         } else if let Err(e) = self.world.db.save_player(&p.user, p.x, p.y, p.tutorial) {
             eprintln!("saving {}: {e}", p.user);
+        } else {
+            let _ = self.world.db.set_last_here(&p.user, super::accounts::now());
         }
         for o in self.players.values() {
             let line = if o.x == p.x && o.y == p.y {
@@ -1127,7 +1138,8 @@ impl Game {
             "mend" | "repair" | "fix" => return self.cmd_mend(id),
             "recipes" => return self.cmd_recipes(id),
             "unmake" | "destroy" | "remove" | "demolish" | "unbuild" | "knock" => {
-                return self.cmd_unmake(id, rest.trim_start().strip_prefix("down ").unwrap_or(rest));
+                return self
+                    .cmd_unmake(id, rest.trim_start().strip_prefix("down ").unwrap_or(rest));
             }
             "undo" => return self.cmd_undo(id),
             "mute" | "block" => return self.cmd_mute(id, rest, true),
@@ -2022,6 +2034,7 @@ impl Game {
         }
         let name: String = name.chars().take(40).collect();
         self.world.set_name(x, y, Some(name.clone()))?;
+        self.happened(&self.user(id), since::NAMED, x, y, &name);
         self.say1(
             id,
             Line::new()

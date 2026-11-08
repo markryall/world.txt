@@ -262,6 +262,7 @@ else sees it in their own time.
 | Thing | When |
 |---|---|
 | Doorbell | You hear someone's visiting your home at most once every 30 minutes per visitor. Only while you're on and away from home, and not for your guests, residents, or people you've muted. |
+| The island since you were last here | Only after at least an hour away, and only if something happened. At most 6 lines (people's doings first, then gardens, boards you follow, and who dropped by your home), with "…and more besides" if there was more. Never anything of your own. |
 | A game (`rps`, `ask`) nobody finishes | Forgotten after 10 minutes |
 | A made thing doing its thing (a frog croaking) | At most once every 3 minutes for each person |
 | Scenery while you're not doing anything | Two lines, then it goes quiet until you do something |
@@ -301,6 +302,8 @@ else sees it in their own time.
 | `@Poppy …` | Only Poppy. If she's away, it waits as mail until she next arrives. |
 | Notes on a board | Anyone who reads the board. Followers hear about new ones from anywhere. |
 | Where you are | Not private: `who` and `find` show where everyone is, including "inside" a building. |
+| Visiting someone's home | The owner hears the doorbell if they're on, and if they're away it's in their "since you were last here" when they're back. Nobody else is told. |
+| What you do out in the open | Claiming or painting a home, finishing a building, naming a spot and making something outdoors can turn up in other people's "since you were last here". Nothing you do inside a building does. |
 | What's in a display case | Anyone who looks. The finds still belong to whoever put each one in. |
 | A hook's secret address | Only whoever made it, once |
 | A place event's links | Only the people who'd hear about it (see Events) |
@@ -317,6 +320,7 @@ someone chooses to send them:
 |---|---|
 | `suggest …` | The suggestion, who left it and when. Only keepers can read them (`suggestions`, newest 20). Keepers in the world get a one-line heads-up when a new one arrives. |
 | Which features you've found | The first time you try each feature (a kite, paint, going inside, the hat…), the island notes that you did, and when. Nothing else: not what you said or made, not where you were, not how often. Keepers see who's found what with `discoveries`. Reports are never counted, and residents and visitors from other worlds aren't noted. |
+| The island since you were last here | For a month, the island keeps a short note of each thing done out in the open (a home claimed or painted, a building finished, a spot named, something made outdoors) and each visit to someone's home: who, what, where and when. Plus when each person last left. It's only ever used for those recaps, and no command shows it to keepers. Whoever runs the server can read its database, though, so it isn't secret from them. |
 | `report Sam …` | The report, in the reporter's own words: who made it, who it's about, and when. Only keepers can read them (`reports`, newest 20), and Sam isn't told. Reporting never shows the keepers what Sam actually said: only what the reporter chose to write. |
 
 ### Muting
@@ -333,6 +337,7 @@ don't get:
 - music Sam plays on a gramophone or a jukebox;
 - a bottle Sam threw out to sea;
 - the doorbell when Sam visits your home;
+- anything Sam did, in your "since you were last here";
 - word that Sam added you to a board.
 
 Muting doesn't stop a radio (radios play the island's stations, not anyone's
