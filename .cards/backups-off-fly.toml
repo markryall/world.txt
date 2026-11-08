@@ -1,0 +1,10 @@
+name = "Backups off Fly"
+status = "done"
+description = "Each world's daily backups land in /data/backups on the same Fly volume as the world itself (plus Fly's own volume snapshots), so losing the volume or the app loses everything: homes, gardens, companions, learned songs. Pulling a copy down is a manual fly ssh sftp get. A small script in deploy/ pulls the newest backup from every world into a folder you name (cloud storage, an external disk), skips ones it already has, and keeps the newest N there, safe to run daily from cron or launchd. Docs in hosting-fly.md, including how to restore."
+created_at = "2026-11-08T02:31:40.737625Z"
+updated_at = "2026-11-08T02:35:32.999784Z"
+tags = [
+    "ops",
+    "backups",
+]
+priority = "high"

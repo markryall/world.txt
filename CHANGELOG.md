@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Backups off Fly
+`deploy/fly-backups <folder>` copies every Fly world's daily backups down to a
+folder of your own, skipping copies it already has and keeping the newest 30,
+so a world outlives its volume. Run it daily from cron;
+[hosting-fly.md](docs/hosting-fly.md#backups) has how, and how to restore.
+
 ## 0.8.0 (2026-11-08)
 
 ### Humming along

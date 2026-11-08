@@ -91,9 +91,42 @@ fly ssh console --app <app> -C "world.txt rename 'Willow Bank'"   # then fly mac
 fly logs --app <app>                                            # what the world is saying
 ```
 
-**Backups** land in `/data/backups/`, on the same volume as the world, and Fly
-also snapshots volumes daily. To keep a copy off Fly too, pull one down now and
-then: `fly ssh sftp get /data/backups/world-<date>.db --app <app>`.
+## Backups
+
+Each world copies itself to `/data/backups/` once a day and keeps the newest 14,
+and Fly snapshots volumes daily too. But they all live with the world on Fly,
+so losing the volume or the app would lose them as well. Keep copies somewhere
+else with `deploy/fly-backups`, which copies every world's backups down to a
+folder you choose:
+
+```
+deploy/fly-backups ~/world-backups        # keeps the newest 30 of each
+deploy/fly-backups /Volumes/Backup/world 60
+```
+
+Each world gets its own folder (`~/world-backups/home/world-2026-11-08.db`…).
+Copies it already has are skipped, so it's quick, and it's safe to run as often
+as you like. To make it daily, a crontab line (`crontab -e`) does it:
+
+```
+30 9 * * * cd ~/code/world.txt && deploy/fly-backups ~/world-backups
+```
+
+It needs `fly` signed in. On macOS, cron only reaches a cloud-synced folder
+(iCloud Drive and the like) once cron has Full Disk Access; or point it at a
+plain folder and let a backup app pick it up. A run that can't reach a world
+says so and exits non-zero, so cron's mail notices.
+
+**To restore a world** from a copy, upload it as `import.db` and restart, just
+like [bringing a world across](#bringing-an-existing-world-across):
+
+```
+fly ssh sftp shell --app <app>
+» put ~/world-backups/home/world-2026-11-08.db /data/import.db
+fly machine restart --app <app>
+```
+
+The world it replaces is kept in `/data/replaced/`.
 
 ---
 [← back to the README](../README.md)

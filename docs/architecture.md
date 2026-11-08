@@ -398,7 +398,8 @@ for something else to drive instead, such as a Claude Code session
 - **On Fly.io:** the Dockerfile builds the release binary in a Rust image
   and copies it into a slim Debian one. The world lives on a volume at
   `/data`, and the server runs as an ordinary unprivileged user.
-  `deploy/fly-deploy all` deploys every world in turn. A redeploy tells
+  `deploy/fly-deploy all` deploys every world in turn, and `deploy/fly-backups`
+  copies their daily backups down off Fly. A redeploy tells
   every browser `restarting`, they reconnect a few seconds later, and nobody
   loses their place.
 

@@ -1,0 +1,48 @@
+#!/bin/sh
+# Copy every Fly world's daily backups down to a folder of your own, so a
+# world outlives its volume: deploy/fly-backups <folder> [keep]
+#
+# Each world (deploy/fly/<world>.toml) gets <folder>/<world>/. Copies it
+# already has are skipped (a day's backup never changes once it's made), and
+# only the newest [keep] (default 30) are kept there. Safe to run as often as
+# you like, e.g. daily from cron or launchd. See docs/hosting-fly.md.
+set -e
+usage() { echo "usage: deploy/fly-backups <folder> [keep]" >&2; exit 2; }
+[ -n "${1:-}" ] || usage
+dest=$1
+keep=${2:-30}
+case "$keep" in '' | *[!0-9]* | 0) usage ;; esac
+case "$dest" in /*) ;; *) dest="$PWD/$dest" ;; esac
+cd "$(dirname "$0")/.."
+
+failed=""
+for cfg in deploy/fly/*.toml; do
+  w=$(basename "$cfg" .toml)
+  [ "$w" = example ] && continue
+  mkdir -p "$dest/$w"
+  # Only names shaped like world-2026-11-08.db, whatever else ssh prints.
+  if ! list=$(fly ssh console --config "$cfg" -C "ls /data/backups" 2>/dev/null | tr -d '\r' | grep -E '^[A-Za-z0-9_.-]+-[0-9]{4}-[0-9]{2}-[0-9]{2}\.db$'); then
+    echo "⚠  $w: couldn't list its backups" >&2
+    failed="$failed $w"
+    continue
+  fi
+  got=0
+  # Just the newest few: older ones would only be pruned again.
+  for f in $(echo "$list" | sort | tail -n "$keep"); do
+    [ -f "$dest/$w/$f" ] && continue
+    rm -f "$dest/$w/$f.partial"
+    if fly ssh sftp get "/data/backups/$f" "$dest/$w/$f.partial" --config "$cfg" >/dev/null 2>&1; then
+      mv "$dest/$w/$f.partial" "$dest/$w/$f"
+      got=$((got + 1))
+    else
+      rm -f "$dest/$w/$f.partial"
+      echo "⚠  $w: couldn't copy $f" >&2
+      failed="$failed $w"
+    fi
+  done
+  # Keep the newest; the dates in the names sort as text.
+  ls "$dest/$w" | grep -E '\.db$' | sort | awk -v k="$keep" '{ a[NR] = $0 } END { for (i = 1; i <= NR - k; i++) print a[i] }' |
+    while read -r old; do rm -f "$dest/$w/$old"; done
+  echo "💾 $w: $got new, $(ls "$dest/$w" | grep -cE '\.db$') kept in $dest/$w"
+done
+[ -z "$failed" ] || { echo "⚠  trouble with:$failed" >&2; exit 1; }
