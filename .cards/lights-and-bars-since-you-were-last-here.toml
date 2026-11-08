@@ -1,0 +1,20 @@
+name = "Lights and bars since you were last here"
+status = "todo"
+description = """
+Status lights and progress bars only speak to whoever's on the island at the time: go red while you're away and you never hear it happened, you just find a red light in the side panel (if you follow its board). Fold them into "The island since you were last here", for boards you follow:
+
+  🔴 CI on the noticeboard at The Greenhouse went down 3 hours ago: fresho-app main semaphore.yml by Sam
+  🟢 Surf went down and came back up while you were away.
+  📊 Photos on the noticeboard at The Village Green is at 7 of 10 (was 3).
+
+- A light that's down now: one line, with when it went down and its note (tappable link kept).
+- A light that went down and came back while you were away: one quiet line, or nothing if it was down for under a few minutes (a flap isn't news).
+- A light that stayed up: nothing.
+- A bar that moved: where it is now, and where it was when you left. Finished bars say so once ("Photos finished").
+- Counted as one of the recap's lines each, after people's doings and before visits, so a busy CI day can't push out friends.
+
+Needs: when each light last changed (a changed_at on hooks, set when up flips) and what it was before, plus a bar's value as of someone's last_here. Simplest is logging light flips and bar moves as happenings (kind "light"/"bar", what = up/down or done/total, board in x,y), kept the same month, read alongside the rest. rules.md: hooks' history is kept a month for the recap."""
+created_at = "2026-11-08T21:50:27.000000Z"
+updated_at = "2026-11-08T21:50:27.000000Z"
+tags = ["belonging", "boards"]
+priority = "medium"
