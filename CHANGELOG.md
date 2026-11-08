@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (2026-11-08)
 
 ### Paste a magic link in
 The welcome screen has a box for a magic link (the whole link, or just its
