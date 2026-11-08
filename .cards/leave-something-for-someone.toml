@@ -1,0 +1,14 @@
+name = "Leave something for someone"
+status = "todo"
+description = """
+Small kindnesses for friends who aren't online, found when they next come by. Today 'give' needs them in the world right now.
+
+- 'give daisy to Poppy' when Poppy's away leaves it on their doorstep (if they have a home) or keeps it like mail: "🎁 Sam left you a daisy, on your doorstep." Into the satchel when they arrive.
+- 'leave a note for Poppy …' at their home: tucked under the door, read when they come home (not on arrival anywhere else), so it's a reason to go home.
+- 'plant bluebells for Poppy': the planting remembers who it's for, and the growth recap tells them too.
+
+One thing at a time on any doorstep from each person, a satchel's worth at most. No thank-you obligations and no counts of gifts given. Feeds 'The island since you were last here'. Docs: rules.md (what's kept), secrets.md (it's a find, not help)."""
+created_at = "2026-11-08T20:50:20.000000Z"
+updated_at = "2026-11-08T20:50:20.000000Z"
+tags = ["together", "homes"]
+priority = "medium"

@@ -1,0 +1,10 @@
+name = "Make sure the long table gets found"
+status = "todo"
+description = """
+The practical side (calls at the gathering table, events, the board fed by outside tools) is what gives a group a reason to come back, and the cosy side is why they stay afterwards. It's rightly wrapped in the setting, but it shouldn't be hidden so well that a group never finds it.
+
+Check 'discoveries' on a hosted world: if meet, events and the noticeboard are going unfound, have the green mention them in its own voice (the Journal's "next gathering" line, a chair pulled out at the table when a call link is set, the board saying it has new notes) rather than adding them to help or the tutorial."""
+created_at = "2026-11-08T20:50:20.000000Z"
+updated_at = "2026-11-08T20:50:20.000000Z"
+tags = ["coherence", "places"]
+priority = "low"

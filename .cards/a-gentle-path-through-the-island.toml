@@ -1,0 +1,12 @@
+name = "A gentle path through the island"
+status = "todo"
+description = """
+There are lots of toys side by side, and not much telling you what one leads to. Make one loose loop the spine, with each step quietly suggesting the next: wander → gather → cook or craft → furnish your home or a display case → show a friend (invite them in).
+
+Through the hints and suggestions, not a quest: after a first gather, a hint that a campfire or bench could use it; after a first craft, that it would look nice at home; after placing something at home, that you could 'share' it with a friend. Each fires once, inside the idle budget, and never in a row.
+
+Before building, check 'discoveries' on a hosted world for where people stop along this path (lots gather, few craft?) and start the hints there. Pause new toys meanwhile: this is about joining up what's there."""
+created_at = "2026-11-08T20:50:20.000000Z"
+updated_at = "2026-11-08T20:50:20.000000Z"
+tags = ["coherence"]
+priority = "medium"
