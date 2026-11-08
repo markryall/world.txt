@@ -20,6 +20,10 @@ pub fn offset(rest: &str) -> Option<(i64, i64)> {
 impl Game {
     /// The first step on a shortest walkable path from `from` to `to`.
     fn first_step(&self, from: (i64, i64), to: (i64, i64)) -> Option<(i64, i64)> {
+        // Indoors is off the map: no path from (or to) there.
+        if !in_bounds(from.0, from.1) || !in_bounds(to.0, to.1) {
+            return None;
+        }
         let idx = |(x, y): (i64, i64)| (y * SIZE + x) as usize;
         let mut first: Vec<Option<(i64, i64)>> = vec![None; (SIZE * SIZE) as usize];
         let mut seen = vec![false; (SIZE * SIZE) as usize];
@@ -138,6 +142,7 @@ impl Game {
     /// it's on another island, then walking on. `join`: then go and find
     /// that person (by username) once across.
     pub(super) fn set_off(&mut self, id: u64, tx: i64, ty: i64, name: &str, join: Option<String>) -> anyhow::Result<()> {
+        self.step_out_first(id)?;
         let Some((x, y, _)) = self.here(id) else { return Ok(()) };
         let here = crate::server::islands::island_at(x, y);
         let island = crate::server::islands::island_at(tx, ty);
@@ -177,6 +182,12 @@ impl Game {
         }
         self.step_travellers();
         Ok(())
+    }
+
+    /// Setting off from indoors: out of the door first (the building
+    /// stays put).
+    pub(super) fn step_out_first(&mut self, id: u64) -> anyhow::Result<()> {
+        if self.in_room(id) { self.cmd_go_out(id) } else { Ok(()) }
     }
 
     /// At a dock on the way somewhere over the water: row on across.

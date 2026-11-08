@@ -63,6 +63,7 @@ impl Game {
 
     /// `go dock`: walk to this island's dock.
     pub(super) fn cmd_go_dock(&mut self, id: u64) -> anyhow::Result<()> {
+        self.step_out_first(id)?;
         let Some((x, y, _)) = self.here(id) else { return Ok(()) };
         let island = islands::island_at(x, y);
         let Some((dx, dy)) = self.dock_on(island) else {

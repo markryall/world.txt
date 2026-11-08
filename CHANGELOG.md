@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Setting off from indoors
+`go` somewhere (a place, home, the dock, an event) or `join` a friend while
+you're inside a building now steps you out of the door first, rather than
+bringing the whole world down with you.
+
 ## 0.10.0 (2026-11-08)
 
 ### Paste a magic link in

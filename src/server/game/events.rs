@@ -689,6 +689,7 @@ impl Game {
             self.say1(id, Line::plain("There's nothing coming up to go to. ('events' lists them)"));
             return Ok(());
         };
+        self.step_out_first(id)?;
         let place = self.world.place_title(e.x, e.y);
         if let Some(p) = self.players.get_mut(&id) {
             p.travel = None;
