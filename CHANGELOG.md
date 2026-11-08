@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-11-08)
 
 ### Humming along
 Hum together and actually stay in time. `hum along` starts a humming circle,
