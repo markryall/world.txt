@@ -80,7 +80,11 @@ Disconnecting from a world stops its sound.
 
 On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
 menu) makes the island an app of its own: its own icon, full screen, no
-browser bars.
+browser bars. On a Mac, Safari's **Add to Dock** does the same. Some of these
+apps start out signed out, because they don't share the browser's storage:
+`link me` in the browser gives you a magic link for a new device, and the
+app's welcome screen has a box to paste it into (the whole link, or just
+the code at the end).
 Progress is saved by name, so returning visitors never see it again
 (`skip` hides it, `tutorial` brings it back).
 

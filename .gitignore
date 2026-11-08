@@ -9,3 +9,4 @@ backups/
 # Your own worlds' Fly settings stay on your machine; only the example is shared.
 deploy/fly/*.toml
 !deploy/fly/example.toml
+.DS_Store

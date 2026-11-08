@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Paste a magic link in
+The welcome screen has a box for a magic link (the whole link, or just its
+code), for when the link can't come in by itself: an island added to the Dock
+from Safari, or to a Home Screen, starts with nothing, signed out.
+
 ### Islands in Emacs
 `emacs/world-txt.el` takes you into a world from Emacs, or into several at
 once, each in its own buffer. Join one from a magic link, and after that pick

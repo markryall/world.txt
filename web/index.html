@@ -235,6 +235,8 @@
     <h1>✨ world.txt ✨</h1>
     <p>a small island · no battles · just bonhomie</p>
     <p id="join-msg"></p>
+    <input id="join-code" hidden autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+      placeholder="paste your magic link (or its code)" aria-label="magic link or invite code">
     <button id="join-go" type="submit" hidden>Enter the world 🌍</button>
   </form>
 </div>
@@ -404,16 +406,49 @@ let invite = params.get('invite');
 // Arriving from another world, with a passport from home.
 let passport = params.get('passport');
 
+// With an invite in hand it's one button. Without one there's a box too,
+// for pasting the magic link (or just its code) in: a web app added to the
+// Dock or Home Screen starts with nothing, so the link can't come in by
+// itself.
 function showJoin(message, enter = false) {
   $('#join').style.display = 'flex';
   $('#join-msg').textContent = message;
-  $('#join-go').hidden = !enter;
+  $('#join-code').hidden = enter;
+  $('#join-code').value = '';
+  $('#join-go').hidden = false;
+  $('#join-go').textContent = enter ? 'Enter the world 🌍' : 'Come in 💌';
+  // Not the box on a phone, where focusing it would throw the keyboard up.
   if (enter) $('#join-go').focus();
+  else if (matchMedia('(pointer: fine)').matches) $('#join-code').focus();
 }
 $('#join form').onsubmit = (e) => {
   e.preventDefault();
-  if (!$('#join-go').hidden) start();
+  if ($('#join-code').hidden) return start();
+  const pasted = pastedInvite($('#join-code').value);
+  if (!pasted) {
+    $('#join-msg').textContent = "That doesn't look like a magic link. Paste the whole link (…#invite=…) or just its code. 💌";
+    return $('#join-code').focus();
+  }
+  if (pasted.host && pasted.host !== location.host) {
+    $('#join-msg').textContent = `That link is for ${pasted.host}: open it there, or paste one for this world. 💌`;
+    return;
+  }
+  invite = pasted.code;
+  passport = null;
+  start();
 };
+
+// A whole magic link ("https://…/#invite=abc123"), or just its code.
+function pastedInvite(text) {
+  text = text.trim();
+  if (!text) return null;
+  const at = text.indexOf('invite=');
+  if (at < 0) return /^[A-Za-z0-9_-]+$/.test(text) ? { code: text } : null;
+  const code = text.slice(at + 7).split(/[&#\s]/)[0];
+  let host = null;
+  try { host = new URL(text).host; } catch {}
+  return code ? { code, host } : null;
+}
 
 function start() {
   $('#join').style.display = 'none';
