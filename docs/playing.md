@@ -18,6 +18,9 @@ underfoot, 🎣 fish by the water, 🌱 plant… and so on, changing as you walk
 Ones with "…" (and a dashed edge) put the start of a command in the box for
 you to finish. **more…** lists everything you could do here, and say, satchel,
 who and help are always at the end. Tap instead of type, on a phone or not.
+Once you've given your companion a pat, it stops being suggested for ten
+minutes. Rather not have suggestions at all? **✕** puts them away, and **✨**
+brings them back (each device remembers its own choice).
 The look text has taps too: a thing's name looks at it and ends with what
 you could do with it, and a person's name gets a message started.
 

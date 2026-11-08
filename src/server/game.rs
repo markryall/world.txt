@@ -189,13 +189,16 @@ struct Game {
     next_tide: std::time::Instant,
     /// The island folk: who's about on which island.
     folk: Vec<folk::Folk>,
+    /// When each person (by username) last patted their companion, so the
+    /// actions row doesn't keep suggesting it, even across a reload.
+    patted: HashMap<String, std::time::Instant>,
     /// For work done elsewhere (looking up what's on) to report back.
     inbox: tokio::sync::mpsc::UnboundedSender<Event>,
 }
 
 pub async fn run(world: World, mut events: UnboundedReceiver<Event>, inbox: tokio::sync::mpsc::UnboundedSender<Event>, url: Option<String>) {
     let seed = world.seed;
-    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), circles: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), doorbells: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600), folk: Vec::new() };
+    let mut game = Game { world, players: HashMap::new(), phase: Clock::phase(), season: Clock::season(), festival: Clock::festival().is_some(), rng: Rng::new(seed), finds: Vec::new(), journal_board: None, last_hum: HashMap::new(), circles: HashMap::new(), wild: Vec::new(), url, waiting: HashMap::new(), spins: HashMap::new(), radios: HashMap::new(), radio_guides: HashMap::new(), radio_news: HashMap::new(), inbox, jukes: HashMap::new(), cooking: HashMap::new(), hook_last: HashMap::new(), bars: std::collections::BTreeMap::new(), lights: std::collections::BTreeMap::new(), builds: std::collections::BTreeMap::new(), meeting_links: HashMap::new(), zones: HashMap::new(), castles: HashMap::new(), snowmen: HashMap::new(), angels: HashMap::new(), rounds: HashMap::new(), doorbells: HashMap::new(), next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600), folk: Vec::new(), patted: HashMap::new() };
     game.load_meetings();
     game.load_snowmen();
     game.load_progress();

@@ -16,6 +16,8 @@ use crate::server::world::{Thing, room_of};
 
 /// At most this many people get a chip of their own.
 const PEOPLE: usize = 2;
+/// A companion that's just been patted doesn't need suggesting again for a while.
+const PAT_AGAIN: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 
 fn run(label: impl Into<String>, cmd: impl Into<String>) -> Action {
     Action { label: label.into(), run: Some(cmd.into()), fill: None }
@@ -45,12 +47,15 @@ impl Game {
         // The island folk, if any are about.
         out.extend(self.folk_actions(id));
 
-        // Creatures: your friend, or a wild one that might become one.
+        // Creatures: your friend (unless they've just had a pat), or a wild
+        // one that might become one.
         if let Some((a, n)) = &me.companion
             && let Some(an) = companions::animal(a)
         {
-            let who = n.clone().unwrap_or_else(|| format!("the {}", an.name));
-            out.push(run(format!("{} pat {who}", an.icon), "pet"));
+            if self.patted.get(&me.user).is_none_or(|t| t.elapsed() > PAT_AGAIN) {
+                let who = n.clone().unwrap_or_else(|| format!("the {}", an.name));
+                out.push(run(format!("{} pat {who}", an.icon), "pet"));
+            }
         } else if let Some(w) = self.wild.iter().find(|w| (w.x, w.y) == (x, y)) {
             out.push(run(format!("🍓 befriend the {}", w.animal.name), format!("befriend {}", w.animal.name)));
         }

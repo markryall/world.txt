@@ -1111,6 +1111,7 @@ const ALWAYS_MORE = [
   { label: '🗺 map', run: 'map' }, { label: '👀 look', run: 'look' },
 ];
 let actionsHere = [];
+let actionsHidden = (() => { try { return localStorage.getItem('world.actions') === 'hidden'; } catch { return false; } })();
 function showActions(actions) {
   actionsHere = actions || [];
   const chip = (a) => {
@@ -1124,12 +1125,31 @@ function showActions(actions) {
     b.addEventListener('mousedown', (e) => { if (document.activeElement === cmdBox) e.preventDefault(); });
     return b;
   };
+  // Put away (✕), they fold into one ✨ that brings them back. Each device
+  // remembers for itself.
+  if (actionsHidden) {
+    const back = chip({ label: '✨', run: null, fill: null });
+    back.className = 'more';
+    back.title = 'show what you could do here';
+    back.onclick = () => setActionsHidden(false);
+    $('#actions').replaceChildren(back);
+    return;
+  }
   const chips = actionsHere.slice(0, ACTION_CHIPS).map(chip);
   const more = chip({ label: 'more…', run: null, fill: null });
   more.className = 'more';
   more.title = 'everything you could do here';
   more.onclick = showMore;
-  $('#actions').replaceChildren(...chips, more);
+  const hide = chip({ label: '✕', run: null, fill: null });
+  hide.className = 'more';
+  hide.title = 'put these suggestions away (✨ brings them back)';
+  hide.onclick = () => setActionsHidden(true);
+  $('#actions').replaceChildren(...chips, more, hide);
+}
+function setActionsHidden(hidden) {
+  actionsHidden = hidden;
+  try { hidden ? localStorage.setItem('world.actions', 'hidden') : localStorage.removeItem('world.actions'); } catch {}
+  showActions(actionsHere);
 }
 function showMore() {
   const all = [...actionsHere, ...ALWAYS_MORE];

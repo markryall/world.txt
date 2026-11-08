@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Suggestions that know when to stop
+The row of things you could do has a ✕ to put it away (✨ brings it back, and
+each device remembers), and once you've patted your companion it stops
+suggesting another pat for ten minutes.
+
 ## 0.9.0 (2026-11-08)
 
 ### Links say how to join

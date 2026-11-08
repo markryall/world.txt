@@ -360,6 +360,11 @@ impl Game {
         };
         self.say1(id, Line::col(Col::Green, format!("{} You pet {who}. {} {happy}.", a.icon, capitalise(&who))));
         self.tell_here(x, y, id, Line::col(Col::Green, format!("{} {name} pets {who}.", a.icon)));
+        // The pat chip can rest a while: freshen the panel now.
+        if let Some(p) = self.players.get(&id) {
+            self.patted.insert(p.user.clone(), std::time::Instant::now());
+            p.status_due.set(true);
+        }
         Ok(())
     }
 
