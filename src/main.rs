@@ -4,6 +4,7 @@ mod client;
 mod identity;
 mod links;
 mod protocol;
+mod records;
 mod server;
 mod service;
 mod sound;

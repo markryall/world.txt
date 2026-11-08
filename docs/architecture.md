@@ -390,8 +390,12 @@ for something else to drive instead, such as a Claude Code session
 - **The terminal** (`src/client.rs`) is a ratatui app with the same log and
   side panel. Music goes to mpv if it's installed (`src/sound.rs`): a radio's
   stream by its URL, and gramophone frames wrapped in Ogg on mpv's stdin, with
-  the volume following you over mpv's control socket. Hums and the island's
-  own sounds stay browser-only.
+  the volume following you over mpv's control socket. Playing your own songs
+  works the other way round (`src/records.rs`): ffmpeg encodes the file in
+  real time to Opus in Ogg, and the packets inside go to the world as a
+  browser's would. `play music <paths>` and `add songs <paths>` are caught in
+  the client, so the world only ever sees `play music`, `add songs` and the
+  songs' titles. Hums and the island's own sounds stay browser-only.
 
 ## Running a world
 

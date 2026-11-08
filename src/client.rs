@@ -84,6 +84,8 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
     let mut st = State::default();
     let mut sound = crate::sound::Sound::new(quiet);
     let mut told_install = false;
+    let (mut records, mut played) = crate::records::Records::new();
+    let mut deck = Deck::default();
 
     let result: anyhow::Result<()> = async {
         loop {
@@ -140,13 +142,58 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
                                 tell_install(&mut st, &mut told_install, heard, "🎶 There's music playing nearby.");
                             }
                             Ok(ToClient::AudioEnd { thing }) => sound.end(thing),
-                            // Playing your own songs is for browsers, for now.
-                            Ok(ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. }) | Err(_) => {}
+                            // Playing your own songs: you're the record player.
+                            Ok(ToClient::SpinStart { thing }) => {
+                                deck.spin = Some(thing);
+                                match deck.want_play.take() {
+                                    Some(files) => records.gramophone(files),
+                                    None => st.log.push(Line::col(Col::Pink, "🎶 Which songs? play music <a file or a folder> (dragging them in works too)")),
+                                }
+                            }
+                            Ok(ToClient::SpinStop { thing }) => {
+                                if deck.spin == Some(thing) {
+                                    deck.spin = None;
+                                    records.stop();
+                                }
+                            }
+                            Ok(ToClient::JukeAdd { thing }) => {
+                                deck.jukebox = Some(thing);
+                                match deck.want_queue.take() {
+                                    Some(songs) => {
+                                        let msg = serde_json::to_string(&ToServer::Queue { thing, songs })?;
+                                        if sink.send(Message::Text(msg.into())).await.is_err() { break; }
+                                    }
+                                    None => st.log.push(Line::col(Col::Pink, format!("📀 Which songs? add songs <files or a folder> (up to {})", crate::records::JUKEBOX_MAX))),
+                                }
+                            }
+                            Ok(ToClient::JukeTurn { thing, key }) => match deck.queued.remove(&key) {
+                                Some(path) => records.jukebox(path, thing, key),
+                                None => {
+                                    let msg = serde_json::to_string(&ToServer::TrackDone { thing, key })?;
+                                    if sink.send(Message::Text(msg.into())).await.is_err() { break; }
+                                }
+                            },
+                            Ok(ToClient::JukeStop { .. }) => records.stop(),
+                            Err(_) => {}
                         }
                     }
                     Some(Ok(_)) => {}
                     _ => break,
                 },
+                Some(p) = played.recv() => {
+                    use crate::records::Played;
+                    let msg = match p {
+                        Played::Track { title } => { st.log.push(Line::col(Col::Pink, format!("🎶 Playing {title}"))); None }
+                        Played::Note(text) => { st.log.push(Line::col(Col::Pink, text)); None }
+                        Played::Frames { frames, title } => Some(ToServer::Audio { frames, title: Some(title) }),
+                        Played::Done { thing, key } => Some(ToServer::TrackDone { thing, key }),
+                    };
+                    if let Some(m) = msg
+                        && sink.send(Message::Text(serde_json::to_string(&m)?.into())).await.is_err()
+                    {
+                        break;
+                    }
+                }
                 ev = events.next() => {
                     let Some(Ok(Event::Key(key))) = ev else { continue };
                     if key.kind != KeyEventKind::Press { continue }
@@ -165,7 +212,14 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
                                 st.history.push(text.clone());
                                 st.hist = st.history.len();
                                 st.scroll = 0;
-                                let msg = serde_json::to_string(&ToServer::Cmd { text })?;
+                                // Songs from this computer: the world only hears the start.
+                                let to_world = match local(&text) {
+                                    Some(Local::PlayMusic(paths)) => deck.play_music(&paths, &mut records, &mut st),
+                                    Some(Local::AddSongs(paths)) => deck.add_songs(&paths, &records, &mut st),
+                                    None => Some(ToServer::Cmd { text }),
+                                };
+                                let Some(to_world) = to_world else { continue };
+                                let msg = serde_json::to_string(&to_world)?;
                                 if sink.send(Message::Text(msg.into())).await.is_err() { break; }
                             }
                         }
@@ -197,6 +251,93 @@ pub async fn run(server: &str, invite: Option<String>, quiet: bool) -> anyhow::R
     let _ = sink.close().await;
     println!("{}", st.closed.unwrap_or_else(|| "✧ You drift out of the world. Come back soon. 💜".into()));
     result
+}
+
+/// Typed commands the terminal handles itself, at least to begin with.
+#[derive(Debug, PartialEq)]
+enum Local {
+    /// play music ~/Music/Rumours
+    PlayMusic(String),
+    /// add songs a.mp3 b.mp3
+    AddSongs(String),
+}
+
+fn local(text: &str) -> Option<Local> {
+    let t = text.trim();
+    let (verb, rest) = t.split_once(char::is_whitespace)?;
+    let (what, paths) = rest.trim_start().split_once(char::is_whitespace)?;
+    let (verb, what, paths) = (verb.to_lowercase(), what.to_lowercase(), paths.trim().to_string());
+    if paths.is_empty() {
+        return None;
+    }
+    match (verb.as_str(), what.as_str()) {
+        ("play" | "wind", "music" | "songs" | "records") => Some(Local::PlayMusic(paths)),
+        ("add" | "queue", "songs" | "music") => Some(Local::AddSongs(paths)),
+        _ => None,
+    }
+}
+
+/// The record player's side of things: which gramophone or jukebox you're
+/// at, and the songs waiting to go on.
+#[derive(Default)]
+struct Deck {
+    /// The gramophone you've wound up.
+    spin: Option<i64>,
+    want_play: Option<Vec<std::path::PathBuf>>,
+    /// The jukebox you last added songs to, and what you've queued, by key.
+    jukebox: Option<i64>,
+    want_queue: Option<Vec<crate::protocol::Song>>,
+    queued: std::collections::HashMap<String, std::path::PathBuf>,
+}
+
+impl Deck {
+    /// `play music <songs>`: wind up the gramophone first if it isn't.
+    fn play_music(&mut self, paths: &str, records: &mut crate::records::Records, st: &mut State) -> Option<ToServer> {
+        let files = self.songs(paths, 500, records, st)?;
+        if self.spin.is_some() {
+            records.gramophone(files);
+            return None;
+        }
+        self.want_play = Some(files);
+        Some(ToServer::Cmd { text: "play music".into() })
+    }
+
+    /// `add songs <songs>`: only their titles go to the world.
+    fn add_songs(&mut self, paths: &str, records: &crate::records::Records, st: &mut State) -> Option<ToServer> {
+        let files = self.songs(paths, crate::records::JUKEBOX_MAX, records, st)?;
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+        let songs: Vec<crate::protocol::Song> = files
+            .into_iter()
+            .enumerate()
+            .map(|(i, f)| {
+                let key = format!("t{stamp:x}{i}");
+                let title = crate::records::title(&f);
+                self.queued.insert(key.clone(), f);
+                crate::protocol::Song { key, title }
+            })
+            .collect();
+        match self.jukebox {
+            Some(thing) => Some(ToServer::Queue { thing, songs }),
+            None => {
+                self.want_queue = Some(songs);
+                Some(ToServer::Cmd { text: "add songs".into() })
+            }
+        }
+    }
+
+    fn songs(&self, paths: &str, max: usize, records: &crate::records::Records, st: &mut State) -> Option<Vec<std::path::PathBuf>> {
+        if !records.can_play() {
+            st.log.push(Line::col(Col::Pink, format!("🎶 To play songs from the terminal: {}, then world.txt play again.", crate::records::INSTALL)));
+            return None;
+        }
+        match crate::records::songs(paths, max) {
+            Ok(files) => Some(files),
+            Err(e) => {
+                st.log.push(Line::col(Col::Pink, format!("🎶 {e}")));
+                None
+            }
+        }
+    }
 }
 
 /// The first music you can't hear says how you could.
@@ -382,6 +523,17 @@ mod tests {
         assert_eq!(st.input, "wave", "and round again");
         st.pick(true);
         assert_eq!(st.input, "read", "Shift+Tab goes back");
+    }
+
+    #[test]
+    fn songs_from_here_stay_here() {
+        assert_eq!(local("play music ~/Music/Rumours"), Some(Local::PlayMusic("~/Music/Rumours".into())));
+        assert_eq!(local("Play  songs a.mp3 b.mp3"), Some(Local::PlayMusic("a.mp3 b.mp3".into())));
+        assert_eq!(local("add songs ~/Music/A\\ Little\\ Tune.mp3"), Some(Local::AddSongs("~/Music/A\\ Little\\ Tune.mp3".into())));
+        assert_eq!(local("play music"), None, "plain, it's for the world");
+        assert_eq!(local("add songs"), None);
+        assert_eq!(local("add Sam to picnic"), None);
+        assert_eq!(local("play"), None);
     }
 
     #[test]

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Your own songs from the terminal
+`play music ~/Music/Rumours` at a gramophone, or `add songs` and some files at
+a jukebox, plays songs from your own computer for everyone nearby, just like
+the browser does. It uses ffmpeg, which `brew install mpv` brings along.
+
 ### Music in the terminal
 The terminal client plays radios, gramophones and jukeboxes through mpv,
 louder as you walk up to them. Without mpv, the first music nearby says how to

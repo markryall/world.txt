@@ -111,7 +111,7 @@ fn volume(gain: f32) -> u32 {
     ((gain.clamp(0.0, 1.0) * 0.8).cbrt() * 100.0).round() as u32
 }
 
-fn find(name: &str) -> Option<PathBuf> {
+pub fn find(name: &str) -> Option<PathBuf> {
     std::env::split_paths(&std::env::var_os("PATH")?).map(|d| d.join(name)).find(|p| p.is_file())
 }
 
@@ -192,7 +192,7 @@ fn unbase64(s: &str) -> Option<Vec<u8>> {
 
 /// Just enough Ogg to carry an Opus stream (RFC 7845): two header pages, then
 /// one page per packet.
-struct Ogg {
+pub struct Ogg {
     serial: u32,
     seq: u32,
     granule: u64,
@@ -204,11 +204,11 @@ const PRE_SKIP: u16 = 312;
 const FRAME: u64 = 960;
 
 impl Ogg {
-    fn new(serial: u32) -> Self {
+    pub fn new(serial: u32) -> Self {
         Ogg { serial, seq: 0, granule: 0 }
     }
 
-    fn headers(&mut self) -> Vec<u8> {
+    pub fn headers(&mut self) -> Vec<u8> {
         let mut head = b"OpusHead".to_vec();
         head.push(1); // version
         head.push(2); // channels
@@ -226,7 +226,7 @@ impl Ogg {
         out
     }
 
-    fn packet(&mut self, data: &[u8]) -> Vec<u8> {
+    pub fn packet(&mut self, data: &[u8]) -> Vec<u8> {
         self.granule += FRAME;
         self.page(data, 0, self.granule)
     }

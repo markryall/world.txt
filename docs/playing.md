@@ -32,6 +32,17 @@ like in a browser. `brew install mpv` (or `apt install mpv`) and it's there;
 `world.txt play --quiet` keeps things silent anyway. Hums and the island's own
 sounds are still browser-only.
 
+You can play your own songs from the terminal too, with
+[ffmpeg](https://ffmpeg.org) (which `brew install mpv` brings along):
+
+- `play music ~/Music/Rumours` at a gramophone plays a folder's songs (or
+  files: `play music a.mp3 b.flac`) round and round until `stop music`.
+- `add songs ~/Music/Rumours` (or a few files) at a jukebox queues up to 20,
+  and they play from your computer when your turn comes.
+
+Dragging files in from Finder works, and so do quotes around a path with
+spaces. Keep the terminal open until your songs have played.
+
 On a phone, **Add to Home Screen** (in Safari's share menu, or Chrome's ⋮
 menu) makes the island an app of its own: its own icon, full screen, no
 browser bars.
