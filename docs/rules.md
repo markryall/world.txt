@@ -97,6 +97,16 @@ the next section).
 | What they make | One thing each at a time, 8 across the world, gone after 1 to 48 hours. Only a keeper can unmake one sooner. |
 | Notes | One per visit, on the village noticeboard |
 | Celebrations | One every 2 to 5 days, between 11am and 7pm in the world's time. Keepers can cancel one like any event. |
+| Errands | One at a time for each person, and at least 4 hours between being asked. They only ask with 2 hours or more left on the island. Only you can see or pick up what they lost. When they row off, the errand and the lost thing go too, wherever it is. |
+
+### Pieces that come together
+
+| Thing | Limit |
+|---|---|
+| Things in pieces | One at a time across the world, three pieces each, starting only while someone's on. The next one comes 12 to 36 hours after the last came whole or faded. |
+| Carrying pieces | One piece of it at a time per person. Anyone can find, carry, give or set down any piece. |
+| Setting a piece down | Only where it belongs. Everyone who set one down gets a keepsake when it comes whole. |
+| Fading | After 3 days, every piece goes, from the ground, satchels or where it belongs, without a word. |
 
 ### Keepers
 
@@ -261,6 +271,7 @@ else sees it in their own time.
 
 | Thing | When |
 |---|---|
+| An errand you never get to | Gone, quietly, when the folk who asked rows off (anything from a few hours to a couple of days) |
 | Doorbell | You hear someone's visiting your home at most once every 30 minutes per visitor. Only while you're on and away from home, and not for your guests, residents, or people you've muted. |
 | The island since you were last here | Only after at least an hour away, and only if something happened. At most 6 lines (people's doings first, then gardens, boards you follow, and who dropped by your home), with "…and more besides" if there was more. Never anything of your own. |
 | A game (`rps`, `ask`) nobody finishes | Forgotten after 10 minutes |
@@ -304,6 +315,8 @@ else sees it in their own time.
 | Where you are | Not private: `who` and `find` show where everyone is, including "inside" a building. |
 | Visiting someone's home | The owner hears the doorbell if they're on, and if they're away it's in their "since you were last here" when they're back. Nobody else is told. |
 | What you do out in the open | Claiming or painting a home, finishing a building, naming a spot and making something outdoors can turn up in other people's "since you were last here". Nothing you do inside a building does. |
+| Errands | Only you hear what a folk asked you to find (unless someone's standing with you), and only you can see it lying about. |
+| Pieces that come together | Everyone on hears when something comes apart and when it comes whole, and the names of everyone who set a piece down. |
 | What's in a display case | Anyone who looks. The finds still belong to whoever put each one in. |
 | A hook's secret address | Only whoever made it, once |
 | A place event's links | Only the people who'd hear about it (see Events) |
@@ -320,7 +333,7 @@ someone chooses to send them:
 |---|---|
 | `suggest …` | The suggestion, who left it and when. Only keepers can read them (`suggestions`, newest 20). Keepers in the world get a one-line heads-up when a new one arrives. |
 | Which features you've found | The first time you try each feature (a kite, paint, going inside, the hat…), the island notes that you did, and when. Nothing else: not what you said or made, not where you were, not how often. Keepers see who's found what with `discoveries`. Reports are never counted, and residents and visitors from other worlds aren't noted. |
-| The island since you were last here | For a month, the island keeps a short note of each thing done out in the open (a home claimed or painted, a building finished, a spot named, something made outdoors) and each visit to someone's home: who, what, where and when. Plus when each person last left. It's only ever used for those recaps, and no command shows it to keepers. Whoever runs the server can read its database, though, so it isn't secret from them. |
+| The island since you were last here | For a month, the island keeps a short note of each thing done out in the open (a home claimed or painted, a building finished, a spot named, something made outdoors) and each visit to someone's home: who, what, where and when. Plus when each person last left, and who set down the pieces of something that came together. It's only ever used for those recaps, and no command shows it to keepers. Whoever runs the server can read its database, though, so it isn't secret from them. |
 | `report Sam …` | The report, in the reporter's own words: who made it, who it's about, and when. Only keepers can read them (`reports`, newest 20), and Sam isn't told. Reporting never shows the keepers what Sam actually said: only what the reporter chose to write. |
 
 ### Muting

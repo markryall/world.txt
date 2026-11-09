@@ -61,6 +61,8 @@ pub const FEATURES: &[(&str, &str)] = &[
     ("high fives", "✋"),
     ("suggestions", "💌"),
     ("island folk", "🧺"),
+    ("errands", "🧵"),
+    ("pieces", "🧩"),
 ];
 
 /// The feature a command is trying, if it's one that's noted.

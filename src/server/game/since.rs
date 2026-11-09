@@ -35,6 +35,8 @@ enum Kind {
     Grew,
     Notes,
     Visit,
+    /// Something in pieces that came together; `what` is already worded.
+    Whole,
 }
 
 impl Kind {
@@ -46,6 +48,7 @@ impl Kind {
             NAMED => Kind::Named,
             MADE => Kind::Made,
             VISIT => Kind::Visit,
+            super::quests::WHOLE => Kind::Whole,
             _ => return None,
         })
     }
@@ -144,6 +147,7 @@ fn summarise(mut items: Vec<Item>) -> Vec<(String, Option<String>)> {
                     format!("{} {} new note{s} {}.", i.icon, i.n, i.what)
                 }
                 Kind::Visit => format!("👣 {who} dropped by your home."),
+                Kind::Whole => i.what.clone(),
             };
             (text, i.tap.clone())
         })
@@ -238,11 +242,20 @@ impl Game {
                 Kind::Home | Kind::Paint => at_home(&r.who).unwrap_or((r.x, r.y)),
                 _ => (r.x, r.y),
             };
+            let what = if kind == Kind::Whole {
+                let place = self.world.place_title(x, y);
+                let Some(words) = self.whole_words(&me, &r.what, &place) else {
+                    continue;
+                };
+                words
+            } else {
+                r.what
+            };
             items.push(Item {
                 at: r.at,
                 who: self.world.nick(&r.who),
                 kind,
-                what: r.what,
+                what,
                 place: self.world.place_title(x, y),
                 island: island_at(x, y).name,
                 tap: tap(x, y),

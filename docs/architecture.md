@@ -179,6 +179,11 @@ Several kinds of thing on the island aren't players:
 - **Wild animals** (`companions.rs`): they turn up beside people and wander
   their own kind of ground a step at a time. Befriend one with a berry and
   it becomes your companion.
+- **Quests** (`quests.rs`, made of `quest_items.rs`): errands the folk ask of
+  whoever says hello, and things in pieces that come whole once every piece is
+  set down where it belongs. Errands and pieces are kept in one `meta` row;
+  what's lost, given and kept are made-up species that never turn up by
+  chance and never go in the journal.
 - **Island folk** (`folk.rs`): scripted characters, one or two to an island.
   Each has a name drawn from a long list and a trade. They row in, potter
   about, keep island hours, make little things that don't last and tidy them

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Errands for the folk
+The island folk sometimes lose things, and mention it, especially if you say
+hello: a silver thimble among the trees near the pond, a straw sunhat in the
+long grass. Find it (it glints when you're close), give it back, and they say
+thank you with something for your home. No hurry and nothing to keep track of
+(`errand` reminds you if you'd like): if you never get to it, it quietly goes
+when they row off.
+
+### Pieces that come together
+Every day or so something comes apart, its three pieces scattered about an
+island: an old music box, a torn treasure map, or the season's own, like the
+great lantern for Lantern Night. Anyone can find a piece and set it down
+where it belongs, whenever they're on, and when the last one's in it comes
+whole, with a keepsake for everyone who helped and a line in their "since
+you were last here". Pieces nobody gets to fade after three days.
+
 ### Companions indoors
 A fox in a room no longer pounces on leaves: companions have tricks of their
 own for indoors, and settle on a cushion, rug or anything soft that's there.

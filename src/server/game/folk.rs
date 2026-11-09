@@ -1123,6 +1123,20 @@ impl Game {
             }
             let first = !self.folk[i].spoke.contains_key(&user);
             self.folk[i].spoke.insert(user.clone(), at);
+            // Something they've lost, now and then (unless there's a party to
+            // tell them about).
+            let (island, leaves) = (self.folk[i].island, self.folk[i].leaves);
+            let party_news = self.folk[i]
+                .party
+                .as_ref()
+                .is_some_and(|p| p.at > now && !self.folk[i].invited.contains(&user));
+            if !party_news
+                && self.rng.chance(0.35)
+                && let Some(text) = self.errand_offer(&name, island, leaves, &user, now)
+            {
+                self.folk_says(x, y, &name, &text);
+                continue;
+            }
             let f = &self.folk[i];
             let trade = f.trade();
             let today = now / DAY;
@@ -1645,6 +1659,10 @@ impl Game {
         if f.asleep {
             text.push_str(" Fast asleep.");
         }
+        let user = self.user(id);
+        if let Some(hoping) = self.errand_hoping(&user, &self.folk[i].name) {
+            text.push_str(&hoping);
+        }
         if let Some(p) = f.party.as_ref().filter(|p| p.at > super::boards::now()) {
             let tz = self.players.get(&id).map_or(chrono_tz::UTC, |p| p.tz);
             text.push_str(&format!(
@@ -1677,6 +1695,11 @@ impl Game {
         };
         let name = self.folk[i].name.clone();
         let thing = crate::server::nature::a(s.name);
+        if !self.folk[i].asleep
+            && let Some(done) = self.errand_returned(id, &name, s)
+        {
+            return done;
+        }
         if self.folk[i].asleep {
             self.say1(
                 id,
@@ -1779,6 +1802,11 @@ impl Game {
         let text = fill(reply, &name, &you);
         self.folk[i].spoke.insert(user.clone(), Instant::now());
         self.folk_says(x, y, &name, &text);
+        // Saying hello is the easy way to hear what they've lost.
+        let (island, leaves) = (self.folk[i].island, self.folk[i].leaves);
+        if let Some(text) = self.errand_offer(&name, island, leaves, &user, super::boards::now()) {
+            self.folk_says(x, y, &name, &text);
+        }
         if !user.contains('@') {
             let _ = self
                 .world

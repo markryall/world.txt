@@ -1405,6 +1405,9 @@ impl Game {
         if self.world.things_at(x, y).any(|t| t.is_dock()) {
             hints.extend(["The rowing boat bobs at the end of the dock. You could sail across to another island.", "A weathered signpost by the dock points the way to all the named places. (places)"]);
         }
+        if self.pieces_on(x, y) {
+            hints.push("There's talk of something in pieces, scattered about this island. The pieces must belong somewhere.");
+        }
         if crate::server::islands::island_at(x, y).id == 1 && !self.lighthouse_lit() {
             hints.push("Out on the point, the old lighthouse waits for someone to mend it.");
         }

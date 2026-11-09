@@ -29,6 +29,7 @@ mod meetings;
 mod music;
 mod play;
 mod progress;
+mod quests;
 mod radio;
 mod songbook;
 mod sounds;
@@ -190,6 +191,8 @@ struct Game {
     next_tide: std::time::Instant,
     /// The island folk: who's about on which island.
     folk: Vec<folk::Folk>,
+    /// Errands for the folk, and whatever's in pieces.
+    quests: quests::Quests,
     /// When each person (by username) last patted their companion, so the
     /// actions row doesn't keep suggesting it, even across a reload.
     patted: HashMap<String, std::time::Instant>,
@@ -238,12 +241,14 @@ pub async fn run(
         doorbells: HashMap::new(),
         next_tide: std::time::Instant::now() + Duration::from_secs(3 * 3600),
         folk: Vec::new(),
+        quests: Default::default(),
         patted: HashMap::new(),
     };
     game.load_meetings();
     game.load_snowmen();
     game.load_progress();
     game.load_folk();
+    game.load_quests();
     game.load_lights();
     game.load_buildings();
     game.load_radios();
@@ -543,6 +548,7 @@ impl Game {
         lines.extend(self.games_lines_here(id));
         lines.extend(self.animal_lines(id));
         lines.extend(self.folk_lines(id));
+        lines.extend(self.quest_lines(id));
         lines.extend(self.find_lines(p.x, p.y));
         lines.extend(exits);
         self.send(id, lines);
@@ -1076,6 +1082,7 @@ impl Game {
             "fish" => return self.cmd_fish(id),
             "satchel" | "bag" | "inventory" | "inv" | "i" => return self.cmd_satchel(id),
             "journal" | "j" => return self.cmd_journal(id),
+            "errand" | "errands" => return self.cmd_errand(id),
             "give" => return self.cmd_give(id, rest),
             "place" | "drop" | "put" => return self.cmd_place(id, rest),
             "release" | "free" => return self.cmd_release(id, rest),
@@ -3384,6 +3391,7 @@ impl Game {
         self.events_tick();
         self.animals_tick();
         self.folk_tick();
+        self.quests_tick();
         // Finds come and go and animals wander by without anyone moving:
         // freshen the side panels whose actions have changed.
         for (&id, p) in &self.players {

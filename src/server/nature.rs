@@ -1009,7 +1009,10 @@ pub const SPECIES: &[Species] = &[
 ];
 
 pub fn by_id(id: &str) -> Option<&'static Species> {
-    SPECIES.iter().find(|s| s.id == id)
+    SPECIES
+        .iter()
+        .find(|s| s.id == id)
+        .or_else(|| super::quest_items::by_id(id))
 }
 
 /// "a daisy", "an owl feather"

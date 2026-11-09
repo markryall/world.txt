@@ -969,6 +969,13 @@ impl Db {
         Ok(())
     }
 
+    /// Take something out of every satchel it's in (quest things that fade).
+    pub fn satchel_take_all(&self, species: &str) -> anyhow::Result<()> {
+        self.conn
+            .execute("DELETE FROM satchel WHERE species = ?1", params![species])?;
+        Ok(())
+    }
+
     // ---- noticeboards ---------------------------------------------------
 
     pub fn add_note(

@@ -170,6 +170,50 @@ days, then heads for the dock and rows off again.
 *Hints: "Somebody nearby is whistling to themself." "You hear someone
 chatting away nearby, to nobody in particular."*
 
+## Errands for the folk
+
+Now and then one of the folk has lost something, and mentions it: "I've gone
+and lost my silver thimble. Last I had it, I was among the trees near The
+Duck Pond. If you happen across it, I'd be ever so glad." Saying hello to
+them is the easiest way to hear about it, but they bring it up by themselves
+sometimes too.
+
+- It's lying where they said, and only you can see it there. Get within a
+  couple of steps and something glints; on the spot, `look` shows it and
+  `gather` picks it up.
+- `give silver thimble to Bramble` hands it back, and they give you
+  something for your home to say thank you: a painted pebble, a jar of
+  honey, a tiny carved bird…
+- `errand` reminds you what you're looking for, and where they've got to
+  once you've found it.
+- No hurry, and nothing to keep up with. One errand at a time, and a few
+  hours before anyone asks you again. If you never get to it, it quietly
+  goes when they row off, along with the thing they lost.
+- What gets lost follows the season: a straw sunhat in summer, a red mitten
+  in winter.
+
+## Pieces that come together
+
+Every day or so, something comes apart, its three pieces scattered about
+one of the islands (mostly Home Island): an old music box, a torn treasure
+map, or the season's own, like the great lantern for Lantern Night or the
+snowman's finery for Snow Lights. Whoever's on hears where it belongs.
+
+- Anyone can find the pieces. Something catches your eye when you're a
+  couple of steps from one, and `gather` picks it up. You carry one piece at
+  a time, so there's some left for everyone else.
+- Take it to where it belongs and `place` it there. It waits, so nobody has
+  to be on at the same time. `look` there shows what's been set down so far.
+- When the last piece is in, it comes whole (the music box plays, the map's
+  big red X turns out to be right there), everyone on hears about it,
+  everyone who set a piece down gets a little keepsake, and anyone who
+  wasn't on hears in their "since you were last here".
+- If nobody gets to them, the pieces quietly fade after three days, from
+  wherever they are, and nothing's said.
+
+*Hint: "There's talk of something in pieces, scattered about this island.
+The pieces must belong somewhere."*
+
 ## The sulking crab
 
 While a status light on a noticeboard is down (see

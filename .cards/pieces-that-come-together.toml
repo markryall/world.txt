@@ -1,5 +1,5 @@
 name = "Pieces that come together"
-status = "todo"
+status = "done"
 description = """
 From a cosy-games expert in the family: quests that need more than one person. Something in pieces is scattered over the island, and it only comes whole when everyone's piece is in.
 
@@ -14,8 +14,10 @@ From a cosy-games expert in the family: quests that need more than one person. S
 - No pressure: pieces nobody has found or set down quietly fade after a while, no failing, no reminders. A world with one person in it still works: pieces can all turn up for you, just more slowly.
 - Never more than one set going on an island at a time.
 
-Shares the spirit of "Leave something for someone": playing together across time zones and bedtimes. Pairs well with "Seasonal quests" as the island's build-up to a festival."""
+Shares the spirit of "Leave something for someone": playing together across time zones and bedtimes. Pairs well with "Seasonal quests" as the island's build-up to a festival.
+
+Built without: pieces fitting when two people carrying them meet away from where it belongs. Setting them down there does the job, and could come later."""
 created_at = "2026-11-09T11:00:00.000000Z"
-updated_at = "2026-11-09T11:00:00.000000Z"
+updated_at = "2026-11-09T12:30:00.000000Z"
 tags = ["belonging", "together", "quests"]
 priority = "medium"

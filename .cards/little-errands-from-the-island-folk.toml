@@ -1,5 +1,5 @@
 name = "Little errands from the island folk"
-status = "todo"
+status = "done"
 description = """
 From a cosy-games expert in the family: little quests that pop up now and then. The island folk are the natural ones to ask, since they already wander about chatting, keeping their hours and making things.
 
@@ -15,8 +15,10 @@ From a cosy-games expert in the family: little quests that pop up now and then. 
 - Rewards stay cosmetic or story-ish: keepsakes, a line in the Island Journal, the folk remembering you next time they visit. No points, no levels, nothing to grind.
 - Not in the help: errands are there to be bumped into, like the folk themselves.
 
+Built so far: always back to the folk who asked (not a friend's doorstep or a landmark), offered when you say hello or now and then while they chat.
+
 rules.md: who can see an errand (only whoever was asked), what's kept, and when it goes away."""
 created_at = "2026-11-09T11:00:00.000000Z"
-updated_at = "2026-11-09T11:00:00.000000Z"
+updated_at = "2026-11-09T12:30:00.000000Z"
 tags = ["belonging", "folk", "quests"]
 priority = "medium"

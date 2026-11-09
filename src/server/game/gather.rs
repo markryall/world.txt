@@ -315,6 +315,9 @@ impl Game {
     // ---- commands -----------------------------------------------------
 
     pub(super) fn cmd_gather(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
+        if let Some(done) = self.quest_gather(id, what) {
+            return done;
+        }
         let Some((x, y, name)) = self.here(id) else {
             return Ok(());
         };
@@ -707,6 +710,9 @@ impl Game {
             );
             return Ok(());
         };
+        if let Some(done) = self.quest_place(id, s) {
+            return done;
+        }
         if s.kind.alive() {
             self.say1(
                 id,

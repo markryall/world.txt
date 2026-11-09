@@ -11,6 +11,7 @@ pub mod islands;
 pub mod names;
 mod nature;
 pub mod paint;
+mod quest_items;
 mod rng;
 mod terrain;
 mod tutorial;
