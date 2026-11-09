@@ -1,0 +1,7 @@
+name = "Learn Rust by building a tiny feature"
+status = "todo"
+description = "A getting-started-with-Rust tutorial, outside the game itself: build a small, silly feature on world.txt from scratch, step by step, that we'd never actually ship (so it stays a safe sandbox). Lives in the repo and/or a GitHub Pages site for the project, which would be nice to have anyway. Pick a feature that touches the essentials gently: a new command, a struct and an enum, a match, a test, maybe a line to everyone nearby."
+created_at = "2026-11-09T14:35:48.000000Z"
+updated_at = "2026-11-09T14:35:48.000000Z"
+tags = ["docs", "fun"]
+priority = "low"
