@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Hosting in Docker, wherever you like
+The hosting guide now covers running a world in Docker on an always-on machine
+of your own (a home server, a NAS, a Raspberry Pi or a rented Linux box), with
+a Cloudflare tunnel beside it, from the same image Fly.io uses. It also says
+what else can get people in (other tunnels, a reverse proxy with an open port,
+a private network), and that Fly.io costs a few dollars a month per world.
+`docs/hosting-cloudflare.md` is now `docs/hosting-at-home.md`, and the
+container's start script is `deploy/start.sh`.
+
 ### The island since you were last here
 Come back after an hour or more and you hear what your friends got up to
 while you were gone: homes made and painted, buildings finished, spots

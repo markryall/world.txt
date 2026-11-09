@@ -1,10 +1,19 @@
 # Hosting on Fly.io
 
-A laptop world goes dark whenever the laptop sleeps. [Fly.io](https://fly.io)
-keeps it up on one small always-on machine for a couple of dollars a month,
-with the world on a volume. The repo has what it needs: a `Dockerfile`,
-`deploy/fly-start.sh`, a settings template in `deploy/fly/example.toml` and
-`deploy/fly-deploy` to deploy with.
+A laptop world goes dark whenever the laptop sleeps. One way round that is to
+rent a small always-on machine, and this page walks through doing it on
+[Fly.io](https://fly.io), one world to a machine with the world on a volume.
+It isn't free: expect a few dollars a month per world for the smallest machine
+and a 1 GB volume (Fly's pricing page has the current numbers). The repo has
+what it needs: a `Dockerfile`, `deploy/start.sh`, a settings template in
+`deploy/fly/example.toml` and `deploy/fly-deploy` to deploy with.
+
+**Elsewhere:** the `Dockerfile` is ordinary Docker, so the world runs just as
+well on any Linux server you rent (a VPS from Hetzner, DigitalOcean, Linode and
+the like) using the [Docker setup for a home server](hosting-at-home.md#on-a-home-server-in-docker),
+or on another platform that runs a container with a persistent volume and
+passes websockets through. Whatever the host, keep it to exactly one machine
+per world, since a world is one SQLite file.
 
 Each world is its own Fly app, with its own settings file in `deploy/fly/`
 (e.g. `deploy/fly/home.toml`). Those files are ignored by git, so your app
@@ -51,7 +60,7 @@ their device tokens live in `world.db`, along with the world's identity key.
 
 1. Stop the old server (and its tunnel), so nothing changes after the copy.
 2. Copy the world safely: `sqlite3 world.db ".backup /tmp/world-move.db"`
-3. Upload it as `import.db`, then restart. On start, `fly-start.sh` moves it
+3. Upload it as `import.db`, then restart. On start, `start.sh` moves it
    into place before the server opens anything, and keeps the world it replaced
    in `/data/replaced/`:
 

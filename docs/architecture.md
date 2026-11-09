@@ -418,13 +418,15 @@ for something else to drive instead, such as a Claude Code session
 - **On your own Mac, always on:** `world.txt service install` sets up launchd agents
   that start the world and a Cloudflare tunnel at login, and restart them if
   they fall over (`src/service.rs`).
-- **On Fly.io:** the Dockerfile builds the release binary in a Rust image
+- **In Docker:** the Dockerfile builds the release binary in a Rust image
   and copies it into a slim Debian one. The world lives on a volume at
-  `/data`, and the server runs as an ordinary unprivileged user.
-  `deploy/fly-deploy all` deploys every world in turn, and `deploy/fly-backups`
-  copies their daily backups down off Fly. A redeploy tells
-  every browser `restarting`, they reconnect a few seconds later, and nobody
-  loses their place.
+  `/data`, and `deploy/start.sh` hands over to an ordinary unprivileged user.
+  The same image runs under Docker Compose on a home server (with a
+  `cloudflared` container beside it) and on Fly.io.
+- **On Fly.io:** `deploy/fly-deploy all` deploys every world in turn, and
+  `deploy/fly-backups` copies their daily backups down off Fly. A redeploy
+  tells every browser `restarting`, they reconnect a few seconds later, and
+  nobody loses their place.
 
 ## Keeping it healthy
 

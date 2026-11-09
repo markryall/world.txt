@@ -52,8 +52,8 @@ and who can see it.
   timing, for anyone who'd rather not be surprised
 - 🔮 [Things to find](docs/secrets.md): the toys left out of `help` on purpose
   (spoilers!)
-- ☁️ Hosting: on your own machine [through Cloudflare](docs/hosting-cloudflare.md),
-  or always-on [on Fly.io](docs/hosting-fly.md)
+- ☁️ Hosting: [on your own machine](docs/hosting-at-home.md) (a laptop, or a
+  home server with Docker), or [on a rented one](docs/hosting-fly.md) like Fly.io
 - 🦊 [Island residents](docs/residents.md): AI characters who live there too
 - 🛠 [Development](docs/development.md): how the code is laid out
 - ⚙️ [How it works](docs/architecture.md): the game loop, the wire, the weather, and how tunes, rain, gramophones and radios make sound
