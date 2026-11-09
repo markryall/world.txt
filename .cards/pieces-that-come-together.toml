@@ -1,0 +1,21 @@
+name = "Pieces that come together"
+status = "todo"
+description = """
+From a cosy-games expert in the family: quests that need more than one person. Something in pieces is scattered over the island, and it only comes whole when everyone's piece is in.
+
+  🧩 A torn treasure map, one corner each.
+  🎶 A music box in three parts: the case, the comb, the little dancer.
+  🏮 A paper lantern: frame, paper and candle.
+
+- Each person who finds a piece gets a different one (so it's naturally shared), and learns where the pieces belong: "It looks like it fits with something. The bandstand on the green, maybe?"
+- You don't have to be online together. Set your piece down where it belongs and it waits there, glowing a little. When the last one arrives, it comes together: the music box plays, the lantern lights, the map shows where something is buried.
+- If you are together, the pieces fit as soon as you meet on the same spot, which is a lovely moment too.
+- Everyone who added a piece hears about it, even later: a line in "The island since you were last here" ("🎶 The music box on the green is whole again, thanks to you, Sam and Poppy"). The finished thing stays as a keepsake for the island, or each person gets a little one of their own.
+- No pressure: pieces nobody has found or set down quietly fade after a while, no failing, no reminders. A world with one person in it still works: pieces can all turn up for you, just more slowly.
+- Never more than one set going on an island at a time.
+
+Shares the spirit of "Leave something for someone": playing together across time zones and bedtimes. Pairs well with "Seasonal quests" as the island's build-up to a festival."""
+created_at = "2026-11-09T11:00:00.000000Z"
+updated_at = "2026-11-09T11:00:00.000000Z"
+tags = ["belonging", "together", "quests"]
+priority = "medium"

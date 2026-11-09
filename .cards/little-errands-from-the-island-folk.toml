@@ -1,0 +1,22 @@
+name = "Little errands from the island folk"
+status = "todo"
+description = """
+From a cosy-games expert in the family: little quests that pop up now and then. The island folk are the natural ones to ask, since they already wander about chatting, keeping their hours and making things.
+
+  🧵 Bramble the knitter has lost her thimble somewhere down by the pond. If you happen across it, she'd be ever so glad.
+
+- An errand is a find hidden somewhere on the island and someone or somewhere to take it to: back to the folk who asked, to a friend's doorstep, to the lighthouse, to the green. Bump into it by looking, gathering or walking past (it shows like any other find there, a little special).
+- Handing it over is a small story moment ("Bramble pops it on her finger and beams") and something for your home: a keepsake, a recipe, a scarf she knitted while she waited.
+- No pressure, ever:
+    - No timer you can see, no failing, no quest log to keep up with.
+    - You get to it or you don't. If you forget, it quietly disappears when that folk rows off, and nothing is said.
+    - At most one errand offered to you at a time, so it never becomes a to-do list.
+- Offered gently, within the idle budget, like hints: a folk mentions it when you're near, once. `errand` (or asking the folk) reminds you what it was, if you want to know.
+- Rewards stay cosmetic or story-ish: keepsakes, a line in the Island Journal, the folk remembering you next time they visit. No points, no levels, nothing to grind.
+- Not in the help: errands are there to be bumped into, like the folk themselves.
+
+rules.md: who can see an errand (only whoever was asked), what's kept, and when it goes away."""
+created_at = "2026-11-09T11:00:00.000000Z"
+updated_at = "2026-11-09T11:00:00.000000Z"
+tags = ["belonging", "folk", "quests"]
+priority = "medium"

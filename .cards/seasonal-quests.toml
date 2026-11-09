@@ -1,0 +1,19 @@
+name = "Seasonal quests"
+status = "todo"
+description = """
+From a cosy-games expert in the family: quests that follow the time of year. The island already turns a season every Monday and holds a festival every Saturday, so quests can hang off those.
+
+  🌸 Spring: blossom petals for the Blossom Picnic's garlands.
+  ☀ Summer: shells for the sandcastle contest at Midsummer Beach Night.
+  🍂 Autumn: lanterns gathered for Lantern Night.
+  ❄ Winter: the snowman on the green has lost his scarf.
+
+- Seasonal errands from the folk ("Little errands from the island folk") use the season's own finds and talk about what's coming up.
+- The week before each festival, one shared quest ("Pieces that come together") is the island's build-up to Saturday: the whole island gathering lanterns, and on the night they're all lit.
+- Festival keepsakes already exist; seasonal quests could hand out their own versions so the shelf fills with a year of memories.
+- Same rules as the rest: optional, no rush, it fades if nobody gets to it, and the festival happens either way. A quest is a nice extra, never a gate on the fun.
+- WORLD_SEASON and WORLD_FESTIVAL should force them too, for testing."""
+created_at = "2026-11-09T11:00:00.000000Z"
+updated_at = "2026-11-09T11:00:00.000000Z"
+tags = ["seasons", "quests"]
+priority = "medium"
