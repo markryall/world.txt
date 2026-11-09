@@ -63,6 +63,8 @@ pub const FEATURES: &[(&str, &str)] = &[
     ("island folk", "🧺"),
     ("errands", "🧵"),
     ("pieces", "🧩"),
+    ("dark mode", "🌚"),
+    ("the typewriter", "⌨️"),
 ];
 
 /// The feature a command is trying, if it's one that's noted.
@@ -135,6 +137,7 @@ pub fn feature(input: &str) -> Option<&'static str> {
         "make" | "create" if has("music box") => "music boxes",
         "make" | "create" if has("gramophone") || has("jukebox") => "gramophones and jukeboxes",
         "make" | "create" if has("radio") => "radio",
+        "make" | "create" if has("typewriter") => "the typewriter",
         "make" | "create" if has("jar") || has("case") || has("shelf") || has("tank") => {
             "display cases"
         }
@@ -176,6 +179,8 @@ pub fn feature(input: &str) -> Option<&'static str> {
         "high" if rest.starts_with("five") => "high fives",
         "highfive" | "high-five" => "high fives",
         "suggest" | "suggestion" | "idea" | "feedback" => "suggestions",
+        "dark" | "darkmode" if verb != "dark" || rest == "mode" => "dark mode",
+        "type" | "typewriter" | "typing" => "the typewriter",
         _ => return None,
     })
 }

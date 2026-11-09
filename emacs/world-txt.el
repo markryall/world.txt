@@ -598,6 +598,9 @@ Links are `[label](https://…)' or a bare https link (src/links.rs)."
           ("restarting"
            (setf (world-txt-world-retries w) 1)
            (world-txt--say w (world-txt--plain "dim" "🌙 The world is restarting, just for a moment. Coming back by ourselves…")))
+          ("typewriter"
+           (world-txt--say w (world-txt--plain "sand" (format "⌨️ A page of %s, by %s. Copying it out letter by letter happens in a browser or world.txt play, but here it is to read:" .title .author)))
+           (world-txt--say w (world-txt--plain "dim" .text)))
           ("travel"
            (world-txt--add-lines
             w (list (list (world-txt--plain "blue" "⛵ Visiting other worlds happens in a browser: open ")

@@ -1004,6 +1004,7 @@ impl World {
                         b,
                         run: None,
                         fill: None,
+                        eerie: false,
                     }),
                 }
             }

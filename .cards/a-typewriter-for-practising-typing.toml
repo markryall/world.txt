@@ -1,0 +1,7 @@
+name = "A typewriter for practising typing"
+status = "done"
+description = "A dusty typewriter (in a schoolhouse, or washed up on a beach) you can 'sit at' to practise typing. It opens a modal with a page of text: each character turns green when it's right and red when it's wrong, backspace works, the next character is highlighted, and Esc wanders off. When you finish a page you get stats: WPM, accuracy, time and the keys you missed most. Then you can carry on with the next page. Web gets a modal and the terminal client a ratatui popup that takes raw keys; Emacs can wait. Text comes from a handful of public-domain island and water books (Treasure Island, The Wind in the Willows, Three Men in a Boat, Robinson Crusoe, Edward Lear's nonsense), split into sentences and compressed into the binary, not all of Gutenberg. Maybe a gentle 'fastest fingers' line on a noticeboard, not a leaderboard. Found through a hint, not help."
+created_at = "2026-11-09T14:21:00.000000Z"
+updated_at = "2026-11-09T14:35:48.000000Z"
+tags = ["fun"]
+priority = "medium"

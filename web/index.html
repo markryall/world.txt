@@ -134,6 +134,26 @@
   #board form input { flex: 1; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 16px; outline: none; }
   #board form button { background: var(--yellow); color: var(--bg); border: 0; border-radius: 10px; padding: 0 14px; font: inherit; cursor: pointer; }
   @media (max-width: 720px) { #board { inset: 0; transform: none; width: auto; height: auto; border-radius: 0; } }
+  #tw { position: fixed; inset: 8vh 50% auto auto; transform: translateX(50%); width: min(680px, 94vw);
+    max-height: 84vh; display: none; flex-direction: column; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.5); z-index: 6; overflow: hidden; }
+  #tw.on { display: flex; }
+  #tw header { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; }
+  #tw h2 { margin: 0; font-size: 16px; color: var(--sand); flex: 1; }
+  #tw .by { color: var(--dim); font-size: 13px; }
+  #tw .close { background: none; border: 0; color: var(--dim); font-size: 22px; cursor: pointer; line-height: 1; }
+  #tw-page { padding: 16px 18px; overflow-y: auto; font-size: 17px; line-height: 1.7; color: var(--dim); cursor: text;
+    white-space: pre-wrap; word-wrap: break-word; }
+  #tw-page .ok { color: var(--green); }
+  #tw-page .no { color: var(--red); background: rgba(255,107,107,.18); border-radius: 2px; }
+  #tw-page .at { color: var(--fg); background: var(--line); border-bottom: 2px solid var(--sand); }
+  #tw-keys { position: absolute; opacity: 0; width: 1px; height: 1px; font-size: 16px; border: 0; padding: 0; resize: none; }
+  #tw-foot { padding: 10px 14px; border-top: 1px solid var(--line); color: var(--dim); font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #tw-foot .stats { flex: 1; min-width: 200px; }
+  #tw-foot .stats b { color: var(--sand); font-weight: normal; }
+  #tw-foot button { background: var(--line); color: var(--fg); border: 0; border-radius: 10px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  #tw-foot button.go { background: var(--sand); color: var(--bg); }
+  @media (max-width: 720px) { #tw { inset: 0 0 auto 0; transform: none; width: auto; max-height: 60dvh; border-radius: 0 0 14px 14px; } }
   #chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; background: var(--panel);
     border-top: 1px solid var(--line); scrollbar-width: none; }
   #chips::-webkit-scrollbar { display: none; }
@@ -217,6 +237,16 @@
   <span id="rsearch" aria-live="polite"></span>
   <input id="cmd" placeholder="say hi, dig, make a frog that croaks when it rains…" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
 </form>
+<div id="tw" role="dialog" aria-label="typewriter">
+  <header>
+    <h2 id="tw-title"></h2><span class="by" id="tw-by"></span>
+    <button class="close" id="tw-close" aria-label="close">×</button>
+  </header>
+  <div id="tw-page"></div>
+  <textarea id="tw-keys" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="type here"></textarea>
+  <div id="tw-foot"><span class="stats" id="tw-stats"></span>
+    <button id="tw-again" class="go" type="button" hidden>next page ↵</button></div>
+</div>
 <div id="board" role="dialog" aria-label="noticeboard">
   <header>
     <h2 id="board-title"></h2>
@@ -576,6 +606,7 @@ function connect() {
     else if (m.type === 'status') status(m);
     else if (m.type === 'hint') hint(m);
     else if (m.type === 'board') board(m);
+    else if (m.type === 'typewriter') typewriter(m);
     else if (m.type === 'spin_start') hostStart(m.thing);
     else if (m.type === 'juke_add') jukeAdd(m.thing);
     else if (m.type === 'juke_turn') jukeTurn(m.thing, m.key);
@@ -1121,7 +1152,7 @@ function tuneIn(m) {
 // (the join screen, a noticeboard, a box of its own) or text is being selected.
 const pointerFine = matchMedia('(pointer: fine)');
 const elsewhere = () =>
-  getComputedStyle($('#join')).display !== 'none' || $('#board').classList.contains('on');
+  getComputedStyle($('#join')).display !== 'none' || $('#board').classList.contains('on') || $('#tw').classList.contains('on');
 const ownInput = (el) => el && el.closest && el.closest('input, textarea, select');
 document.addEventListener('click', (e) => {
   // On a phone that would pop the keyboard up at every tap.
@@ -1136,6 +1167,99 @@ document.addEventListener('keydown', (e) => {
   if (e.key === ' ' && document.activeElement?.closest('button, [role=button]')) return;
   $('#cmd').focus({ preventScroll: true });
 });
+
+// ---- the typewriter -----------------------------------------------------------
+// A page of an old island story to copy out. Everything happens here: each
+// letter goes green when it's right and red when it isn't, Backspace mends,
+// and the page's stats come at the end. Enter then asks the world for the next.
+const tw = { text: '', typed: [], keys: 0, slips: 0, missed: {}, start: 0, end: 0 };
+const twKeys = $('#tw-keys');
+const twSame = (a, b) => a === b || ({ '‘': "'", '’': "'", '“': '"', '”': '"', '—': '-', '–': '-' })[a] === b;
+function typewriter(m) {
+  Object.assign(tw, { text: m.text, typed: [], keys: 0, slips: 0, missed: {}, start: 0, end: 0 });
+  $('#tw-title').textContent = m.title;
+  $('#tw-by').textContent = 'by ' + m.author;
+  $('#tw-stats').textContent = (pointerFine.matches ? 'Just start typing.' : 'Tap the page and start typing.') + ' Backspace mends a mistake, Esc gets up.';
+  $('#tw-again').hidden = true;
+  $('#tw').classList.add('on');
+  twDraw();
+  twFocus();
+}
+function twFocus() { twReset(); twKeys.focus({ preventScroll: true }); }
+// Something always sits in the box so Backspace has something to delete.
+function twReset() { twKeys.value = '··'; twKeys.setSelectionRange(2, 2); }
+function twDraw() {
+  const page = $('#tw-page');
+  const frag = document.createDocumentFragment();
+  let plain = '';
+  const flush = () => { if (plain) { frag.append(plain); plain = ''; } };
+  for (let i = 0; i < tw.text.length; i++) {
+    const c = tw.text[i];
+    if (i < tw.typed.length) {
+      flush();
+      const s = document.createElement('span');
+      s.className = twSame(tw.typed[i], c) ? 'ok' : 'no';
+      s.textContent = c;
+      frag.append(s);
+    } else if (i === tw.typed.length && !tw.end) {
+      flush();
+      const s = document.createElement('span');
+      s.className = 'at'; s.textContent = c;
+      frag.append(s);
+    } else plain += c;
+  }
+  flush();
+  page.replaceChildren(frag);
+  page.querySelector('.at')?.scrollIntoView({ block: 'nearest' });
+}
+function twType(c) {
+  if (tw.end || tw.typed.length >= tw.text.length) return;
+  if (!tw.start) tw.start = performance.now();
+  const want = tw.text[tw.typed.length];
+  tw.keys++;
+  if (!twSame(c, want)) { tw.slips++; tw.missed[want] = (tw.missed[want] || 0) + 1; }
+  tw.typed.push(c);
+  if (tw.typed.length === tw.text.length) twDone();
+  twDraw();
+}
+function twBack() { if (!tw.end && tw.typed.length) { tw.typed.pop(); twDraw(); } }
+function twDone() {
+  tw.end = performance.now();
+  const mins = Math.max((tw.end - tw.start) / 60000, 1 / 600);
+  const right = tw.typed.filter((c, i) => twSame(c, tw.text[i])).length;
+  const wpm = Math.round(right / 5 / mins);
+  const acc = Math.round(100 * (tw.keys - tw.slips) / Math.max(tw.keys, 1));
+  const secs = Math.round((tw.end - tw.start) / 1000);
+  const time = secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+  const tricky = Object.entries(tw.missed).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([k]) => k === ' ' ? 'space' : k).join(' ');
+  const stats = $('#tw-stats');
+  stats.replaceChildren();
+  const part = (label, value) => { stats.append(label + ' '); const b = document.createElement('b'); b.textContent = value; stats.append(b, '  '); };
+  part('⌨️', `${wpm} wpm`); part('accuracy', `${acc}%`); part('time', time);
+  if (tricky) part('trickiest', tricky);
+  $('#tw-again').hidden = false;
+}
+function twClose() { $('#tw').classList.remove('on'); twKeys.blur(); }
+// Phone keyboards that compose a word at a time hand it over when it's done.
+twKeys.addEventListener('compositionend', (e) => { [...(e.data || '')].forEach(twType); twReset(); });
+twKeys.addEventListener('beforeinput', (e) => {
+  if (e.inputType === 'insertCompositionText') return;
+  e.preventDefault();
+  if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') {
+    if (tw.end) send('type');
+  } else if (e.inputType === 'deleteContentBackward') twBack();
+  else if (e.inputType.startsWith('insert') && e.data) [...e.data].forEach(twType);
+  twReset();
+});
+twKeys.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); twClose(); }
+  else if (e.key === 'Tab') e.preventDefault();
+});
+$('#tw-page').onclick = twFocus;
+$('#tw-close').onclick = twClose;
+$('#tw-again').onclick = () => send('type');
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#tw').classList.contains('on')) twClose(); });
 
 // ---- what can I do here? ------------------------------------------------------
 // The world says what you could do where you're standing, most likely first:

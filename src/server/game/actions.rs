@@ -9,7 +9,7 @@
 
 use super::Game;
 use super::companions;
-use super::{builds, cook, gramophone, jukebox, meetings, music, radio};
+use super::{builds, cook, gramophone, jukebox, meetings, music, radio, typewriter};
 use crate::protocol::Action;
 use crate::server::terrain::Terrain;
 use crate::server::world::{Thing, room_of};
@@ -142,6 +142,9 @@ impl Game {
         }
         if kind == radio::kind() {
             out.push(fill("📻 tune…", "tune "));
+        }
+        if kind == typewriter::KIND {
+            out.push(run("⌨️ type", "type"));
         }
         if kind == cook::FIRE || kind == cook::OVEN {
             out.push(run("🍳 cook", "cook"));

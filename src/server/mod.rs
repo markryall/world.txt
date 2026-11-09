@@ -3,6 +3,7 @@
 
 pub mod accounts;
 pub mod backup;
+mod dark;
 mod db;
 pub mod federation;
 mod game;
@@ -43,6 +44,8 @@ pub struct ClientTx {
     audio_queued: Arc<std::sync::atomic::AtomicUsize>,
     queued: Arc<std::sync::atomic::AtomicUsize>,
     swamped: Arc<std::sync::atomic::AtomicBool>,
+    /// Dark mode: their lines go out a little bit wrong (see `dark`).
+    dark: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Messages waiting for one connection before side panels are skipped.
@@ -57,7 +60,16 @@ impl ClientTx {
             audio_queued: Arc::default(),
             queued: Arc::default(),
             swamped: Arc::default(),
+            dark: Arc::default(),
         }
+    }
+
+    pub fn set_dark(&self, on: bool) {
+        self.dark.store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn dark(&self) -> bool {
+        self.dark.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Queue a message. The error (the connection's gone) carries the message
@@ -278,8 +290,18 @@ async fn connection(
     let counter = tx.clone();
 
     let writer = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
+        let mut rng = rng::Rng::new(
+            id ^ std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos() as u64),
+        );
+        while let Some(mut msg) = rx.recv().await {
             counter.taken(&msg);
+            if let ToClient::Lines { lines } = &mut msg
+                && counter.dark()
+            {
+                dark::curse(lines, &mut rng);
+            }
             if counter.swamped() {
                 eprintln!("connection {id}: fell too far behind, letting it go");
                 break;

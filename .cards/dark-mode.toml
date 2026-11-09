@@ -1,0 +1,7 @@
+name = "Dark mode"
+status = "done"
+description = "A joke on the theme toggle: 'dark mode' doesn't darken the colours, it makes the island quietly cursed, for you only. Animals go slightly wrong (the fox stares at a spot just behind you, ducks all face the same way and won't say why, a dog with a few too many teeth, all of them polite), island folk seem disturbed (a sleeve where a hand should be, a smile held a little too long), flowers ring faintly when nobody is near. Unsettling, never violent or gory. It's per-player and only changes the descriptions you get: everyone else's island stays cute, so it can't spook kids. AI residents: canned uncanny lines rather than changing their shared Claude context (or only when you're alone with one). 'light mode' snaps it back with a little shiver line. Found through a play_hint (the lighthouse lamp flickers, someone mutters about a darker way to see the island), never in help."
+created_at = "2026-11-09T14:21:00.000000Z"
+updated_at = "2026-11-09T14:35:48.000000Z"
+tags = ["fun"]
+priority = "medium"

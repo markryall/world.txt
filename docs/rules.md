@@ -86,6 +86,7 @@ the next section).
 | Switch a radio off | Its maker, or a keeper. |
 | Stop a gramophone | Whoever's playing it, or a keeper. |
 | Skip a jukebox song | Whoever chose it, or a keeper. |
+| Type at a typewriter | Anyone, wherever one's been made. Pages are about 300 letters, and a very long sentence is broken at a dash or comma. |
 
 ### Island folk
 
@@ -315,6 +316,8 @@ else sees it in their own time.
 | Where you are | Not private: `who` and `find` show where everyone is, including "inside" a building. |
 | Visiting someone's home | The owner hears the doorbell if they're on, and if they're away it's in their "since you were last here" when they're back. Nobody else is told. |
 | What you do out in the open | Claiming or painting a home, finishing a building, naming a spot and making something outdoors can turn up in other people's "since you were last here". Nothing you do inside a building does. |
+| Dark mode | Only you. The world remembers it's on, by username, and nobody else's island changes. |
+| The typewriter | People on the spot see you sit down to type. What you type, and how fast, never leaves your device; the world only remembers which page you're up to. |
 | Errands | Only you hear what a folk asked you to find (unless someone's standing with you), and only you can see it lying about. |
 | Pieces that come together | Everyone on hears when something comes apart and when it comes whole, and the names of everyone who set a piece down. |
 | What's in a display case | Anyone who looks. The finds still belong to whoever put each one in. |

@@ -309,7 +309,7 @@ impl Game {
                     way(dx, dy)
                 )
             };
-            self.say1(id, Line::col(Col::Green, line));
+            self.say1(id, Line::col(Col::Green, line).eerie());
         }
 
         self.wild_wander(now);

@@ -110,7 +110,7 @@ pub async fn run(
                         let _ = log.flush();
                     }
                     // Sound is for browsers.
-                    Ok(ToClient::Hint { .. } | ToClient::Circle { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. } | ToClient::Restarting) | Err(_) => {}
+                    Ok(ToClient::Hint { .. } | ToClient::Circle { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. } | ToClient::Typewriter { .. } | ToClient::Restarting) | Err(_) => {}
                 }
             }
             Some(cmd) = cmd_rx.recv() => {

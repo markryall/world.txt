@@ -32,6 +32,100 @@ struct State {
     /// Lines scrolled up from the bottom.
     scroll: u16,
     closed: Option<String>,
+    /// A page being copied out at a typewriter, over everything.
+    typing: Option<Typing>,
+}
+
+/// A page at a typewriter: what's to be typed, what has been, and how it went.
+struct Typing {
+    title: String,
+    author: String,
+    text: Vec<char>,
+    typed: Vec<char>,
+    keys: u32,
+    slips: u32,
+    missed: std::collections::HashMap<char, u32>,
+    start: Option<std::time::Instant>,
+    end: Option<std::time::Instant>,
+}
+
+impl Typing {
+    fn new(title: String, author: String, text: &str) -> Typing {
+        Typing {
+            title,
+            author,
+            text: text.chars().collect(),
+            typed: Vec::new(),
+            keys: 0,
+            slips: 0,
+            missed: Default::default(),
+            start: None,
+            end: None,
+        }
+    }
+
+    fn key(&mut self, c: char) {
+        if self.end.is_some() || self.typed.len() >= self.text.len() {
+            return;
+        }
+        let now = std::time::Instant::now();
+        self.start.get_or_insert(now);
+        let want = self.text[self.typed.len()];
+        self.keys += 1;
+        if c != want {
+            self.slips += 1;
+            *self.missed.entry(want).or_default() += 1;
+        }
+        self.typed.push(c);
+        if self.typed.len() == self.text.len() {
+            self.end = Some(now);
+        }
+    }
+
+    fn back(&mut self) {
+        if self.end.is_none() {
+            self.typed.pop();
+        }
+    }
+
+    /// Words a minute, accuracy, the time it took and the trickiest keys,
+    /// once the page is done.
+    fn stats(&self) -> Option<String> {
+        let (start, end) = (self.start?, self.end?);
+        let secs = end.duration_since(start).as_secs_f64().max(0.1);
+        let right = self
+            .typed
+            .iter()
+            .zip(&self.text)
+            .filter(|(a, b)| a == b)
+            .count();
+        let wpm = (right as f64 / 5.0 / (secs / 60.0)).round();
+        let acc = (100.0 * (self.keys - self.slips) as f64 / self.keys.max(1) as f64).round();
+        let s = secs.round() as u64;
+        let time = if s >= 60 {
+            format!("{}m {}s", s / 60, s % 60)
+        } else {
+            format!("{s}s")
+        };
+        let mut missed: Vec<_> = self.missed.iter().collect();
+        missed.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        let tricky: Vec<String> = missed
+            .iter()
+            .take(3)
+            .map(|(c, _)| {
+                if **c == ' ' {
+                    "space".into()
+                } else {
+                    c.to_string()
+                }
+            })
+            .collect();
+        let mut out = format!("⌨️ {wpm} wpm · accuracy {acc}% · {time}");
+        if !tricky.is_empty() {
+            out.push_str(&format!(" · trickiest: {}", tricky.join(" ")));
+        }
+        Some(out)
+    }
 }
 
 /// At most this many actions listed in the side panel (Tab reaches them all).
@@ -131,6 +225,9 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
                                 st.here = here;
                             }
                             ToClient::Hint { text, .. } => st.hint = text,
+                            ToClient::Typewriter { title, author, text } => {
+                                st.typing = Some(Typing::new(title, author, &text));
+                            }
                             // One short line a turn says who's humming.
                             ToClient::Circle { parts, .. } if !parts.is_empty() => st.log.push(crate::protocol::circle_line(&parts)),
                             ToClient::Travel { url } => st.log.push(crate::protocol::Line::new()
@@ -161,6 +258,19 @@ pub async fn run(server: &str, invite: Option<String>, sound_on: bool) -> anyhow
                     let Some(Ok(Event::Key(key))) = ev else { continue };
                     if key.kind != KeyEventKind::Press { continue }
                     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+                    // At the typewriter, the keys are for the page.
+                    if let Some(t) = st.typing.as_mut().filter(|_| !ctrl) {
+                        match key.code {
+                            KeyCode::Esc => st.typing = None,
+                            KeyCode::Char(c) => t.key(c),
+                            KeyCode::Backspace => t.back(),
+                            KeyCode::Enter if t.end.is_some() => {
+                                outbox.push(ToServer::Cmd { text: "type".into() });
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
                     match key.code {
                         KeyCode::Char('c' | 'd') if ctrl => break,
                         KeyCode::Esc => break,
@@ -379,6 +489,63 @@ fn draw(f: &mut Frame, st: &mut State) {
     );
     let cx = input.x + 3 + st.input.chars().count() as u16;
     f.set_cursor_position((cx.min(input.right().saturating_sub(2)), input.y + 1));
+
+    if let Some(t) = &st.typing {
+        draw_typing(f, t);
+    }
+}
+
+/// The typewriter's page, over everything: green where it's right, red
+/// where it isn't, and the next letter picked out.
+fn draw_typing(f: &mut Frame, t: &Typing) {
+    let area = f.area();
+    let w = area.width.saturating_sub(4).min(76);
+    let h = area.height.saturating_sub(2).min(18);
+    let pop = ratatui::layout::Rect {
+        x: area.x + (area.width - w) / 2,
+        y: area.y + (area.height - h) / 2,
+        width: w,
+        height: h,
+    };
+    let ok = Style::default().fg(colour(Col::Green));
+    let no = Style::default()
+        .fg(colour(Col::Red))
+        .add_modifier(Modifier::UNDERLINED);
+    let at = Style::default().add_modifier(Modifier::REVERSED);
+    let mut spans: Vec<RSpan> = Vec::new();
+    for (i, &c) in t.text.iter().enumerate() {
+        let style = match t.typed.get(i) {
+            Some(&typed) if typed == c => ok,
+            Some(_) => no,
+            None if i == t.typed.len() && t.end.is_none() => at,
+            None => dim(),
+        };
+        // A wrong space would vanish: show it.
+        let shown = if c == ' ' && style == no { '·' } else { c };
+        spans.push(RSpan::styled(shown.to_string(), style));
+    }
+    let foot = t.stats().map_or_else(
+        || "Just start typing. Backspace mends a mistake, Esc gets up.".to_string(),
+        |s| format!("{s}   Enter: next page · Esc: get up"),
+    );
+    let text = Text::from(vec![
+        RLine::from(spans),
+        RLine::default(),
+        RLine::from(RSpan::styled(foot, Style::default().fg(colour(Col::Sand)))),
+    ]);
+    f.render_widget(ratatui::widgets::Clear, pop);
+    f.render_widget(
+        Paragraph::new(text).wrap(Wrap { trim: false }).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colour(Col::Sand)))
+                .title(RSpan::styled(
+                    format!(" ⌨️ {} · {} ", t.title, t.author),
+                    Style::default().fg(colour(Col::Sand)),
+                )),
+        ),
+        pop,
+    );
 }
 
 fn to_rline(l: &Line) -> RLine<'static> {
@@ -426,6 +593,27 @@ fn colour(c: Col) -> Color {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typing_a_page_counts_slips_and_mends() {
+        let mut t = Typing::new("T".into(), "A".into(), "a cat");
+        for c in "a cot".chars() {
+            t.key(c);
+        }
+        assert!(t.end.is_some());
+        assert_eq!((t.keys, t.slips), (5, 1));
+        assert_eq!(t.missed.get(&'a'), Some(&1));
+        let stats = t.stats().unwrap();
+        assert!(stats.contains("accuracy 80%"), "{stats}");
+        assert!(stats.contains("trickiest: a"), "{stats}");
+
+        let mut t = Typing::new("T".into(), "A".into(), "ab");
+        t.key('x');
+        t.back();
+        t.key('a');
+        assert_eq!(t.typed, ['a']);
+        assert!(t.stats().is_none());
+    }
 
     fn act(label: &str, run: Option<&str>, fill: Option<&str>) -> Action {
         Action {

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Dark mode
+There's a dark mode now. It doesn't make anything darker, exactly: the fox is
+grinning, the ducks won't blink, and the island folk wave with a sleeve where a
+hand should be. It's only for you, it's only ever the island's own words, never
+anything a person wrote, and `light mode` puts it all back. Someone may whisper
+about it.
+
+### Typewriters
+Make a typewriter and sit down at it to copy out a page of an old island
+story: Treasure Island, The Wind in the Willows, Three Men in a Boat, Robinson
+Crusoe or Alice. Letters go green when they're right and red when they're
+not, and at the end of the page you get your words a minute, your accuracy
+and your trickiest keys. It remembers where you got to. In the browser and
+the terminal.
+
 ## 0.11.0 (2026-11-09)
 
 ### Errands for the folk

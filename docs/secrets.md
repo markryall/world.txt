@@ -230,6 +230,47 @@ along': the world counts you both in.)". `hum along` is also in `help music`.
 A music box someone's taught a tune to plays it now and then when people are
 near.
 
+## Dark mode
+
+`dark mode` doesn't change the colours. It makes the island quietly wrong, for
+you alone: the fox is grinning, the ducks won't blink, the folk smile with
+slightly too many teeth and wave with a sleeve where a hand should be, and the
+scenery now and then says things like "You hear your own name, whispered, from
+the long grass." Unsettling, never gory. `light mode` puts it all back (it says
+so when you switch), and it's remembered between visits until you do.
+
+Only the island's own words are touched: animals, the island folk, finds and
+the scenery. Anything a person said, emoted, posted or wrote reaches you
+exactly as they wrote it, and nobody else's island changes at all.
+
+The hint: "For half a second the whole island flickers, like someone reaching
+for a light switch. Somewhere, someone whispers about a dark mode." Once it's
+on: "Something is very wrong with the animals today. Maybe it's time for light
+mode."
+
+## The typewriter
+
+`make a typewriter` (any name with "typewriter" in it), then `type` beside it
+(or `sit at the typewriter`). A page of an old island story opens over
+everything, in the browser and `world.txt play`: each letter goes green when
+it's right and red when it isn't, Backspace mends a mistake, and Esc gets up.
+At the end of the page you get your words a minute, accuracy, how long it took
+and your trickiest keys, and Enter winds in the next page.
+
+The world remembers where you got to, so `type` carries on from there. `type
+treasure island` (or `type alice`, `type toad`…) switches book, picking up
+where you left off if it's the one you were on, and `type something else`
+opens a random page of a random book. The books are Treasure Island, The Wind
+in the Willows, Three Men in a Boat, Robinson Crusoe and Alice's Adventures in
+Wonderland, all public domain, from Project Gutenberg. In Emacs the page comes
+as plain text to read.
+
+The hints: at your home's room, "A typewriter would sit nicely in a quiet
+corner in here. Whole island stories to copy out, a page at a time." Beside
+one: "A typewriter waits with a fresh sheet of paper in it. It's practically
+begging to be typed on." It's also in the actions row (⌨️ type) when you're
+standing by one.
+
 ## Hints at home
 
 At your own home the scenery mentions the practical home things now and then:

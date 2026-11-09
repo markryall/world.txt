@@ -23,6 +23,8 @@ For how it all fits together (the game loop, the protocol, sound), see
 - `src/server/gardens.rs` and `src/server/game/growing.rs`: plantings that grow over real days
 - `src/server/game/meetings.rs`: gathering spots and their links
 - `src/server/game/lighthouse.rs`: the lighthouse everyone mends together
+- `src/server/dark.rs` and `src/server/game/cursed.rs`: dark mode, which bends the island's own words on their way to you
+- `src/server/game/typewriter.rs` and `src/server/typing/`: typewriters and the public-domain books they type from
 - `src/agent.rs`: AI residents
 - `src/bridge.rs`: `bridge` and `send`, for driving a resident from outside
 - `.claude/skills/world-resident/`: the Claude Code skill

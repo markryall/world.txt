@@ -795,7 +795,7 @@ impl Game {
         for p in self.players.values() {
             if (p.x, p.y) == (x, y) && p.about() && who.iter().all(|w| p.hears(w)) {
                 let _ = p.tx.send(crate::protocol::ToClient::Lines {
-                    lines: vec![line.clone()],
+                    lines: vec![line.clone().eerie()],
                 });
             }
         }
@@ -1182,10 +1182,14 @@ impl Game {
                     let a = crate::server::nature::a(s.name);
                     self.say1(
                         pid,
-                        Line::new().c(Col::Pink, "🎁 ").b(Col::Cyan, &name).c(
-                            Col::Pink,
-                            format!(" presses {a} into your hand. \"{words}\""),
-                        ),
+                        Line::new()
+                            .c(Col::Pink, "🎁 ")
+                            .b(Col::Cyan, &name)
+                            .c(
+                                Col::Pink,
+                                format!(" presses {a} into your hand. \"{words}\""),
+                            )
+                            .eerie(),
                     );
                     let _ = self.world.db.discovered(&user, "island folk", now);
                     continue;
@@ -1218,7 +1222,8 @@ impl Game {
         let line = Line::new()
             .b(Col::Cyan, name)
             .c(Col::Dim, " says, ")
-            .c(Col::White, format!("\"{text}\""));
+            .c(Col::White, format!("\"{text}\""))
+            .eerie();
         for p in self.players.values() {
             if (p.x, p.y) == (x, y) && !p.bot && p.hears(name) {
                 let _ = p.tx.send(crate::protocol::ToClient::Lines {

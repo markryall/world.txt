@@ -37,16 +37,21 @@ pub struct Span {
     /// ("@Sam " to message Sam).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fill: Option<String>,
+    /// The island's own words (animals, folk, scenery), which dark mode may
+    /// bend. Never set on anything a person wrote. Stays in the world.
+    #[serde(skip)]
+    pub eerie: bool,
 }
 
 impl Span {
-    fn new(t: impl Into<String>, c: Col, b: bool) -> Self {
+    pub fn new(t: impl Into<String>, c: Col, b: bool) -> Self {
         Span {
             t: t.into(),
             c,
             b,
             run: None,
             fill: None,
+            eerie: false,
         }
     }
 }
@@ -98,6 +103,13 @@ impl Line {
             fill: Some(fill),
             ..Span::new(name, Col::Cyan, true)
         });
+        self
+    }
+    /// The island's own words, for dark mode to bend (see `Span::eerie`).
+    pub fn eerie(mut self) -> Self {
+        for s in &mut self.0 {
+            s.eerie = true;
+        }
         self
     }
     pub fn plain(text: impl Into<String>) -> Self {
@@ -364,6 +376,12 @@ pub enum ToClient {
     JukeTurn { thing: i64, key: String },
     /// Stop playing your song on this jukebox (skipped, or it's moved on).
     JukeStop { thing: i64 },
+    /// A page to copy out at a typewriter: open it over everything.
+    Typewriter {
+        title: String,
+        author: String,
+        text: String,
+    },
 }
 
 /// A song waiting on a jukebox: a key the browser knows it by, and its title.

@@ -10,6 +10,7 @@ mod circle;
 mod companions;
 mod cook;
 mod craft;
+mod cursed;
 mod discoveries;
 mod events;
 mod feedback;
@@ -38,6 +39,7 @@ mod sailing;
 mod since;
 mod together;
 mod travel;
+mod typewriter;
 mod visitors;
 
 use super::nature::Find;
@@ -397,7 +399,7 @@ impl Game {
         for p in self.players.values() {
             if p.x == x && p.y == y && p.about() {
                 let _ = p.tx.send(ToClient::Lines {
-                    lines: vec![line.clone()],
+                    lines: vec![line.clone().eerie()],
                 });
             }
         }
@@ -546,10 +548,14 @@ impl Game {
         lines.extend(self.home_life_lines(id));
         lines.extend(self.cases_lines_here(id));
         lines.extend(self.games_lines_here(id));
-        lines.extend(self.animal_lines(id));
-        lines.extend(self.folk_lines(id));
+        // The island's own creatures, which dark mode may bend.
+        let creatures = [
+            self.animal_lines(id),
+            self.folk_lines(id),
+            self.find_lines(p.x, p.y),
+        ];
         lines.extend(self.quest_lines(id));
-        lines.extend(self.find_lines(p.x, p.y));
+        lines.extend(creatures.into_iter().flatten().map(Line::eerie));
         lines.extend(exits);
         self.send(id, lines);
     }
@@ -736,6 +742,7 @@ impl Game {
                 fun: play::Fun::wearing(self.world.db.wearing(&user)),
             },
         );
+        self.restore_dark(id);
 
         self.send(
             id,
@@ -874,6 +881,12 @@ impl Game {
             return self.walk(id, dx, dy);
         }
         if let Some(done) = self.crab_command(id, &verb, rest) {
+            return done;
+        }
+        if let Some(done) = self.cursed_command(id, &verb, rest) {
+            return done;
+        }
+        if let Some(done) = self.typewriter_command(id, &verb, rest) {
             return done;
         }
         // In and out of buildings.
@@ -2206,6 +2219,35 @@ impl Game {
             self.status_all();
             return Ok(());
         }
+        if typewriter::is_typewriter(&name) {
+            self.world.add_thing(
+                x,
+                y,
+                name.clone(),
+                None,
+                Trigger::Always,
+                &self.user(id),
+                Some(typewriter::KIND),
+            )?;
+            self.say1(
+                id,
+                Line::new()
+                    .c(Col::Sand, "⌨️ You make ")
+                    .b(Col::Sand, &name)
+                    .c(
+                        Col::Sand,
+                        ", with a stack of old island stories beside it. Sit down and type.",
+                    ),
+            );
+            self.tell_here(
+                x,
+                y,
+                id,
+                Line::col(Col::Sand, format!("⌨️ {who} makes {name}.")),
+            );
+            self.status_all();
+            return Ok(());
+        }
         if let Some(kind) = cook::kitchen(&name) {
             self.world.add_thing(
                 x,
@@ -3374,11 +3416,14 @@ impl Game {
                 } else {
                     None
                 };
+                let dark = (self.is_dark(id) && self.rng.chance(0.5))
+                    .then(|| *self.rng.pick(super::dark::SCENERY));
                 if let Some(line) = hint
+                    .or(dark)
                     .or_else(|| ambient(&mut self.rng, terrain, sky, phase, Clock::season()))
                     .filter(|l| Some(*l) != last)
                 {
-                    self.say1(id, Line::col(Col::Dim, line));
+                    self.say1(id, Line::col(Col::Dim, line).eerie());
                     if let Some(p) = self.players.get_mut(&id) {
                         p.last_ambient = Some(line);
                         p.ambient_quiet += 1;

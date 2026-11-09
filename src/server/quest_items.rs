@@ -358,7 +358,6 @@ pub fn set(id: &str) -> Option<&'static Set> {
     SETS.iter().find(|s| s.id == id)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -198,7 +198,7 @@ pub async fn run(opts: Options) -> anyhow::Result<()> {
                         while seen.len() > CONTEXT_LINES { seen.pop_front(); }
                     }
                     // Sound is for browsers.
-                    Ok(ToClient::Hint { .. } | ToClient::Circle { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. } | ToClient::Restarting) | Err(_) => {}
+                    Ok(ToClient::Hint { .. } | ToClient::Circle { .. } | ToClient::Travel { .. } | ToClient::SpinStart { .. } | ToClient::SpinStop { .. } | ToClient::Audio { .. } | ToClient::AudioEnd { .. } | ToClient::Radio { .. } | ToClient::JukeAdd { .. } | ToClient::JukeTurn { .. } | ToClient::JukeStop { .. } | ToClient::Typewriter { .. } | ToClient::Restarting) | Err(_) => {}
                 }
                 continue;
             }

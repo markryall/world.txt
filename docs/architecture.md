@@ -115,6 +115,16 @@ passport), `cmd` (anything typed), `audio` (gramophone music), and `queue` /
   fingerprint of the page the world serves (it's written into the page too),
   so a browser left open across an update offers to reload.
 - `audio`, `audio_end`, `radio`, `spin_start`, `juke_turn`…: sound (below).
+- `typewriter`: a page to copy out (a title, an author and the text). The
+  browser and terminal open it over everything and do all the typing and
+  counting themselves; Enter at the end just sends `type` for the next page.
+
+**Dark mode** happens on the way out. Lines the island writes itself (animals,
+folk, finds, scenery) have their spans marked `eerie`, a flag that never goes
+over the wire. When someone's in dark mode, their connection's writer
+(`src/server/dark.rs`) bends just those spans before sending: a word in front
+of a creature, a twist on how something's done, now and then an aside.
+Anything a person typed is never marked, so it always arrives as written.
 
 Clients are deliberately thin. The world decides what everyone sees, and the
 browser and terminal just draw it. Links in text are the only formatting

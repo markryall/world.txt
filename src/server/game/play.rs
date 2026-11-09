@@ -1260,6 +1260,15 @@ impl Game {
         );
     }
 
+    /// Somebody whispers about dark mode, or, once it's on, about the way out.
+    fn dark_hint(&self, id: u64) -> Option<&'static str> {
+        Some(if self.is_dark(id) {
+            "Something is very wrong with the animals today. Maybe it's time for light mode."
+        } else {
+            "For half a second the whole island flickers, like someone reaching for a light switch. Somewhere, someone whispers about a dark mode."
+        })
+    }
+
     fn food_of(&self, user: &str) -> Option<&'static nature::Species> {
         self.world
             .db
@@ -1291,9 +1300,14 @@ impl Game {
                     "This room could be anything you like. Describe it in your own words. (describe …)",
                     "A feather cushion and a leaf rug would make it in here cosier. (recipes)",
                     "A jar on the windowsill would be just the place for your finds.",
+                    "A typewriter would sit nicely in a quiet corner in here. Whole island stories to copy out, a page at a time.",
                 ]);
             }
             hints.push("Rain or shine, it's snug in here.");
+            if self.typewriter_here(x, y) {
+                hints.push("A typewriter waits with a fresh sheet of paper in it. It's practically begging to be typed on.");
+            }
+            hints.extend(self.dark_hint(id));
             let fresh: Vec<&'static str> = hints
                 .into_iter()
                 .filter(|h| {
@@ -1370,6 +1384,10 @@ impl Game {
             } else if !night && dry && matches!(t, Terrain::Meadow | Terrain::Grass) {
                 hints.push("What a spot for a picnic. Good grass, good company.");
             }
+        }
+        hints.extend(self.dark_hint(id));
+        if self.typewriter_here(x, y) {
+            hints.push("A typewriter waits with a fresh sheet of paper in it. It's practically begging to be typed on.");
         }
         // Everything else there is to do.
         if matches!(t, Terrain::Grass | Terrain::Dirt) {
