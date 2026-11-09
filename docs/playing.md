@@ -450,8 +450,8 @@ Wild animals turn up right beside people now and then: a fox in the woods, a
 duckling on the water, a rabbit in the meadow by day, a hedgehog at night, a
 turtle on the shore. Berries (blackberries, wild strawberries, bilberries) are
 gathered like anything else, and `befriend fox` offers one; it may take a couple.
-A companion follows you everywhere, gets up to little things, and shows up in
-`look` and in your comings and goings. `petname Rusty`, `pet`, and `let go`.
+A companion follows you everywhere, indoors too, gets up to little things, and
+shows up in `look` and in your comings and goings. `petname Rusty`, `pet`, and `let go`.
 One each, remembered between visits.
 
 ## Crafting

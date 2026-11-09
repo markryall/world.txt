@@ -10,7 +10,7 @@ use crate::protocol::{Col, Line};
 use crate::server::nature::{self, Kind};
 use crate::server::terrain::Terrain as T;
 use crate::server::weather::{Clock, Phase};
-use crate::server::world::{DIRS, capitalise};
+use crate::server::world::{DIRS, capitalise, in_room_space};
 use std::time::{Duration, Instant};
 
 pub struct Animal {
@@ -22,6 +22,10 @@ pub struct Animal {
     /// "A fox {here}."
     here: &'static str,
     tricks: &'static [&'static str],
+    /// Its tricks in a room, where there are no leaves or clover.
+    indoors: &'static [&'static str],
+    /// Settling on something soft in a room: "curls up on {}".
+    snug: &'static str,
     /// How it gets about: "trots".
     moves: &'static str,
     /// Seconds between steps, at the quickest and slowest.
@@ -46,6 +50,13 @@ pub const ANIMALS: &[Animal] = &[
             "curls its tail around your feet",
             "yips softly",
         ],
+        indoors: &[
+            "curls up in the warmest corner, nose tucked under its tail",
+            "sits by the window, watching the world go by",
+            "chases its own tail round and round, then pretends it didn't",
+            "noses at the door, then thinks better of it and lies down",
+        ],
+        snug: "turns round three times on {} and curls up, nose under its tail",
         moves: "trots",
         pace: (20.0, 50.0),
         patted: &[
@@ -73,6 +84,13 @@ pub const ANIMALS: &[Animal] = &[
             "waddles in a little circle",
             "shakes water off its fluffy feathers",
         ],
+        indoors: &[
+            "waddles under the table and peeps from there",
+            "peeps at its reflection in something shiny",
+            "fluffs itself up and has a little doze",
+            "pitter-patters from one end of the room to the other",
+        ],
+        snug: "settles on {}, fluffed up like a dandelion",
         moves: "paddles",
         pace: (15.0, 40.0),
         patted: &[
@@ -98,6 +116,13 @@ pub const ANIMALS: &[Animal] = &[
             "does a happy little hop",
             "twitches its nose at you",
         ],
+        indoors: &[
+            "flops over on its side, utterly content",
+            "does a binky across the floor",
+            "washes its ears, one at a time",
+            "stretches out long and flat, like a little rug",
+        ],
+        snug: "flops over on {}, utterly content",
         moves: "hops",
         pace: (12.0, 35.0),
         patted: &[
@@ -124,6 +149,13 @@ pub const ANIMALS: &[Animal] = &[
             "curls into a prickly ball, then uncurls",
             "trundles along beside you",
         ],
+        indoors: &[
+            "snuffles along the skirting board",
+            "finds a cosy gap behind something and naps in it",
+            "grunts contentedly to itself",
+            "trundles a slow lap of the room, inspecting everything",
+        ],
+        snug: "investigates {} very seriously, then falls asleep on it",
         moves: "trundles",
         pace: (30.0, 70.0),
         patted: &[
@@ -149,6 +181,13 @@ pub const ANIMALS: &[Animal] = &[
             "pokes its head out to look around",
             "trundles very, very slowly after you",
         ],
+        indoors: &[
+            "finds a warm patch by the window and stays there",
+            "blinks slowly at the room",
+            "pulls its head in for a nap",
+            "sets off across the floor, with no hurry at all",
+        ],
+        snug: "plods all the way onto {} and stays there",
         moves: "plods",
         pace: (60.0, 140.0),
         patted: &[
@@ -183,6 +222,28 @@ fn way(dx: i64, dy: i64) -> &'static str {
     DIRS.iter()
         .find(|q| q.2 == dx.signum() && q.3 == dy.signum())
         .map_or("nearby", |q| q.1)
+}
+
+/// Something soft enough for a companion to settle on: "a feather cushion"
+/// becomes "the feather cushion".
+fn soft(name: &str) -> Option<String> {
+    const SOFT: &[&str] = &[
+        "cushion", "rug", "pillow", "blanket", "beanbag", "bed", "sofa", "couch", "armchair",
+        "mat", "quilt",
+    ];
+    let words: Vec<&str> = name.split_whitespace().collect();
+    let bare = match words.first() {
+        Some(&"a" | &"an" | &"the" | &"some") => &words[1..],
+        _ => &words[..],
+    };
+    bare.iter()
+        .any(|w| {
+            SOFT.contains(
+                &w.to_lowercase()
+                    .trim_matches(|c: char| !c.is_alphanumeric()),
+            )
+        })
+        .then(|| format!("the {}", bare.join(" ")))
 }
 
 /// A companion's friendly label: "Rusty the fox", or "your fox".
@@ -261,16 +322,26 @@ impl Game {
             .filter_map(|p| p.companion.as_ref().map(|(a, n)| (p.x, p.y, a, n)))
             .filter_map(|(x, y, a, n)| animal(a).map(|an| (x, y, an, n.clone())))
             .filter_map(|(x, y, an, n)| {
-                if self.rng.chance(1.0 / 25.0) {
-                    let trick = *self.rng.pick(an.tricks);
-                    Some((
-                        x,
-                        y,
-                        format!("{} {} {trick}.", an.icon, capitalise(&label(an, &n))),
-                    ))
-                } else {
-                    None
+                if !self.rng.chance(1.0 / 25.0) {
+                    return None;
                 }
+                let trick = if !in_room_space(x, y) {
+                    (*self.rng.pick(an.tricks)).to_string()
+                } else if let Some(soft) = self
+                    .world
+                    .things_at(x, y)
+                    .find_map(|t| soft(&t.name))
+                    .filter(|_| self.rng.chance(1.0 / 3.0))
+                {
+                    an.snug.replace("{}", &soft)
+                } else {
+                    (*self.rng.pick(an.indoors)).to_string()
+                };
+                Some((
+                    x,
+                    y,
+                    format!("{} {} {trick}.", an.icon, capitalise(&label(an, &n))),
+                ))
             })
             .collect();
         for (x, y, line) in pets {
@@ -699,5 +770,45 @@ impl Game {
             ),
         );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_companion_has_tricks_for_indoors() {
+        for a in ANIMALS {
+            assert!(a.indoors.len() >= 3, "{} needs indoor tricks", a.name);
+            assert!(
+                a.snug.contains("{}"),
+                "{} needs somewhere to settle",
+                a.name
+            );
+            for t in a.indoors.iter().chain([&a.snug]) {
+                for outdoorsy in [
+                    "leaf", "leaves", "clover", "grass", "sand", "water", "seaweed",
+                ] {
+                    assert!(!t.contains(outdoorsy), "{}: {t}", a.name);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn companions_settle_on_soft_things() {
+        assert_eq!(
+            soft("a feather cushion").as_deref(),
+            Some("the feather cushion")
+        );
+        assert_eq!(soft("a leaf rug").as_deref(), Some("the leaf rug"));
+        assert_eq!(
+            soft("an enormous pink beanbag").as_deref(),
+            Some("the enormous pink beanbag")
+        );
+        assert_eq!(soft("a driftwood table"), None);
+        assert_eq!(soft("a jar"), None);
+        assert_eq!(soft("a matchbox"), None);
     }
 }

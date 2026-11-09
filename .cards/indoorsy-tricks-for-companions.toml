@@ -1,5 +1,5 @@
 name = "Indoorsy tricks for companions"
-status = "todo"
+status = "done"
 description = """
 Companions follow you everywhere, rooms included, but their tricks are all outdoors: indoors your fox still "pounces on a leaf", your rabbit "nibbles some clover" and your hedgehog "snuffles in the leaves", right in the middle of somebody's disco den.
 
@@ -16,6 +16,6 @@ Give each animal a few indoor tricks (an `indoors` list beside `tricks` in src/s
 - Same pace as tricks now (about one a minute or so, to everyone on the spot), and nothing new to type.
 - Every animal gets its own indoor tricks (a test checks none are left without), so nobody's companion falls back to leaves and clover on the carpet."""
 created_at = "2026-11-09T09:30:00.000000Z"
-updated_at = "2026-11-09T09:30:00.000000Z"
+updated_at = "2026-11-09T10:30:00.000000Z"
 tags = ["companions", "homes"]
 priority = "low"

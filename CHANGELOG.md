@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Companions indoors
+A fox in a room no longer pounces on leaves: companions have tricks of their
+own for indoors, and settle on a cushion, rug or anything soft that's there.
+
 ### Hosting in Docker, wherever you like
 The hosting guide now covers running a world in Docker on an always-on machine
 of your own (a home server, a NAS, a Raspberry Pi or a rented Linux box), with

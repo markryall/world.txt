@@ -123,6 +123,11 @@ other up, and touch noses with a companion of their own kind. `pat` (or
 in at dawn, and day ones at dusk. Animals (and companions) keep quiet for
 anyone who's stepped away.
 
+Companions have indoor manners too. In a room they leave the leaves and clover
+outside: a fox curls up in the warmest corner, a rabbit flops over on its
+side, a turtle finds the warm patch by the window. Put a cushion, rug or
+anything soft in there and they'll settle on it now and then.
+
 ## Island folk
 
 Each island has one or two folk on it at a time: scripted characters (not
