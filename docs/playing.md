@@ -387,9 +387,11 @@ pearls, sand dollars and driftwood), **Mossy Holm** (deep woods, with giant
 puffballs, glow-worms and fern fronds) and **Ember Rock** (warm stone heights,
 with obsidian, fire opals and sun lizards). Each island has a dock (`⚓` on the
 map) with a rowing boat: `go dock` walks you there, `sail` lists where you can
-go, and `sail Driftwood` rows you across. `map` shows the island you're on,
-`find` tells you which island a friend is on, and homes can be claimed on any
-island. Worlds from before the archipelago keep their island as Home Island and
+go, and `sail Driftwood` rows you across, a square at a time over the open
+water, so you can watch the island shrink behind you on the map. Once you've
+pushed off there's no stopping until you bump the far dock. `map` shows the
+island you're on, `find` tells you which island a friend is on, and homes can
+be claimed on any island. Worlds from before the archipelago keep their island as Home Island and
 grow the other three the first time they start.
 
 ## Seasons and festivals

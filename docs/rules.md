@@ -279,7 +279,7 @@ else sees it in their own time.
 | A made thing doing its thing (a frog croaking) | At most once every 3 minutes for each person |
 | Scenery while you're not doing anything | Two lines, then it goes quiet until you do something |
 | A jukebox turn whose browser goes quiet | Skipped after 10 seconds |
-| Sailing to another island | About 3.5 seconds |
+| Sailing to another island | A square every half second, like walking, over the open water from dock to dock: about 15 seconds. There's no stopping once you've pushed off, and if you drift off to sleep on the way you wake at the far dock. |
 
 ### Out on the water and the beach
 

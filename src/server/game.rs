@@ -821,9 +821,11 @@ impl Game {
         let Some(p) = self.players.remove(&id) else {
             return;
         };
+        // Asleep at sea: the boat drifts in to the far dock.
+        let (sx, sy) = p.voyage.as_ref().map_or((p.x, p.y), |v| v.to);
         if p.bot {
             // Residents keep no position or progress.
-        } else if let Err(e) = self.world.db.save_player(&p.user, p.x, p.y, p.tutorial) {
+        } else if let Err(e) = self.world.db.save_player(&p.user, sx, sy, p.tutorial) {
             eprintln!("saving {}: {e}", p.user);
         } else {
             let _ = self.world.db.set_last_here(&p.user, super::accounts::now());
@@ -1049,7 +1051,11 @@ impl Game {
             "stop" if rest.starts_with("music") || rest.starts_with("the music") => {
                 return self.cmd_stop_music(id);
             }
-            "stop" => self.stop_travelling(id, true),
+            "stop" => {
+                if !self.at_sea(id) {
+                    self.stop_travelling(id, true)
+                }
+            }
             "map" | "m" => {
                 if let Some(p) = self.players.get(&id) {
                     let people: Vec<(i64, i64)> = self
@@ -1506,8 +1512,10 @@ impl Game {
         let Some(p) = self.players.get(&id) else {
             return;
         };
+        // Out at sea, the far dock: the boat drifts in even if they don't.
+        let (x, y) = p.voyage.as_ref().map_or((p.x, p.y), |v| v.to);
         if !p.bot
-            && let Err(e) = self.world.db.save_player(&p.user, p.x, p.y, p.tutorial)
+            && let Err(e) = self.world.db.save_player(&p.user, x, y, p.tutorial)
         {
             eprintln!("saving {}: {e}", p.user);
         }

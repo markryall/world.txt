@@ -17,6 +17,12 @@ not, and at the end of the page you get your words a minute, your accuracy
 and your trickiest keys. It remembers where you got to. In the browser and
 the terminal.
 
+### Rowing across, a square at a time
+Sailing to another island isn't a blink any more: you row out over the open
+water a square at a time, like walking, with the map following your little
+boat until the far island rises up ahead. Once you've pushed off there's no
+stopping, and if you fall asleep on the way you wake at the far dock.
+
 ## 0.11.0 (2026-11-09)
 
 ### Errands for the folk

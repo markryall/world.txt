@@ -181,6 +181,9 @@ impl Game {
         name: &str,
         join: Option<String>,
     ) -> anyhow::Result<()> {
+        if self.at_sea(id) {
+            return Ok(());
+        }
         self.step_out_first(id)?;
         let Some((x, y, _)) = self.here(id) else {
             return Ok(());
@@ -325,6 +328,10 @@ impl Game {
                 self.stop_travelling(id, true);
                 continue;
             };
+            if self.players[&tid].voyage.is_some() {
+                // They're out on the water: wait for them to land.
+                continue;
+            }
             let (me, them) = (
                 (self.players[&id].x, self.players[&id].y),
                 self.world
