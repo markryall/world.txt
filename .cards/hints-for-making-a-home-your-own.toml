@@ -1,0 +1,22 @@
+name = "Hints for making a home your own"
+status = "todo"
+description = """
+Homes can be painted, described, furnished from finds, filled with cases of finds and built on, but someone pottering about at their new home can easily never find out. The home hints are only three outdoors and three in a room, they compete as equals with soft earth, humming and naming spots, the paint one never says `paint`, and outdoor `describe` and `place` have no hint at all. Claiming says "The patch around you is yours to decorate" without saying what decorating means.
+
+Keep it hints, not help:
+
+- When you claim, name the decorating verbs once, softly, in the tip line that's already there:
+    Type home to come back from anywhere · paint it, describe it, furnish it from finds (recipes) · share it with a friend
+- At your own home (outdoors or in its rooms), prefer a home hint over the generic ones while there are home hints you haven't had yet, so a new home owner hears about decorating before they hear about humming.
+- Give hints their verb where it's missing: "A pot of paint sits by your door. Anything here could be any colour you like. (paint home lilac)".
+- A few more home hints:
+    - outdoors: describing the spot ("Passers-by only see grass here. You could tell them what it's really like. (describe …)")
+    - setting a find down (`place daisy`)
+    - building ("A little cottage would make it feel like a home", when a plan's makings are in your satchel)
+- Say where `describe` put your words: "…on this spot outside your home" or "…in this room". It's easy to describe the garden while meaning the inside, and the reply reads the same either way.
+
+Still within the idle budget, still one of each per session, nothing new in help."""
+created_at = "2026-11-09T10:30:00.000000Z"
+updated_at = "2026-11-09T10:30:00.000000Z"
+tags = ["homes", "hints"]
+priority = "medium"
