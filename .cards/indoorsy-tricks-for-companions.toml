@@ -12,6 +12,7 @@ Give each animal a few indoor tricks (an `indoors` list beside `tricks` in src/s
   🐢 The turtle finds a warm patch by the window and stays there.
 
 - Nice if a trick notices the room: curling up on a cushion or rug that's actually placed there, peering into a jar of fireflies, settling by a lit oven. Plain ones when the room is bare.
+- Strictly no poo or wee, no accidents on the rug, nothing to clean up: companions are the dream version of a pet, not a chore.
 - Same pace as tricks now (about one a minute or so, to everyone on the spot), and nothing new to type.
 - Every animal gets its own indoor tricks (a test checks none are left without), so nobody's companion falls back to leaves and clover on the carpet."""
 created_at = "2026-11-09T09:30:00.000000Z"
