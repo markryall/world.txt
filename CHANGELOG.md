@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 (2026-11-09)
 
 ### Errands for the folk
 The island folk sometimes lose things, and mention it, especially if you say
