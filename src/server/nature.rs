@@ -723,6 +723,195 @@ pub const SPECIES: &[Species] = &[
         ground: HIGH,
         here: "basks on a warm stone",
     },
+    Species {
+        id: "harebell",
+        name: "harebell",
+        kind: Flower,
+        rarity: Uncommon,
+        when: On(0),
+        ground: MEADOW,
+        here: "nods a pale blue bell on a stem like a thread",
+    },
+    Species {
+        id: "brimstone",
+        name: "brimstone butterfly",
+        kind: Butterfly,
+        rarity: Common,
+        when: On(0),
+        ground: MEADOWY,
+        here: "flutters by, yellow as a lemon",
+    },
+    Species {
+        id: "elderflower",
+        name: "spray of elderflower",
+        kind: Herb,
+        rarity: Common,
+        when: On(0),
+        ground: &[T::Meadow, T::Forest],
+        here: "hangs in creamy, sweet-smelling clusters",
+    },
+    Species {
+        id: "hazelnut",
+        name: "hazelnut",
+        kind: Leaf,
+        rarity: Common,
+        when: On(0),
+        ground: WOODS,
+        here: "lies in its frilly green cup",
+    },
+    Species {
+        id: "kingfisher_feather",
+        name: "kingfisher feather",
+        kind: Feather,
+        rarity: Rare,
+        when: On(0),
+        ground: &[T::Grass, T::Meadow, T::Sand],
+        here: "flashes electric blue in the grass",
+    },
+    Species {
+        id: "fairy_ring",
+        name: "fairy-ring mushroom",
+        kind: Mushroom,
+        rarity: Uncommon,
+        when: On(0),
+        ground: MEADOWY,
+        here: "grows in a perfect little circle with its friends",
+    },
+    Species {
+        id: "sea_pink",
+        name: "sea pink",
+        kind: Flower,
+        rarity: Common,
+        when: On(1),
+        ground: &[T::Sand, T::Grass],
+        here: "grows in a soft cushion of pink",
+    },
+    Species {
+        id: "cuttlebone",
+        name: "cuttlebone",
+        kind: Shell,
+        rarity: Common,
+        when: On(1),
+        ground: SHORE,
+        here: "lies chalky white at the tideline",
+    },
+    Species {
+        id: "samphire",
+        name: "sprig of samphire",
+        kind: Herb,
+        rarity: Common,
+        when: On(1),
+        ground: SHORE,
+        here: "grows in little salty green fingers",
+    },
+    Species {
+        id: "penguin_feather",
+        name: "little penguin feather",
+        kind: Feather,
+        rarity: Uncommon,
+        when: On(1),
+        ground: SHORE,
+        here: "lies on the sand, blue-grey and soft",
+    },
+    Species {
+        id: "flying_fish",
+        name: "flying fish",
+        kind: Fish,
+        rarity: Uncommon,
+        when: On(1),
+        ground: SEA,
+        here: "skims out of the water on silver fins",
+    },
+    Species {
+        id: "bluebell",
+        name: "bluebell",
+        kind: Flower,
+        rarity: Common,
+        when: On(2),
+        ground: WOODS,
+        here: "rings a silent blue bell in the shade",
+    },
+    Species {
+        id: "emerald_moth",
+        name: "emerald moth",
+        kind: Butterfly,
+        rarity: Uncommon,
+        when: On(2),
+        ground: WOODS,
+        here: "rests on a fern, green as a new leaf",
+    },
+    Species {
+        id: "cloudberry",
+        name: "cloudberry",
+        kind: Berry,
+        rarity: Uncommon,
+        when: On(2),
+        ground: &[T::Forest, T::Grass],
+        here: "glows amber on a low green plant",
+    },
+    Species {
+        id: "jay_feather",
+        name: "jay feather",
+        kind: Feather,
+        rarity: Uncommon,
+        when: On(2),
+        ground: WOODS,
+        here: "lies barred with bright blue among the moss",
+    },
+    Species {
+        id: "moss_agate",
+        name: "moss agate",
+        kind: Stone,
+        rarity: Rare,
+        when: On(2),
+        ground: WOODS,
+        here: "lies half-buried in moss, veined with green",
+    },
+    Species {
+        id: "fire_lily",
+        name: "fire lily",
+        kind: Flower,
+        rarity: Uncommon,
+        when: On(3),
+        ground: &[T::Hill, T::Grass],
+        here: "blazes orange among the stones",
+    },
+    Species {
+        id: "fiery_copper",
+        name: "fiery copper butterfly",
+        kind: Butterfly,
+        rarity: Common,
+        when: On(3),
+        ground: &[T::Hill, T::Grass],
+        here: "flickers bright copper in the sun",
+    },
+    Species {
+        id: "wild_oregano",
+        name: "wild oregano",
+        kind: Herb,
+        rarity: Common,
+        when: On(3),
+        ground: HIGH,
+        here: "smells warm and peppery in the sun",
+    },
+    Species {
+        id: "pumice",
+        name: "piece of pumice",
+        kind: Stone,
+        rarity: Common,
+        when: On(3),
+        ground: HIGH,
+        here: "sits light as a sponge among the rocks",
+    },
+    Species {
+        id: "kestrel_feather",
+        name: "kestrel feather",
+        kind: Feather,
+        rarity: Uncommon,
+        when: On(3),
+        ground: HIGH,
+        here: "lies speckled brown on a warm rock",
+    },
     // festival keepsakes: found only on festival days, and they glow once placed
     Species {
         id: "golden_blossom",
@@ -1083,6 +1272,22 @@ pub fn lifetime(rng: &mut Rng) -> Instant {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn every_island_has_finds_of_its_own() {
+        for isle in &crate::server::islands::ISLANDS {
+            let own: Vec<&Species> = SPECIES.iter().filter(|s| s.when == On(isle.id)).collect();
+            assert!(own.len() >= 5, "{} has its own finds", isle.name);
+            assert!(own.iter().all(|s| s.kind != Craft && s.kind != Food));
+        }
+        for (i, s) in SPECIES.iter().enumerate() {
+            assert!(
+                SPECIES[i + 1..].iter().all(|o| o.id != s.id),
+                "unique id {}",
+                s.id
+            );
+        }
+    }
+
     use super::*;
 
     #[test]

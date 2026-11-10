@@ -123,6 +123,19 @@ other up, and touch noses with a companion of their own kind. `pat` (or
 in at dawn, and day ones at dusk. Animals (and companions) keep quiet for
 anyone who's stepped away.
 
+Each island has creatures of its own, found nowhere else (a companion can
+come home with you, though):
+
+- **Home Island**: a barn owl and a curlew at night, wailing in the dark, a
+  wombat bulldozing through the grass, and a kookaburra laughing in the trees
+  by day.
+- **Driftwood Isle**: a seal lolling on the sand, a pelican looking important,
+  and little penguins waddling up from the water after dark.
+- **Mossy Holm**: a badger and a possum at night, a red squirrel by day, and a
+  koala, mostly asleep.
+- **Ember Rock**: a mountain goat on impossible ledges, a salamander under
+  the rocks at night, a kangaroo and an echidna.
+
 Companions have indoor manners too. In a room they leave the leaves and clover
 outside: a fox curls up in the warmest corner, a rabbit flops over on its
 side, a turtle finds the warm patch by the window. Put a cushion, rug or
@@ -149,6 +162,8 @@ days, then heads for the dock and rows off again.
   to someone who's about (never to someone who's stepped away), and to the
   same person at most once every ten minutes. Some of them hand over a
   little something, once a day at most.
+- Now and then they gossip about the other islands: a find that grows only
+  over there (one you haven't found yet) or a creature you'd only meet there.
 - They answer if you say hello, or say their name, or `talk to Bramble`.
   `look Bramble` looks at them, and `give daisy to Bramble` gives them
   something, which they keep. Asleep, only their name stirs them.

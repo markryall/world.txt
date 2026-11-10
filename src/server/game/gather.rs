@@ -503,6 +503,28 @@ impl Game {
             Col::Dim,
             "Some only appear at night, in the rain, or in certain places.",
         ));
+        // Things only one island has, still to find: name the islands, not the things.
+        let isles: Vec<&str> = crate::server::islands::ISLANDS
+            .iter()
+            .filter(|i| {
+                nature::SPECIES
+                    .iter()
+                    .any(|s| s.when == nature::When::On(i.id) && !found.iter().any(|f| f == s.id))
+            })
+            .map(|i| i.name)
+            .collect();
+        if !isles.is_empty() {
+            let has = if isles.len() == 1 { "has" } else { "have" };
+            let list = match isles.split_last() {
+                Some((last, [])) => last.to_string(),
+                Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+                None => String::new(),
+            };
+            lines.push(Line::col(
+                Col::Dim,
+                format!("🏝 Some things grow on one island and nowhere else: {list} still {has} some you haven't found."),
+            ));
+        }
         self.send(id, lines);
         Ok(())
     }

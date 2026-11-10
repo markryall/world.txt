@@ -23,6 +23,17 @@ water a square at a time, like walking, with the map following your little
 boat until the far island rises up ahead. Once you've pushed off there's no
 stopping, and if you fall asleep on the way you wake at the far dock.
 
+### Every island its own
+Each island now has its own flowers, feathers, stones, herbs and fish, Home
+Island included: harebells and kingfisher feathers at home, sea pinks and
+flying fish on Driftwood Isle, bluebells and moss agate on Mossy Holm, fire
+lilies and pumice on Ember Rock. And creatures you'll only meet on one
+island: a kookaburra, a curlew and a wombat at home, seals and little
+penguins on the beaches, a koala and a badger in the deep woods, a kangaroo
+and a mountain goat up on the rocks, and more. The island folk gossip about
+what's over the water, and your journal says which islands still have
+something you haven't found.
+
 ## 0.11.0 (2026-11-09)
 
 ### Errands for the folk

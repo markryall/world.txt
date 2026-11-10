@@ -385,13 +385,17 @@ The world is an archipelago of four islands, each in its own patch of sea:
 **Home Island** (where everyone arrives), **Driftwood Isle** (long beaches, with
 pearls, sand dollars and driftwood), **Mossy Holm** (deep woods, with giant
 puffballs, glow-worms and fern fronds) and **Ember Rock** (warm stone heights,
-with obsidian, fire opals and sun lizards). Each island has a dock (`⚓` on the
-map) with a rowing boat: `go dock` walks you there, `sail` lists where you can
-go, and `sail Driftwood` rows you across, a square at a time over the open
-water, so you can watch the island shrink behind you on the map. Once you've
-pushed off there's no stopping until you bump the far dock. `map` shows the
-island you're on, `find` tells you which island a friend is on, and homes can
-be claimed on any island. Worlds from before the archipelago keep their island as Home Island and
+with obsidian, fire opals and sun lizards). Every island, Home Island too, has
+a handful of flowers, feathers, stones and other finds that grow nowhere else,
+and a few creatures of its own, so a full journal means a bit of rowing about;
+the journal says which islands still have something you haven't found. Each
+island has a dock (`⚓` on the map) with a rowing boat: `go dock` walks you
+there, `sail` lists where you can go, and `sail Driftwood` rows you across, a
+square at a time over the open water, so you can watch the island shrink
+behind you on the map. Once you've pushed off there's no stopping until you
+bump the far dock. `map` shows the island you're on, `find` tells you which
+island a friend is on, and homes can be claimed on any island. Worlds from
+before the archipelago keep their island as Home Island and
 grow the other three the first time they start.
 
 ## Seasons and festivals
@@ -450,7 +454,8 @@ crumble and honey cake in the oven.
 
 Wild animals turn up right beside people now and then: a fox in the woods, a
 duckling on the water, a rabbit in the meadow by day, a hedgehog at night, a
-turtle on the shore. Berries (blackberries, wild strawberries, bilberries) are
+turtle on the shore, and stranger things on the other islands. Berries
+(blackberries, wild strawberries, bilberries) are
 gathered like anything else, and `befriend fox` offers one; it may take a couple.
 A companion follows you everywhere, indoors too, gets up to little things, and
 shows up in `look` and in your comings and goings. `petname Rusty`, `pet`, and `let go`.

@@ -17,6 +17,8 @@ pub struct Animal {
     pub id: &'static str,
     pub name: &'static str,
     pub icon: &'static str,
+    /// Only ever found on this island (see islands::ISLANDS), or anywhere.
+    pub island: Option<u8>,
     ground: &'static [T],
     night: Option<bool>,
     /// "A fox {here}."
@@ -41,6 +43,7 @@ pub const ANIMALS: &[Animal] = &[
         id: "fox",
         name: "fox",
         icon: "🦊",
+        island: None,
         ground: &[T::Forest],
         night: None,
         here: "peeks out from behind a tree, ears twitching",
@@ -76,6 +79,7 @@ pub const ANIMALS: &[Animal] = &[
         id: "duckling",
         name: "duckling",
         icon: "🐥",
+        island: None,
         ground: &[T::Pond, T::Water],
         night: Some(false),
         here: "paddles about, peeping",
@@ -108,6 +112,7 @@ pub const ANIMALS: &[Animal] = &[
         id: "rabbit",
         name: "rabbit",
         icon: "🐇",
+        island: None,
         ground: &[T::Meadow, T::Grass],
         night: Some(false),
         here: "sits up on its back legs, nose twitching",
@@ -141,6 +146,7 @@ pub const ANIMALS: &[Animal] = &[
         id: "hedgehog",
         name: "hedgehog",
         icon: "🦔",
+        island: None,
         ground: &[T::Forest, T::Grass, T::Meadow],
         night: Some(true),
         here: "snuffles through the leaves",
@@ -173,6 +179,7 @@ pub const ANIMALS: &[Animal] = &[
         id: "turtle",
         name: "turtle",
         icon: "🐢",
+        island: None,
         ground: &[T::Sand],
         night: None,
         here: "blinks at you from the sand",
@@ -198,6 +205,502 @@ pub const ANIMALS: &[Animal] = &[
             "blinks at the sea for a long time",
             "digs a small hole, then sits in it",
             "nibbles a strand of seaweed, slowly",
+        ],
+    },
+    Animal {
+        id: "barn_owl",
+        name: "barn owl",
+        icon: "🦉",
+        island: Some(0),
+        ground: &[T::Forest, T::Grass, T::Meadow],
+        night: Some(true),
+        here: "watches you from a low branch, pale as a moon",
+        tricks: &[
+            "turns its head almost all the way round",
+            "blinks very slowly at you",
+            "fluffs up into a soft round ball",
+        ],
+        indoors: &[
+            "perches on the back of a chair like it owns it",
+            "watches the window, perfectly still",
+            "dozes with one eye open",
+            "preens a wing, feather by feather",
+        ],
+        snug: "settles on {} and fluffs up into a ball",
+        moves: "glides",
+        pace: (30.0, 70.0),
+        patted: &[
+            "lets you smooth one wing, then gives a soft hiss",
+            "clicks its beak and stays put",
+        ],
+        busy: &[
+            "drifts low over the grass without a sound",
+            "listens to the ground, head tilted",
+            "gives a long, eerie screech",
+            "sits as still as a carving",
+        ],
+    },
+    Animal {
+        id: "kookaburra",
+        name: "kookaburra",
+        icon: "🐦",
+        island: Some(0),
+        ground: &[T::Forest, T::Grass],
+        night: Some(false),
+        here: "sits on a branch, eyeing you sideways",
+        tricks: &[
+            "throws back its head and laughs",
+            "bobs its tail up and down",
+            "cocks its head at you",
+        ],
+        indoors: &[
+            "laughs at something only it found funny",
+            "sits on the windowsill, eyeing the room",
+            "bashes a twig against the floor to show who's boss",
+            "fluffs up and settles down",
+        ],
+        snug: "perches on {} and chuckles to itself",
+        moves: "flaps",
+        pace: (20.0, 50.0),
+        patted: &[
+            "chuckles and hops along the branch, just out of reach",
+            "lets you, then laughs about it",
+        ],
+        busy: &[
+            "starts laughing, and doesn't stop for ages",
+            "swoops down on a beetle and flies back up",
+            "whacks a worm against a branch",
+            "sits very still, watching the grass",
+        ],
+    },
+    Animal {
+        id: "curlew",
+        name: "curlew",
+        icon: "🐦",
+        island: Some(0),
+        ground: &[T::Grass, T::Meadow],
+        night: Some(true),
+        here: "stands stock still on long legs, big yellow eyes on you",
+        tricks: &[
+            "freezes, pretending to be a stick",
+            "stalks along beside you on long legs",
+            "gives a soft, sad little wail",
+        ],
+        indoors: &[
+            "stands in a corner, pretending to be a hat stand",
+            "stalks slowly round the room",
+            "stares at the lamp with enormous eyes",
+            "folds its long legs and sits down, very carefully",
+        ],
+        snug: "folds its long legs and settles on {}",
+        moves: "stalks",
+        pace: (25.0, 60.0),
+        patted: &[
+            "freezes and pretends you aren't there",
+            "stalks off three steps, then stalks back",
+        ],
+        busy: &[
+            "lets out a long, wailing cry into the dark",
+            "freezes mid-step and holds it",
+            "stalks after a moth",
+            "stares at you without blinking",
+        ],
+    },
+    Animal {
+        id: "wombat",
+        name: "wombat",
+        icon: "🐾",
+        island: Some(0),
+        ground: &[T::Grass, T::Forest, T::Meadow],
+        night: Some(true),
+        here: "waddles about, round and very determined",
+        tricks: &[
+            "bumps into your shin on purpose",
+            "digs a little hollow and sits in it",
+            "scratches its back against your leg",
+        ],
+        indoors: &[
+            "digs at the rug, and is quite disappointed",
+            "falls asleep flat on its back",
+            "trundles round the room bumping into things",
+            "wedges itself under something and snores",
+        ],
+        snug: "digs at {} until it's just right, then sleeps on it",
+        moves: "waddles",
+        pace: (30.0, 70.0),
+        patted: &[
+            "leans its whole weight on your hand",
+            "grunts, and carries on regardless",
+        ],
+        busy: &[
+            "digs a hole with great determination",
+            "has a long, thorough scratch",
+            "munches the grass, chomp chomp",
+            "trundles in a straight line, through everything",
+        ],
+    },
+    Animal {
+        id: "seal",
+        name: "seal",
+        icon: "🦭",
+        island: Some(1),
+        ground: &[T::Sand],
+        night: None,
+        here: "lolls on the sand, whiskers twitching",
+        tricks: &[
+            "rolls over on its back",
+            "claps its flippers",
+            "flumps along beside you",
+        ],
+        indoors: &[
+            "lies on the floor like a big warm bolster",
+            "rolls onto its back and waits to be admired",
+            "barks at the door, once",
+            "flops down with a deep sigh",
+        ],
+        snug: "flumps onto {} and lies there like a pudding",
+        moves: "flumps",
+        pace: (40.0, 90.0),
+        patted: &[
+            "blinks its big dark eyes at you",
+            "snorts and rolls away a little",
+            "lets you, and sighs happily",
+        ],
+        busy: &[
+            "scratches its chin with a flipper",
+            "rolls over to warm the other side",
+            "barks at the waves",
+            "stretches its head and tail up, like a banana",
+        ],
+    },
+    Animal {
+        id: "pelican",
+        name: "pelican",
+        icon: "🐦",
+        island: Some(1),
+        ground: &[T::Sand],
+        night: Some(false),
+        here: "stands on the sand, looking very important",
+        tricks: &[
+            "opens its enormous beak, then closes it again",
+            "waddles after you",
+            "shakes out its wings",
+        ],
+        indoors: &[
+            "inspects the room down its long beak",
+            "tries to fit something in its pouch, and can't",
+            "stands on one leg by the window",
+            "clacks its beak at the ceiling",
+        ],
+        snug: "settles on {} and tucks its beak into its feathers",
+        moves: "waddles",
+        pace: (25.0, 60.0),
+        patted: &[
+            "clacks its beak at you, politely",
+            "lets you, then waddles off a step",
+        ],
+        busy: &[
+            "checks its pouch for fish, and finds none",
+            "stretches its wings out wide to dry",
+            "stares out to sea, very serious",
+            "gulps at a passing fly",
+        ],
+    },
+    Animal {
+        id: "little_penguin",
+        name: "little penguin",
+        icon: "🐧",
+        island: Some(1),
+        ground: &[T::Sand],
+        night: Some(true),
+        here: "waddles up from the water, blue and tiny",
+        tricks: &[
+            "waddles round your feet",
+            "flaps its little flippers",
+            "shakes off the sea",
+        ],
+        indoors: &[
+            "waddles round and round the table",
+            "stands in the corner, very upright",
+            "shuffles under a chair for a nap",
+            "preens its blue back",
+        ],
+        snug: "waddles onto {} and goes to sleep standing up",
+        moves: "waddles",
+        pace: (20.0, 45.0),
+        patted: &[
+            "puffs up its chest, then lets you",
+            "yips and shuffles back",
+        ],
+        busy: &[
+            "waddles up the beach in a hurry",
+            "calls out a funny little bray",
+            "stands and shakes, sprinkling water",
+            "preens its blue feathers",
+        ],
+    },
+    Animal {
+        id: "badger",
+        name: "badger",
+        icon: "🦡",
+        island: Some(2),
+        ground: &[T::Forest, T::Grass],
+        night: Some(true),
+        here: "snuffles along, stripy and serious",
+        tricks: &[
+            "snuffles the ground",
+            "grunts at you",
+            "digs at something interesting",
+        ],
+        indoors: &[
+            "digs at the floorboards, hopefully",
+            "drags a cushion into a corner",
+            "snores in a striped heap",
+            "sniffs every corner, very thoroughly",
+        ],
+        snug: "drags {} into a corner and burrows in",
+        moves: "shuffles",
+        pace: (30.0, 70.0),
+        patted: &[
+            "huffs at you, but stays",
+            "shuffles round to put its back to you",
+        ],
+        busy: &[
+            "digs for worms with great energy",
+            "snuffles noisily under a log",
+            "grunts at the moon",
+            "scratches itself, all over",
+        ],
+    },
+    Animal {
+        id: "red_squirrel",
+        name: "red squirrel",
+        icon: "🐿️",
+        island: Some(2),
+        ground: &[T::Forest],
+        night: Some(false),
+        here: "sits up on a stump, tail in a question mark",
+        tricks: &[
+            "scampers up you and down again",
+            "flicks its tail",
+            "nibbles a nut, very fast",
+        ],
+        indoors: &[
+            "hides something behind a cushion",
+            "runs along the back of the sofa",
+            "sits on the windowsill, chattering",
+            "checks every pocket in the room",
+        ],
+        snug: "curls up on {} with its tail over its nose",
+        moves: "scampers",
+        pace: (10.0, 30.0),
+        patted: &[
+            "chatters crossly and darts away a step",
+            "lets you touch its tail, just once",
+        ],
+        busy: &[
+            "buries a nut, then forgets where",
+            "chatters at a bird",
+            "races up a tree and back down",
+            "nibbles a pinecone into a little stalk",
+        ],
+    },
+    Animal {
+        id: "koala",
+        name: "koala",
+        icon: "🐨",
+        island: Some(2),
+        ground: &[T::Forest],
+        night: None,
+        here: "clings to a tree trunk, mostly asleep",
+        tricks: &[
+            "opens one eye",
+            "hugs your arm sleepily",
+            "yawns enormously",
+        ],
+        indoors: &[
+            "falls asleep holding a chair leg",
+            "hugs the nearest lamp",
+            "stares at nothing, chewing",
+            "dozes with its chin on its paws",
+        ],
+        snug: "climbs onto {} and is asleep before it lands",
+        moves: "climbs",
+        pace: (90.0, 200.0),
+        patted: &[
+            "grunts and goes back to sleep",
+            "leans into your hand without waking up",
+        ],
+        busy: &[
+            "falls asleep again",
+            "munches a leaf, very slowly",
+            "shifts to a comfier branch and nods off",
+            "grunts a deep, rumbling snore",
+        ],
+    },
+    Animal {
+        id: "possum",
+        name: "possum",
+        icon: "🐾",
+        island: Some(2),
+        ground: &[T::Forest, T::Grass],
+        night: Some(true),
+        here: "peers down from a branch, eyes shining",
+        tricks: &[
+            "hangs by its tail",
+            "scurries up your arm and back down",
+            "peers at you, upside down",
+        ],
+        indoors: &[
+            "raids the fruit bowl",
+            "hangs from the curtain rail by its tail",
+            "rummages in a cupboard",
+            "curls up on a high shelf",
+        ],
+        snug: "curls up on {} with its tail wrapped round it",
+        moves: "scurries",
+        pace: (15.0, 40.0),
+        patted: &[
+            "hisses a little, then sniffs your fingers",
+            "freezes, then decides you're all right",
+        ],
+        busy: &[
+            "rummages for something to eat",
+            "hangs by its tail, swinging gently",
+            "scurries along a branch",
+            "chitters at another possum somewhere",
+        ],
+    },
+    Animal {
+        id: "mountain_goat",
+        name: "mountain goat",
+        icon: "🐐",
+        island: Some(3),
+        ground: &[T::Hill, T::Stone],
+        night: Some(false),
+        here: "stands on a rock that seems far too small for it",
+        tricks: &[
+            "butts your hand gently",
+            "bleats at you",
+            "hops onto a rock beside you",
+        ],
+        indoors: &[
+            "climbs onto the table and looks proud",
+            "chews the corner of a rug",
+            "stands on the highest thing in the room",
+            "bleats at the ceiling",
+        ],
+        snug: "stands on {} and refuses to come down",
+        moves: "clatters",
+        pace: (20.0, 50.0),
+        patted: &[
+            "butts your hand, gently but firmly",
+            "chews your sleeve thoughtfully",
+        ],
+        busy: &[
+            "leaps from rock to rock without a thought",
+            "chews something it shouldn't",
+            "balances on a ledge, quite unbothered",
+            "bleats at the wind",
+        ],
+    },
+    Animal {
+        id: "salamander",
+        name: "salamander",
+        icon: "🦎",
+        island: Some(3),
+        ground: &[T::Stone, T::Hill],
+        night: Some(true),
+        here: "glistens black and gold under a rock",
+        tricks: &[
+            "crawls onto your hand, cool and slow",
+            "blinks its gold-ringed eyes",
+            "curls its tail",
+        ],
+        indoors: &[
+            "finds the coolest stone on the hearth and stays there",
+            "creeps along the skirting board",
+            "sits very still by the fire",
+            "tucks itself into a dark corner",
+        ],
+        snug: "creeps onto {} and goes very still",
+        moves: "creeps",
+        pace: (50.0, 110.0),
+        patted: &[
+            "sits quite still, cool under your finger",
+            "creeps out from under your hand",
+        ],
+        busy: &[
+            "creeps out over a warm stone",
+            "snaps up a tiny beetle",
+            "glows faintly in the ember light",
+            "sits as still as the rock",
+        ],
+    },
+    Animal {
+        id: "kangaroo",
+        name: "kangaroo",
+        icon: "🦘",
+        island: Some(3),
+        ground: &[T::Grass, T::Hill, T::Meadow],
+        night: None,
+        here: "leans back on its tail and looks at you",
+        tricks: &[
+            "bounds round you in a big circle",
+            "boxes the air",
+            "flops onto its side",
+        ],
+        indoors: &[
+            "bounces into the room and bounces out again",
+            "lies on its side by the fire",
+            "scratches its tummy, thinking",
+            "peers out of the window, ears up",
+        ],
+        snug: "flops down on {} and scratches its tummy",
+        moves: "bounds",
+        pace: (15.0, 40.0),
+        patted: &[
+            "sniffs you, ears twitching, and stays",
+            "leans away, then leans back in",
+        ],
+        busy: &[
+            "bounds off a little way and comes back",
+            "scratches its chest, thinking",
+            "lies down in the sun, legs everywhere",
+            "stands up very tall to look around",
+        ],
+    },
+    Animal {
+        id: "echidna",
+        name: "echidna",
+        icon: "🦔",
+        island: Some(3),
+        ground: &[T::Hill, T::Stone, T::Grass],
+        night: None,
+        here: "pokes its long snout into the ground",
+        tricks: &[
+            "snuffles your boot with its long nose",
+            "tucks itself into a spiky ball",
+            "trundles after you",
+        ],
+        indoors: &[
+            "pokes its snout into every crack in the floor",
+            "digs itself halfway into a corner",
+            "trundles under the table",
+            "noses along the skirting board for ants",
+        ],
+        snug: "digs itself into {} until only spines show",
+        moves: "trundles",
+        pace: (30.0, 70.0),
+        patted: &[
+            "tucks into a spiky ball. Careful!",
+            "lets you stroke its nose, just once",
+        ],
+        busy: &[
+            "licks up ants with a long pink tongue",
+            "digs straight down until only spines show",
+            "snuffles a stone over",
+            "trundles along, nose first",
         ],
     },
 ];
@@ -279,9 +782,14 @@ impl Game {
             let dy = (self.rng.next() % 3) as i64 - 1;
             let (x, y) = (px + dx, py + dy);
             let ground = self.world.terrain(x, y);
+            let island = crate::server::islands::island_at(x, y).id;
             let options: Vec<&'static Animal> = ANIMALS
                 .iter()
-                .filter(|a| a.ground.contains(&ground) && a.night.is_none_or(|n| n == night))
+                .filter(|a| {
+                    a.ground.contains(&ground)
+                        && a.night.is_none_or(|n| n == night)
+                        && a.island.is_none_or(|i| i == island)
+                })
                 .collect();
             if options.is_empty() {
                 continue;
@@ -299,12 +807,17 @@ impl Game {
             });
             let d = dx.abs().max(dy.abs());
             let line = if d == 0 {
-                format!("{} A {} {} right here!", a.icon, a.name, a.here)
+                format!(
+                    "{} {} {} right here!",
+                    a.icon,
+                    capitalise(&nature::a(a.name)),
+                    a.here
+                )
             } else {
                 format!(
-                    "{} A {} {}, just to the {}.",
+                    "{} {} {}, just to the {}.",
                     a.icon,
-                    a.name,
+                    capitalise(&nature::a(a.name)),
                     a.here,
                     way(dx, dy)
                 )
@@ -404,9 +917,9 @@ impl Game {
             );
             self.tell_watchers(x, y, Line::col(Col::Green, the));
             let arrives = format!(
-                "{} A {} {} in from the {}.",
+                "{} {} {} in from the {}.",
                 a.icon,
-                a.name,
+                capitalise(&nature::a(a.name)),
                 a.moves,
                 way(-dx, -dy)
             );
@@ -501,7 +1014,12 @@ impl Game {
                 Line::new()
                     .c(
                         Col::Green,
-                        format!("{} A {} {}.", w.animal.icon, w.animal.name, w.animal.here),
+                        format!(
+                            "{} {} {}.",
+                            w.animal.icon,
+                            capitalise(&nature::a(w.animal.name)),
+                            w.animal.here
+                        ),
                     )
                     .c(
                         Col::Dim,
@@ -522,7 +1040,7 @@ impl Game {
                 format!(
                     "{} {}, {}'s {}, is here.",
                     an.icon,
-                    n.clone().unwrap_or_else(|| format!("A {}", an.name)),
+                    n.clone().unwrap_or_else(|| capitalise(&nature::a(an.name))),
                     p.name,
                     an.name
                 )
@@ -717,6 +1235,22 @@ impl Game {
             "duckling" => "peeps and snuggles into your palm",
             "rabbit" => "flops over, utterly content",
             "hedgehog" => "uncurls and snuffles your fingers",
+            "turtle" => "closes its eyes, which surely means it likes it",
+            "barn_owl" => "fluffs up and leans its soft face into your hand",
+            "kookaburra" => "chuckles quietly, very pleased with itself",
+            "curlew" => "folds down on its long legs and lets out a soft little trill",
+            "wombat" => "rolls over for a tummy scratch",
+            "seal" => "rolls onto its back and sighs happily",
+            "pelican" => "rests its enormous beak on your arm",
+            "little_penguin" => "leans against your leg and closes its eyes",
+            "badger" => "grunts contentedly and leans in",
+            "red_squirrel" => "sits on your palm, tail curled over its back",
+            "koala" => "hugs your arm and falls asleep",
+            "possum" => "wraps its tail round your wrist",
+            "mountain_goat" => "butts your hand for more",
+            "salamander" => "sits on your palm, cool and calm",
+            "kangaroo" => "leans back on its tail and lets you scratch its chest",
+            "echidna" => "uncurls and pokes its long nose into your sleeve",
             _ => "looks very content",
         };
         self.say1(
@@ -810,5 +1344,47 @@ mod tests {
         assert_eq!(soft("a driftwood table"), None);
         assert_eq!(soft("a jar"), None);
         assert_eq!(soft("a matchbox"), None);
+    }
+}
+
+#[cfg(test)]
+mod island_tests {
+    use super::*;
+    use crate::server::db::Db;
+    use crate::server::islands::ISLANDS;
+    use crate::server::world::World;
+
+    #[test]
+    fn every_island_has_creatures_of_its_own_that_can_turn_up_there() {
+        let world = World::load_or_create(Db::open(":memory:").unwrap(), Some(7)).unwrap();
+        for isle in &ISLANDS {
+            let own: Vec<&Animal> = ANIMALS
+                .iter()
+                .filter(|a| a.island == Some(isle.id))
+                .collect();
+            assert!(own.len() >= 2, "{} has its own creatures", isle.name);
+            for a in own {
+                let room = (isle.oy..isle.oy + crate::server::islands::REGION)
+                    .flat_map(|y| (isle.ox..isle.ox + 64).map(move |x| (x, y)))
+                    .filter(|&(x, y)| a.ground.contains(&world.terrain(x, y)))
+                    .count();
+                assert!(
+                    room > 20,
+                    "the {} has ground to live on, on {}",
+                    a.name,
+                    isle.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_creature_has_a_full_life() {
+        for a in ANIMALS {
+            assert!(!a.tricks.is_empty() && !a.indoors.is_empty() && !a.patted.is_empty());
+            assert!(!a.busy.is_empty() && a.snug.contains("{}"), "{}", a.id);
+            let same = ANIMALS.iter().filter(|b| b.id == a.id).count();
+            assert_eq!(same, 1, "unique id {}", a.id);
+        }
     }
 }

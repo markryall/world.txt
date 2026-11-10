@@ -593,6 +593,48 @@ const GREET: &[(Phase, &str)] = &[
     (Phase::Dusk, "Evening! Nearly lamp time."),
 ];
 
+/// Word of what lives only on another island: something they haven't found
+/// yet, or a creature that's never seen anywhere else.
+fn gossip(rng: &mut crate::server::rng::Rng, here: u8, found: &[String]) -> Option<String> {
+    use crate::server::nature::{SPECIES, When, a};
+    let isle = |i: u8| ISLANDS[i as usize % ISLANDS.len()].name;
+    let finds: Vec<(&str, u8)> = SPECIES
+        .iter()
+        .filter_map(|s| match s.when {
+            When::On(i) if i != here && !found.iter().any(|f| f == s.id) => Some((s.name, i)),
+            _ => None,
+        })
+        .collect();
+    let creatures: Vec<(&str, u8)> = super::companions::ANIMALS
+        .iter()
+        .filter_map(|c| c.island.filter(|&i| i != here).map(|i| (c.name, i)))
+        .collect();
+    if !finds.is_empty() && (creatures.is_empty() || rng.chance(0.5)) {
+        let &(name, i) = rng.pick(&finds);
+        let (thing, isle) = (a(name), isle(i));
+        let says = [
+            format!(
+                "They say there's {thing} to be found over on {isle}. I've never seen one myself."
+            ),
+            format!(
+                "My cousin brought back {thing} from {isle} once. Kept it on the mantelpiece for years."
+            ),
+            format!(
+                "You won't find {thing} round here. You'd want to row over to {isle} for that."
+            ),
+        ];
+        return Some(rng.pick(&says).clone());
+    }
+    let &(name, i) = rng.pick(&creatures);
+    let (creature, isle) = (a(name), isle(i));
+    let says = [
+        format!("Have you been to {isle}? There's {creature} there, bold as anything."),
+        format!("I rowed over to {isle} once and {creature} watched me all the way to the dock."),
+        format!("Never seen {creature} round here. Only ever on {isle}, funny that."),
+    ];
+    Some(rng.pick(&says).clone())
+}
+
 const WET: &[&str] = &[
     "Lovely weather for ducks.",
     "Rain's good for the garden, they say. They don't say whose.",
@@ -1202,16 +1244,21 @@ impl Game {
                 .map(|(_, g)| *g)
                 .collect();
             let wet = self.world.weather.sky_at(x, y).wet();
+            let found = self.world.db.journal(&user).unwrap_or_default();
             let text = if first && !greet.is_empty() {
-                *self.rng.pick(&greet)
+                (*self.rng.pick(&greet)).to_string()
             } else if wet && self.rng.chance(0.5) {
-                *self.rng.pick(WET)
+                (*self.rng.pick(WET)).to_string()
             } else if self.rng.chance(0.3) {
-                *self.rng.pick(season_says(self.season))
+                (*self.rng.pick(season_says(self.season))).to_string()
+            } else if self.rng.chance(0.3)
+                && let Some(g) = gossip(&mut self.rng, f.island, &found)
+            {
+                g
             } else {
-                *self.rng.pick(trade.says)
+                (*self.rng.pick(trade.says)).to_string()
             };
-            self.folk_says(x, y, &name, &fill(text, &name, &you));
+            self.folk_says(x, y, &name, &fill(&text, &name, &you));
             if !user.contains('@') {
                 let _ = self.world.db.discovered(&user, "island folk", now);
             }
