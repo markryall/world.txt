@@ -1,0 +1,17 @@
+name = "Anything you type does something"
+status = "done"
+description = """
+There's a fixed set of words, and anything else used to get "Hmm, 'x' isn't something you know how to do": guessing your way through the island was frustrating. Now whatever you type, something happens:
+- A near-miss of a word the island knows (lok, gahter, recpies) is taken as meant, for a safe set of words only, and only when it can't be anything else.
+- Questions get a gentle non-answer and a nudge to the help topic their words belong to (how do I sail? → help moving).
+- Chatter (hello everyone, what a lovely day!) is said aloud.
+- A thing (the moon) is mused on, just for you.
+- Anything else is done: dance a jig → 'Wren dances a jig.', with my/me turned into their/them for others, and the island (or an animal, or folk) reacting now and then.
+- Rudeness gets a smarmy word back, for the rude one only, and goes no further."""
+created_at = "2026-11-12T20:15:43.421588Z"
+updated_at = "2026-11-12T20:15:43.421588Z"
+tags = [
+    "commands",
+    "onboarding",
+]
+priority = "medium"

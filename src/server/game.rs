@@ -1,6 +1,7 @@
 //! The one task that owns the world. Connections send it events; it
 //! answers with lines of text and status updates.
 
+mod anything;
 mod boards;
 pub(super) use boards::backfill_journal;
 mod actions;
@@ -1167,7 +1168,20 @@ impl Game {
                 }
             }
             "chat" | "all" => return self.cmd_chat(id, rest),
-            "find" | "where" => self.cmd_find(id, rest.trim_start_matches("is ").trim()),
+            // "where is Poppy" finds her; "where do I find pearls?" is a
+            // question for the island, not a name.
+            "find" | "where"
+                if self
+                    .find_player(rest.trim_start_matches("is ").trim().trim_end_matches('?'))
+                    .is_none()
+                    && rest.split_whitespace().count() > 2 =>
+            {
+                return self.cmd_anything(id, input);
+            }
+            "find" | "where" => self.cmd_find(
+                id,
+                rest.trim_start_matches("is ").trim().trim_end_matches('?'),
+            ),
             "sit" => return self.cmd_emote(id, "sits down for a while."),
             "lie" | "rest" => return self.cmd_emote(id, "lies back and gazes at the sky."),
             "dance" => return self.cmd_emote(id, "dances, a little twirl and a sway. 💃"),
@@ -1230,13 +1244,8 @@ impl Game {
                     });
                 }
             }
-            _ => self.say1(
-                id,
-                Line::col(
-                    Col::Dim,
-                    format!("Hmm, '{verb}' isn't something you know how to do. Try 'help'."),
-                ),
-            ),
+            // Not one of the island's words: something happens anyway.
+            _ => return self.cmd_anything(id, input),
         }
         Ok(())
     }
@@ -4361,6 +4370,14 @@ fn help_topic(t: &HelpTopic) -> Vec<Line> {
         lines.push(Line::col(Col::Dim, format!("  {f}")));
     }
     lines
+}
+
+/// The help topic a word belongs to, if any (not the keepers' one).
+fn help_topic_for(word: &str) -> Option<&'static str> {
+    HELP.iter()
+        .filter(|t| !t.keepers)
+        .find(|t| t.name == word || t.also.contains(&word))
+        .map(|t| t.name)
 }
 
 fn help(topic: &str, keeper: bool) -> Vec<Line> {

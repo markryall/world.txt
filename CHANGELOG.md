@@ -20,6 +20,14 @@ Somewhere with its own description, a planting used to say only "You planted
 it 2 days ago", without saying what. Now it's "You planted the birch here 2
 days ago, and it's a young birch now".
 
+### Anything you type does something
+No more "that isn't something you know how to do". Type anything at all and
+something happens: a slip of a word the island knows is taken as meant (lok,
+gahter), a question gets a nudge towards the help that might know, chatter is
+said aloud, and anything else you simply do ("wiggle my toes" → "Wren wiggles
+their toes."), with the island, a passing animal or one of the folk reacting
+now and then. Anything rude gets a smarmy word back, for your ears only.
+
 ## 0.12.0 (2026-11-12)
 
 ### Dark mode

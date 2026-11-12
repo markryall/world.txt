@@ -148,6 +148,25 @@ ladybird eats the greenfly, a stag beetle turns the soil, a sun lizard snaps
 up the slugs, and the flowers or tree grow on a little (an hour for flowers,
 half a day for a tree). Anyone's garden, not just your own.
 
+## Anything goes
+
+The island only knows so many words, but nothing you type is wasted:
+
+- A slip of a word it knows (`lok`, `gahter`, `recpies`) is taken as meant,
+  with a quiet "(taking that as look)". Only for harmless words, and only
+  when it can't be anything else (`book` could be look or cook, so no).
+- A question (`how do I sail?`) gets a gentle non-answer, and the help topic
+  its words belong to (`help moving might know`).
+- Chatter (`hello everyone`, `what a lovely day!`) is said aloud.
+- A thing (`the moon`) is mused on, just for you.
+- Anything else, you do: `wiggle my toes` shows as "You wiggle your toes." to
+  you and "Wren wiggles their toes." to everyone with you. Now and then the
+  island reacts: an animal there watches, head on one side, one of the folk
+  joins in, badly, or a leaf just lands at your feet.
+- Anything rude gets something smarmy back (a duchess faints onto a chaise
+  longue; a pigeon tuts "Language!"), for your eyes only, and goes no
+  further.
+
 ## Island folk
 
 Each island has one or two folk on it at a time: scripted characters (not
