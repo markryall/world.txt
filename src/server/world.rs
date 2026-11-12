@@ -952,15 +952,17 @@ impl World {
         out
     }
 
-    /// A small coloured map centred on (cx, cy).
+    /// A small coloured map centred on (cx, cy), reaching `reach` steps
+    /// either side and up and down.
     pub fn minimap(
         &self,
         cx: i64,
         cy: i64,
+        reach: (i64, i64),
         people: &[(i64, i64)],
         finds: &[(i64, i64)],
     ) -> Vec<Line> {
-        let (rw, rh) = MINIMAP_REACH;
+        let (rw, rh) = reach;
         let people: HashSet<(i64, i64)> = people.iter().copied().collect();
         let lit = self.lighthouse_lit();
         let mut out = Vec::new();
@@ -1025,6 +1027,16 @@ impl World {
 
 /// How far the minimap sees: steps left and right, and up and down.
 pub const MINIMAP_REACH: (i64, i64) = (7, 4);
+/// The furthest a wide side panel's map may reach.
+pub const MINIMAP_MOST: (i64, i64) = (20, 10);
+
+/// A browser's asked-for map reach, kept between the usual and the most.
+pub fn map_reach(across: i64, down: i64) -> (i64, i64) {
+    (
+        across.clamp(MINIMAP_REACH.0, MINIMAP_MOST.0),
+        down.clamp(MINIMAP_REACH.1, MINIMAP_MOST.1),
+    )
+}
 
 /// A touch of the season, for descriptions.
 fn season_line(here: Terrain, season: Season) -> &'static str {
@@ -1181,6 +1193,23 @@ fn load_homes(db: &Db) -> anyhow::Result<Vec<Home>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_wider_panel_sees_more_map_but_not_without_end() {
+        assert_eq!(map_reach(3, 1), MINIMAP_REACH, "never less than the usual");
+        assert_eq!(map_reach(12, 7), (12, 7));
+        assert_eq!(map_reach(99, 99), MINIMAP_MOST);
+        let world = World::load_or_create(super::super::db::Db::open(":memory:").unwrap(), Some(7))
+            .unwrap();
+        let map = world.minimap(30, 30, (12, 7), &[], &[]);
+        assert_eq!(map.len(), 15, "seven rows either side of you");
+        let across: usize = map[0].0.iter().map(|s| s.t.chars().count()).sum();
+        assert_eq!(
+            across,
+            25 * 2 - 1,
+            "a symbol and a space for each of 25 squares"
+        );
+    }
 
     #[test]
     fn a_hurried_planting_grows_on() {

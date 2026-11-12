@@ -146,6 +146,11 @@ pub enum Event {
         thing: i64,
         songs: Vec<crate::protocol::Song>,
     },
+    View {
+        id: u64,
+        across: i64,
+        down: i64,
+    },
     TrackDone {
         id: u64,
         thing: i64,
@@ -401,6 +406,9 @@ async fn connection(
             }
             ToServer::TrackDone { thing, key } if joined => {
                 events.send(Event::TrackDone { id, thing, key })?;
+            }
+            ToServer::View { across, down } if joined => {
+                events.send(Event::View { id, across, down })?;
             }
             _ => {}
         }

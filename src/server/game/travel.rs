@@ -3,7 +3,7 @@
 
 use super::Game;
 use crate::protocol::{Col, Line};
-use crate::server::world::{DIRS, MINIMAP_REACH, SIZE, in_bounds, room_of};
+use crate::server::world::{DIRS, SIZE, in_bounds, room_of};
 use std::collections::VecDeque;
 
 /// `+3 -2` (or `3 -2`): so far east and south, as tapping the map sends it.
@@ -59,7 +59,7 @@ impl Game {
             self.say1(id, Line::plain("Indoors, just walk: n, s, e, w, or out."));
             return Ok(());
         }
-        let (rw, rh) = MINIMAP_REACH;
+        let (rw, rh) = self.players.get(&id).map_or((0, 0), |p| p.reach);
         if dx.abs() > rw || dy.abs() > rh {
             self.say1(
                 id,

@@ -426,6 +426,7 @@ function status(m) {
     map.appendChild(paintLine(line.map(textStyle)));
   });
   mapSize = [m.map.length, m.map[0] ? m.map[0].reduce((n, s) => n + s.t.length, 0) : 0];
+  sendView();
   sky = m.weather;
   // An older world says only the weather: rain's all it can tell us.
   heard = m.sounds || { rain: /\brain\b/.test(sky) ? 1 : /drizzle/.test(sky) ? 0.4 : 0 };
@@ -437,6 +438,35 @@ function status(m) {
 // swapped for a device token, kept here so next time just works.
 const stored = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+
+// ---- how much map the side panel has room for -----------------------------
+// The world draws the map; a wider panel asks it for more of the island.
+let viewSent = null, mapCell = 0;
+function mapView() {
+  if (matchMedia('(max-width: 720px)').matches) return [7, 4];
+  const side = $('#side'), map = $('#map');
+  if (!mapCell) {
+    // One map square is a symbol and a space.
+    const probe = document.createElement('span');
+    probe.textContent = '\u2588 '.repeat(20);
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+    map.appendChild(probe);
+    mapCell = probe.getBoundingClientRect().width / 20;
+    probe.remove();
+    if (!mapCell) return [7, 4];
+  }
+  const room = side.clientWidth - 28 - 8; // its padding, and a little slack
+  const cols = Math.floor(room / mapCell + 0.5); // the last square has no space after it
+  const across = Math.max(7, Math.min(20, Math.floor((cols - 1) / 2)));
+  return [across, Math.max(4, Math.min(10, Math.round(across * 4 / 7)))];
+}
+function sendView() {
+  if (!ws || ws.readyState !== 1) return;
+  const [across, down] = mapView();
+  if (viewSent === `${across},${down}`) return;
+  viewSent = `${across},${down}`;
+  ws.send(JSON.stringify({ type: 'view', across, down }));
+}
 
 // ---- the side panel's width ------------------------------------------------
 // Dragged wider or narrower by the grip on its left edge, and remembered.
@@ -461,7 +491,7 @@ const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localSt
     grip.setPointerCapture(e.pointerId);
     grip.classList.add('dragging');
     document.body.classList.add('resizing');
-    const move = (ev) => { want = width = set(innerWidth - ev.clientX, false); };
+    const move = (ev) => { want = width = set(innerWidth - ev.clientX, false); sendView(); };
     const up = () => {
       grip.removeEventListener('pointermove', move);
       grip.classList.remove('dragging');
@@ -472,7 +502,7 @@ const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localSt
     grip.addEventListener('pointerup', up, { once: true });
     grip.addEventListener('pointercancel', up, { once: true });
   });
-  const choose = (w) => { want = width = set(w, true); };
+  const choose = (w) => { want = width = set(w, true); sendView(); };
   grip.addEventListener('dblclick', () => choose(DEFAULT));
   grip.addEventListener('keydown', (e) => {
     const step = e.shiftKey ? 60 : 20;
@@ -483,7 +513,7 @@ const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localSt
     e.preventDefault();
   });
   // A smaller window shouldn't leave the panel wider than it allows.
-  addEventListener('resize', () => { width = set(want, false); });
+  addEventListener('resize', () => { width = set(want, false); sendView(); });
 })();
 
 const params = new URLSearchParams(location.hash.slice(1));
@@ -648,6 +678,7 @@ function zone() {
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   byeSeen = false;
+  viewSent = null; // a new connection starts at the usual map
   ws = new WebSocket(`${proto}://${location.host}/`);
   ws.onopen = () => ws.send(JSON.stringify({
     // A device token for this world wins: they've been here before.

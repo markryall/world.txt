@@ -77,6 +77,8 @@ struct Player {
     reply_to: Option<String>,
     /// First-steps progress: an index into tutorial::STEPS, or DONE.
     tutorial: u8,
+    /// How far their side panel's map reaches: wider on a wider panel.
+    reach: (i64, i64),
     /// When a brand-new arrival first came in (their very first visit only),
     /// so their first few minutes can stay quiet.
     new_since: Option<std::time::Instant>,
@@ -347,6 +349,15 @@ impl Game {
             }
             Event::Queue { id, thing, songs } => self.queue_songs(id, thing, songs),
             Event::TrackDone { id, thing, key } => self.track_done(id, thing, &key),
+            Event::View { id, across, down } => {
+                let reach = super::world::map_reach(across, down);
+                if let Some(p) = self.players.get_mut(&id)
+                    && p.reach != reach
+                {
+                    p.reach = reach;
+                    self.status(id);
+                }
+            }
             Event::Cmd { id, text } => {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.ambient_quiet = 0;
@@ -468,7 +479,8 @@ impl Game {
             clock: Clock::label(),
             map: {
                 let (mx, my) = self.world.outside(p.x, p.y);
-                self.world.minimap(mx, my, &people, &self.find_positions())
+                self.world
+                    .minimap(mx, my, p.reach, &people, &self.find_positions())
             },
             here: self.others_here(id),
             humans: self.players.values().filter(|p| !p.bot).count() as u32,
@@ -524,8 +536,8 @@ impl Game {
     /// A step only changes the maps that can see it, and a crowd's steps
     /// share one update each half second.
     pub(super) fn status_near(&self, id: u64, spots: &[(i64, i64)]) {
-        let (rw, rh) = super::world::MINIMAP_REACH;
         for (&pid, p) in &self.players {
+            let (rw, rh) = p.reach;
             if pid != id
                 && spots
                     .iter()
@@ -735,6 +747,7 @@ impl Game {
                 reply_to: None,
                 tutorial,
                 new_since: first_time.then(std::time::Instant::now),
+                reach: super::world::MINIMAP_REACH,
                 fishing: None,
                 reading: None,
                 muted,

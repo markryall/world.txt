@@ -12,7 +12,8 @@ rest turns up once they've found their feet.
 
 ### A side panel you can resize
 In the browser, drag the side panel's edge to make it wider or narrower. It
-remembers, and a double-click puts it back.
+remembers, and a double-click puts it back. A wider panel shows more of the
+map, up to about three times as much of the island around you.
 
 ## 0.12.0 (2026-11-12)
 

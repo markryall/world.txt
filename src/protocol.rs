@@ -440,6 +440,12 @@ pub enum ToServer {
         thing: i64,
         key: String,
     },
+    /// How much map this browser's side panel has room for: steps either
+    /// side, and up and down. A wider panel shows more of the island.
+    View {
+        across: i64,
+        down: i64,
+    },
 }
 
 /// A board as plain lines, for clients that show it in their log. `None`
