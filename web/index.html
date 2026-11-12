@@ -24,7 +24,11 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); }
   body { font: 15px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; display: flex; flex-direction: column; height: 100dvh; }
-  #app { flex: 1; display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+  #app { flex: 1; display: grid; grid-template-columns: 1fr 6px var(--side-w, 300px); min-height: 0; }
+  /* Drag to make the side panel wider or narrower; double-click puts it back. */
+  #grip { cursor: col-resize; background: var(--bg); touch-action: none; }
+  #grip:hover, #grip:focus-visible, #grip.dragging { background: var(--line); outline: none; }
+  body.resizing { cursor: col-resize; user-select: none; }
   #log { overflow-y: auto; padding: 14px 16px; white-space: pre-wrap; word-wrap: break-word; }
   #log .ln { min-height: 1.45em; border-radius: 4px; }
   #log .ln:hover { background: var(--panel); }
@@ -174,6 +178,7 @@
     body.typing #here, body.typing #sound, body.typing #me { display: none; }
     body.typing #side { padding: 6px 12px; }
     #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    #grip { display: none; }
     #side { order: -1; border-left: 0; border-bottom: 1px solid var(--line); flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; padding: 8px; gap: 8px 14px; }
     #map { font-size: 13px; padding: 0; }
     #pad { grid-template-columns: repeat(3, 42px); gap: 4px; }
@@ -189,6 +194,7 @@
 <body>
 <div id="app">
   <div id="log" aria-live="polite"></div>
+  <div id="grip" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" tabindex="0" title="Drag to resize · double-click to reset"></div>
   <div id="side">
     <div class="info">
       <div id="me" hidden></div>
@@ -431,6 +437,55 @@ function status(m) {
 // swapped for a device token, kept here so next time just works.
 const stored = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const store = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+
+// ---- the side panel's width ------------------------------------------------
+// Dragged wider or narrower by the grip on its left edge, and remembered.
+(() => {
+  const app = document.getElementById('app');
+  const grip = document.getElementById('grip');
+  const DEFAULT = 300, MIN = 220;
+  const max = () => Math.max(MIN, Math.min(720, Math.round(innerWidth * 0.6)));
+  const set = (w, keep) => {
+    w = Math.round(Math.max(MIN, Math.min(max(), w)));
+    app.style.setProperty('--side-w', w + 'px');
+    grip.setAttribute('aria-valuenow', w);
+    if (keep) store('world.side', w === DEFAULT ? null : String(w));
+    return w;
+  };
+  const saved = parseInt(stored('world.side'), 10);
+  // What they chose, and what the window has room for right now.
+  let want = Number.isFinite(saved) ? saved : DEFAULT;
+  let width = set(want, false);
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    grip.classList.add('dragging');
+    document.body.classList.add('resizing');
+    const move = (ev) => { want = width = set(innerWidth - ev.clientX, false); };
+    const up = () => {
+      grip.removeEventListener('pointermove', move);
+      grip.classList.remove('dragging');
+      document.body.classList.remove('resizing');
+      width = set(width, true);
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up, { once: true });
+    grip.addEventListener('pointercancel', up, { once: true });
+  });
+  const choose = (w) => { want = width = set(w, true); };
+  grip.addEventListener('dblclick', () => choose(DEFAULT));
+  grip.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 60 : 20;
+    if (e.key === 'ArrowLeft') choose(width + step);
+    else if (e.key === 'ArrowRight') choose(width - step);
+    else if (e.key === 'Home') choose(DEFAULT);
+    else return;
+    e.preventDefault();
+  });
+  // A smaller window shouldn't leave the panel wider than it allows.
+  addEventListener('resize', () => { width = set(want, false); });
+})();
+
 const params = new URLSearchParams(location.hash.slice(1));
 let invite = params.get('invite');
 // Arriving from another world, with a passport from home.

@@ -15,6 +15,10 @@ or so at most), the island keeps quiet: no hints in the scenery, no news of
 quests or errands, no gossip from the folk, and less scenery, so it's just the
 island and one nudge at a time. Everything else turns up once they've found their feet.
 
+On a wider screen, drag the edge of the side panel to make it wider or
+narrower; it remembers, and a double-click puts it back. (The arrow keys work
+too, once the edge has focus.)
+
 Above the box, a row of buttons offers what you could do right where you
 are: 👋 wave and 💬 a word with whoever's here, pat your companion, 📖 read
 the board, 🎶 play the music box, 🚪 go in, ⛵ sail, 🧺 gather what's

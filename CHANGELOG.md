@@ -10,6 +10,10 @@ their first steps (for ten minutes or so at most), it's just the island and
 one gentle nudge at a time. Names come up once they've said hello, and the
 rest turns up once they've found their feet.
 
+### A side panel you can resize
+In the browser, drag the side panel's edge to make it wider or narrower. It
+remembers, and a double-click puts it back.
+
 ## 0.12.0 (2026-11-12)
 
 ### Dark mode
