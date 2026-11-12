@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 (2026-11-12)
 
 ### Dark mode
 There's a dark mode now. It doesn't make anything darker, exactly: the fox is
