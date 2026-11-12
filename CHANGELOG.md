@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Nobody gets hurt
+Try to kill, punch or stab anyone (or anything) and it comes out as
+something soft instead: a hug, a boop on the nose, a daisy, a dance-off.
+Everyone nearby sees how it turned out.
+
 ## 0.12.1 - 2026-11-13
 
 ### Installing without Rust

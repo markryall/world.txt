@@ -166,6 +166,9 @@ The island only knows so many words, but nothing you type is wasted:
 - Anything rude gets something smarmy back (a duchess faints onto a chaise
   longue; a pigeon tuts "Language!"), for your eyes only, and goes no
   further.
+- Trying to hurt anyone (kill, punch, stab, slap…) never works: it turns into
+  a hug, a boop on the nose, a daisy picked for them or a dance-off, and
+  everyone nearby sees it. Try it on yourself and you get a pat on the back.
 
 ## Island folk
 

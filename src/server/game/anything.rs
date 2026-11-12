@@ -114,10 +114,46 @@ const RUDE_WORDS: &[&str] = &[
     "wtf", "damn", "dammit", "fk", "fkn", "fking", "ffs", "shite", "sod", "frick", "fricking",
 ];
 
+/// Fighting words, as the first word. Nobody gets hurt on the island: it
+/// all turns into something soft instead.
+const FIGHTY: &[&str] = &[
+    "kill",
+    "murder",
+    "stab",
+    "punch",
+    "attack",
+    "hit",
+    "slap",
+    "fight",
+    "smack",
+    "strangle",
+    "bite",
+    "slay",
+    "maim",
+    "assassinate",
+    "throttle",
+    "wallop",
+    "thump",
+    "whack",
+    "beat",
+    "bash",
+    "headbutt",
+    "choke",
+    "poison",
+    "behead",
+    "decapitate",
+    "execute",
+    "shank",
+    "nuke",
+    "obliterate",
+];
+
 /// What someone typed, as far as the island can tell.
 #[derive(Debug, PartialEq)]
 enum Said {
     Rude,
+    /// Wanting to hurt something, which comes out as something nice.
+    Fighty,
     /// A near-miss of a word the island knows.
     Typo(&'static str),
     Question,
@@ -199,6 +235,8 @@ fn said(text: &str) -> Said {
     let first = ws.first().map(String::as_str).unwrap_or("");
     if rude(text) {
         Said::Rude
+    } else if FIGHTY.contains(&first) {
+        Said::Fighty
     } else if text.trim_end().ends_with('?')
         || (ASKING.contains(&first) && !text.trim_end().ends_with('!'))
     {
@@ -282,6 +320,67 @@ const SMARM: &[&str] = &[
     "The island has been called worse. It just can't remember when.",
 ];
 
+/// What a fight turns into: (yours, as others see it). {v} is the verb,
+/// {t} whoever it was meant for.
+const SOFTENED: &[(&str, &str)] = &[
+    (
+        "You go to {v} {t}, and somehow it turns into a hug. 🤗",
+        "goes to {v} {t}, and somehow it turns into a hug. 🤗",
+    ),
+    (
+        "You lunge at {t} with terrible intent, and give {t} a gentle boop on the nose. 👉",
+        "lunges at {t} with terrible intent, and gives {t} a gentle boop on the nose. 👉",
+    ),
+    (
+        "You raise a fist at {t}. It opens, all by itself, into a little wave. 👋",
+        "raises a fist at {t}. It opens, all by itself, into a little wave. 👋",
+    ),
+    (
+        "You set out to {v} {t}, but stop to pick {t} a daisy instead. 🌼",
+        "sets out to {v} {t}, but stops to pick {t} a daisy instead. 🌼",
+    ),
+    (
+        "You {v} {t}… with kindness. It's baffling, but lovely. 💐",
+        "tries to {v} {t}… with kindness. It's baffling, but lovely. 💐",
+    ),
+    (
+        "You try to {v} {t}, but a butterfly lands on your fist and you can't bring yourself to move. 🦋",
+        "tries to {v} {t}, but a butterfly lands on their fist and they can't bring themself to move. 🦋",
+    ),
+    (
+        "You challenge {t} to a duel. It's a dance-off. Everyone wins. 💃",
+        "challenges {t} to a duel. It's a dance-off. Everyone wins. 💃",
+    ),
+    (
+        "You swing at {t} and miss by a mile, then pretend you were stretching. 🙆",
+        "swings at {t} and misses by a mile, then pretends they were stretching. 🙆",
+    ),
+    (
+        "You narrow your eyes at {t}. A kitten sneezes nearby and you forget all about it. 🐱",
+        "narrows their eyes at {t}. A kitten sneezes nearby and they forget all about it. 🐱",
+    ),
+    (
+        "You try to {v} {t}. The island gently takes the idea off you and gives you a biscuit instead. 🍪",
+        "tries to {v} {t}. The island gently takes the idea off them and gives them a biscuit instead. 🍪",
+    ),
+];
+
+/// What a fight with yourself turns into.
+const SOFTENED_SELF: &[(&str, &str)] = &[
+    (
+        "You go to {v} yourself, and give yourself a little hug instead. 🤗",
+        "goes to {v} themself, and gives themself a little hug instead. 🤗",
+    ),
+    (
+        "You raise a hand to {v} yourself, and pat yourself on the back instead. You've earned it. 🫶",
+        "raises a hand to {v} themself, and pats themself on the back instead. They've earned it. 🫶",
+    ),
+    (
+        "You think about it, then make yourself a nice cup of tea instead. ☕",
+        "thinks about it, then makes themself a nice cup of tea instead. ☕",
+    ),
+];
+
 const MUSING: &[&str] = &[
     "You think about {} for a while. It's nice to think about things.",
     "You turn the idea of {} over in your mind, like a smooth pebble.",
@@ -319,6 +418,34 @@ impl Game {
             Said::Rude => {
                 let line = *self.rng.pick(SMARM);
                 self.say1(id, Line::col(Col::Dim, line).eerie());
+            }
+            Said::Fighty => {
+                let (verb, rest) = input
+                    .split_once(char::is_whitespace)
+                    .unwrap_or((&input, ""));
+                let verb = verb.to_lowercase();
+                let rest = rest.trim().trim_end_matches(['.', '!', '…']);
+                let (yours, theirs) = if matches!(rest.to_lowercase().as_str(), "me" | "myself") {
+                    *self.rng.pick(SOFTENED_SELF)
+                } else {
+                    *self.rng.pick(SOFTENED)
+                };
+                // Someone's name, written properly ("kill corey" → Corey).
+                let named = self
+                    .players
+                    .values()
+                    .find(|p| p.name.eq_ignore_ascii_case(rest))
+                    .map(|p| p.name.clone());
+                let target = |mine: bool| match (&named, whose(rest, mine)) {
+                    (Some(n), _) => n.clone(),
+                    (None, t) if t.is_empty() => "the nearest tree".to_string(),
+                    (None, t) => t,
+                };
+                let fill =
+                    |s: &str, mine: bool| s.replace("{v}", &verb).replace("{t}", &target(mine));
+                self.say1(id, Line::col(Col::Cyan, fill(yours, true)));
+                let theirs = format!(" {}", fill(theirs, false));
+                self.tell_here_from(x, y, id, &user, Line::new().who(&name).c(Col::Cyan, theirs));
             }
             Said::Typo(meant) => {
                 let rest = input.split_once(char::is_whitespace).map_or("", |r| r.1);
@@ -419,6 +546,9 @@ mod tests {
         assert_eq!(said("shut up!"), Said::Rude);
         assert_eq!(said("f*** off"), Said::Rude);
         assert_eq!(said("what a lovely day!"), Said::Chatter);
+        assert_eq!(said("kill corey"), Said::Fighty);
+        assert_eq!(said("Punch the duck!"), Said::Fighty);
+        assert_eq!(said("kill this stupid duck"), Said::Rude, "rude first");
         assert_eq!(
             said("assemble the crew"),
             Said::Doing,
