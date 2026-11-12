@@ -10,6 +10,12 @@ world.txt invite Mark --keeper       # your account, and its magic link: open it
 world.txt play --invite <link>       # or the terminal client (just `world.txt play` after)
 ```
 
+Homebrew installs a prebuilt binary for macOS or Linux. On Linux that binary
+carries its own OpenSSL, which only gets security fixes when world.txt makes a
+new release. If you'd rather use your system's OpenSSL, which updates with the
+rest of the system, build it yourself with `make install` or
+`cargo install world-txt`.
+
 Play in a browser (phones and iPads too) or in a terminal. The world is
 invite-only: a keeper makes each account, and its magic link signs that device
 in for good.
