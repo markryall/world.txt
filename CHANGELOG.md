@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.12.1 - 2026-11-13
+
 ### Installing without Rust
 `brew install markryall/tap/world-txt` now fetches a ready-made world.txt for
 macOS or Linux instead of building it, so there's no Rust to install and
