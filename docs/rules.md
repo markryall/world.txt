@@ -239,10 +239,11 @@ times go by yours (see below).
 | A finished building's progress bar | Stays up 2 more minutes |
 | Trees | A sapling, then young after 1 day, tall after 3 days, old after 10 days |
 | Flowers | Shoots, then in bud after 2 hours, in bloom after 12 hours |
-| Mint tea, toasted acorns | 15 seconds |
-| Grilled fish | 20 seconds |
-| Mushroom stew | 30 seconds |
-| Honey cake | 35 seconds |
+| Mint tea, herb tea, toasted acorns | 15 seconds |
+| Grilled fish, elderflower cordial, herby mushrooms | 20 seconds |
+| Samphire fish supper | 25 seconds |
+| Mushroom stew, cloudberry jam | 30 seconds |
+| Honey cake, hazelnut honey cake | 35 seconds |
 | Berry crumble | 40 seconds |
 | A cooking smell | Reaches everyone within 6 steps |
 

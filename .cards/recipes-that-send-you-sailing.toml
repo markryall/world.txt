@@ -1,0 +1,17 @@
+name = "Recipes that send you sailing"
+status = "done"
+description = """
+Island-only finds are just filler: every recipe takes 'any flower' or 'any shell', so a harebell does a daisy's job and nothing needs a trip. Only driftwood, fire opal and glow-worm are ever asked for by name.
+
+- Four-island crafts, one thing from each island: an island posy (harebell, sea pink, bluebell, fire lily) and a feather wreath (kingfisher, little penguin, jay and kestrel feathers).
+- Cooking with island things: elderflower cordial, cloudberry jam, a samphire fish supper, herby mushrooms with wild oregano, hazelnut honey cake, and a herb tea that takes any herb, so the herbs have somewhere to go.
+- Rare finds made into something precious: a pearl necklace, a moss agate pendant, a fire opal ring.
+- Recipes stay discoverable the way they are now (recipes / cook lists), nothing new in help."""
+created_at = "2026-11-12T13:42:13.957577Z"
+updated_at = "2026-11-12T13:43:39.843552Z"
+tags = [
+    "recipes",
+    "islands",
+    "nature",
+]
+priority = "medium"

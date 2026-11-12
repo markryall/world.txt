@@ -70,6 +70,28 @@ pub const RECIPES: &[Recipe] = &[
             (Any(Kind::Stone), 1),
         ],
     },
+    // One flower from every island.
+    Recipe {
+        makes: "island_posy",
+        needs: &[
+            (Exactly("harebell"), 1),
+            (Exactly("sea_pink"), 1),
+            (Exactly("bluebell"), 1),
+            (Exactly("fire_lily"), 1),
+        ],
+    },
+    Recipe {
+        makes: "pearl_necklace",
+        needs: &[(Exactly("pearl"), 1), (Any(Kind::Shell), 2)],
+    },
+    Recipe {
+        makes: "agate_pendant",
+        needs: &[(Exactly("moss_agate"), 1), (Any(Kind::Leaf), 1)],
+    },
+    Recipe {
+        makes: "fire_opal_ring",
+        needs: &[(Exactly("fire_opal"), 1), (Exactly("pebble"), 1)],
+    },
 ];
 
 /// Things for a home, made from finds: place one and it's part of the room.
@@ -109,6 +131,16 @@ pub const FURNITURE: &[Recipe] = &[
     Recipe {
         makes: "pebble_doorstop",
         needs: &[(Exactly("pebble"), 2), (Any(Kind::Feather), 1)],
+    },
+    // One feather from every island.
+    Recipe {
+        makes: "feather_wreath",
+        needs: &[
+            (Exactly("kingfisher_feather"), 1),
+            (Exactly("penguin_feather"), 1),
+            (Exactly("jay_feather"), 1),
+            (Exactly("kestrel_feather"), 1),
+        ],
     },
     Recipe {
         makes: "butterfly_bush",

@@ -336,7 +336,7 @@ your guests made too. `paint the bench plain` scrubs it off.
 Homes can be furnished from finds, too: `recipes` lists things for a home
 (a feather cushion, a toadstool stool, a leaf rug, a door wreath, a vase of
 flowers, a shell mirror, a pinecone lamp, a driftwood table, a pebble doorstop,
-a butterfly bush). `craft feather cushion`, then `place feather cushion` where
+a butterfly bush, and a four-feather wreath with a feather from every island). `craft feather cushion`, then `place feather cushion` where
 you want it, and paint it if you like.
 
 Every finished building has a room inside: `go in` (or `enter the cottage`)
@@ -447,8 +447,10 @@ things you've gathered as they are. It takes a few moments, and smells: as it
 goes on, halfway, and when it's done, the smell drifts to everyone nearby.
 Then there are a few helpings in your satchel to `eat`, or `serve` to everyone
 standing with you. Wild mint, thyme and honeycomb turn up as you wander. Mint
-tea, toasted acorns, grilled fish and mushroom stew cook on a fire; berry
-crumble and honey cake in the oven.
+tea, herb tea, toasted acorns, grilled fish and mushroom stew cook on a fire;
+berry crumble and honey cake in the oven. Some want things from the other
+islands: elderflower cordial, cloudberry jam, a samphire fish supper, herby
+mushrooms with wild oregano, and hazelnut honey cake.
 
 ## Companions
 
@@ -465,8 +467,10 @@ One each, remembered between visits.
 
 `recipes` shows what can be made from gathered things, ticking the ones your
 satchel is ready for: flower crowns, bouquets, shell wind chimes, dreamcatchers,
-crystal lanterns, mushroom soup, shell necklaces, stone cairns, a conch horn and
-a rainbow garland. `craft wind chime` makes one (using your commonest finds
+crystal lanterns, mushroom soup, shell necklaces, stone cairns, a conch horn,
+a rainbow garland, and precious things from the rarest finds (a pearl
+necklace, a moss agate pendant, a fire opal ring, and an island posy with a
+flower from every island). `craft wind chime` makes one (using your commonest finds
 first, so rare ones aren't spent by accident). Crafts go in your satchel to
 `give` or `place`, and placed crafts come alive: a wind chime tinkles in the
 breeze, a lantern glows at night.

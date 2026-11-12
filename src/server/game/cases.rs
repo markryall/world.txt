@@ -22,6 +22,7 @@ const GLOWS: &[&str] = &[
     "crystal_lantern",
     "glowing_shell",
     "paper_lantern",
+    "fire_opal_ring",
 ];
 
 /// Words that make a `make` a display case.

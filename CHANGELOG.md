@@ -39,6 +39,14 @@ Every island has a fish you can only catch off its own shores now: garfish
 off Home Island, flying fish off Driftwood Isle, a weedy seadragon off Mossy
 Holm and a red emperor off Ember Rock.
 
+### Recipes that send you sailing
+The island finds are wanted now. An island posy needs a flower from every
+island and a four-feather wreath a feather from every island. Pearls, moss
+agate and fire opals make a necklace, a pendant and a ring (which glows at
+night). And there's new cooking: elderflower cordial, cloudberry jam, a
+samphire fish supper, herby mushrooms with wild oregano, hazelnut honey
+cake, and a herb tea that takes any herbs at all.
+
 ## 0.11.0 (2026-11-09)
 
 ### Errands for the folk
