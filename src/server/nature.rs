@@ -912,6 +912,33 @@ pub const SPECIES: &[Species] = &[
         ground: HIGH,
         here: "lies speckled brown on a warm rock",
     },
+    Species {
+        id: "garfish",
+        name: "garfish",
+        kind: Fish,
+        rarity: Common,
+        when: On(0),
+        ground: SEA,
+        here: "flashes by, all silver and long thin beak",
+    },
+    Species {
+        id: "weedy_seadragon",
+        name: "weedy seadragon",
+        kind: Fish,
+        rarity: Uncommon,
+        when: On(2),
+        ground: SEA,
+        here: "drifts like a little piece of seaweed with a face",
+    },
+    Species {
+        id: "red_emperor",
+        name: "red emperor",
+        kind: Fish,
+        rarity: Uncommon,
+        when: On(3),
+        ground: SEA,
+        here: "glows red as an ember under the water",
+    },
     // festival keepsakes: found only on festival days, and they glow once placed
     Species {
         id: "golden_blossom",
@@ -1278,6 +1305,11 @@ mod tests {
             let own: Vec<&Species> = SPECIES.iter().filter(|s| s.when == On(isle.id)).collect();
             assert!(own.len() >= 5, "{} has its own finds", isle.name);
             assert!(own.iter().all(|s| s.kind != Craft && s.kind != Food));
+            assert!(
+                own.iter().any(|s| s.kind == Fish),
+                "{} has a fish of its own",
+                isle.name
+            );
         }
         for (i, s) in SPECIES.iter().enumerate() {
             assert!(

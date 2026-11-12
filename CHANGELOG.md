@@ -34,6 +34,11 @@ and a mountain goat up on the rocks, and more. The island folk gossip about
 what's over the water, and your journal says which islands still have
 something you haven't found.
 
+### A fish for every island
+Every island has a fish you can only catch off its own shores now: garfish
+off Home Island, flying fish off Driftwood Isle, a weedy seadragon off Mossy
+Holm and a red emperor off Ember Rock.
+
 ## 0.11.0 (2026-11-09)
 
 ### Errands for the folk
