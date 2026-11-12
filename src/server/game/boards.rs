@@ -214,6 +214,8 @@ impl Game {
             "📌 The noticeboard"
         };
         let news = match new {
+            // A newcomer doesn't need telling there's nothing new.
+            0 if p.settling() => return vec![],
             0 => "has nothing new for you".to_string(),
             1 => "has 1 new note".to_string(),
             n => format!("has {n} new notes"),

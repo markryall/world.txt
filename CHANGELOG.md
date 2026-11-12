@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### A quieter first visit
+Someone brand new used to get a wall of things before they'd taken a step:
+quest news, a hilltop hint, a whisper about dark mode, their username and how
+to change their nickname. Now, on their very first visit, while they're on
+their first steps (for ten minutes or so at most), it's just the island and
+one gentle nudge at a time. Names come up once they've said hello, and the
+rest turns up once they've found their feet.
+
 ## 0.12.0 (2026-11-12)
 
 ### Dark mode

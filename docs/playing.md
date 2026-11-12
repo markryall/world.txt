@@ -10,6 +10,10 @@ wherever there's room around the Journal.
 New arrivals get five tiny first steps: walk, say hi, make something, plant
 something, see who's around. One hint shows at a time and clears when they do it.
 In the browser the hint glows above the input, and tapping it does the step.
+On their very first visit, while they're on those first steps (for ten minutes
+or so at most), the island keeps quiet: no hints in the scenery, no news of
+quests or errands, no gossip from the folk, and less scenery, so it's just the
+island and one nudge at a time. Everything else turns up once they've found their feet.
 
 Above the box, a row of buttons offers what you could do right where you
 are: 👋 wave and 💬 a word with whoever's here, pat your companion, 📖 read

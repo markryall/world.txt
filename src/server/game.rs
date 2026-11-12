@@ -58,6 +58,8 @@ use tokio::sync::mpsc::UnboundedReceiver;
 const SAY_QUOTES: [char; 6] = ['\'', '"', '‘', '’', '“', '”'];
 const TICK: Duration = Duration::from_secs(3);
 const SHOUT_RANGE: i64 = 10;
+/// How long a newcomer's very first visit stays quieter, at most.
+const SETTLING: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 /// How long a place's description may be.
 const DESCRIBE_MAX: usize = 280;
 
@@ -75,6 +77,9 @@ struct Player {
     reply_to: Option<String>,
     /// First-steps progress: an index into tutorial::STEPS, or DONE.
     tutorial: u8,
+    /// When a brand-new arrival first came in (their very first visit only),
+    /// so their first few minutes can stay quiet.
+    new_since: Option<std::time::Instant>,
     /// Ticks until something bites, while a line is in the water.
     fishing: Option<u8>,
     /// Which board they're reading, for `read more`.
@@ -131,6 +136,15 @@ impl Player {
     /// (the same measure that quietens the scenery).
     fn about(&self) -> bool {
         !self.bot && self.ambient_quiet < AMBIENT_WHILE_IDLE
+    }
+
+    /// Brand new and still finding their feet: their very first visit, on
+    /// their first steps, in the first few minutes. The island keeps its
+    /// news, whispers and hints to itself for now, so it's just the island
+    /// and one nudge at a time. Someone who comes back with the first steps
+    /// unfinished gets the island as usual.
+    fn settling(&self) -> bool {
+        self.tutorial != tutorial::DONE && self.new_since.is_some_and(|t| t.elapsed() < SETTLING)
     }
 }
 
@@ -720,6 +734,7 @@ impl Game {
                 bot,
                 reply_to: None,
                 tutorial,
+                new_since: first_time.then(std::time::Instant::now),
                 fishing: None,
                 reading: None,
                 muted,
@@ -765,7 +780,6 @@ impl Game {
                     format!("🐣 Welcome to the island, {name}! Here's how to get started."),
                 ),
             );
-            self.say1(id, Line::col(Col::Dim, format!("Your username is {user}: it's yours forever. Your nickname ({name}) can change any time: nickname Pip")));
         }
         self.show_hint(id);
         if self.is_keeper(&user) {
@@ -1537,6 +1551,13 @@ impl Game {
             p.tutorial + 1
         };
         self.say1(id, Line::new().b(Col::Yellow, step.cheer));
+        if act == Act::Say
+            && let Some(p) = self.players.get(&id)
+        {
+            // Names matter once they've said something: not before.
+            let (user, name) = (p.user.clone(), p.name.clone());
+            self.say1(id, Line::col(Col::Dim, format!("Everyone sees you as {name}, and you can change that any time: nickname Pip. Your username, {user}, is yours forever.")));
+        }
         self.show_hint(id);
         self.save_progress(id);
     }
@@ -3416,10 +3437,15 @@ impl Game {
                 if let Some(p) = self.players.get_mut(&id) {
                     p.sky = sky;
                 }
-            } else if p.ambient_quiet < AMBIENT_WHILE_IDLE && self.rng.chance(1.0 / 14.0) {
+            } else if p.ambient_quiet < AMBIENT_WHILE_IDLE
+                && self
+                    .rng
+                    .chance(if p.settling() { 1.0 / 40.0 } else { 1.0 / 14.0 })
+            {
                 let terrain = self.world.terrain(x, y);
                 let last = p.last_ambient;
-                let hint = if self.rng.chance(0.3) {
+                let settling = p.settling();
+                let hint = if !settling && self.rng.chance(0.3) {
                     self.hint(id, sky)
                 } else {
                     None

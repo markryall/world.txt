@@ -956,7 +956,9 @@ impl Game {
             return;
         }
         let only = a.island.map_or(String::new(), |i| {
-            let isle = crate::server::islands::ISLANDS[i as usize % crate::server::islands::ISLANDS.len()].name;
+            let isle = crate::server::islands::ISLANDS
+                [i as usize % crate::server::islands::ISLANDS.len()]
+            .name;
             format!(" (only ever on {isle})")
         });
         self.say1(

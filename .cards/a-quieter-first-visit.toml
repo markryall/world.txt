@@ -1,0 +1,17 @@
+name = "A quieter first visit"
+status = "done"
+description = """
+The few people shown the island got confused and didn't come back. A brand-new arrival gets a wall of things before they've taken a step: the welcome, the green, the Island Journal's 'nothing new for you', their username and how to change their nickname, a tutorial nudge, a hilltop hint, a quest announcement, a dark-mode whisper and scenery.
+
+While someone's still on their first steps (the tutorial, and for at most the first ten minutes or so of a visit), keep it to the island and one gentle nudge at a time:
+- No feature hints, whispers, quest or errand news, folk gossip or 'since you were last here' until they've settled.
+- Scenery stays (it's the island), but sparser.
+- A shorter welcome: the username line can wait until they've walked a bit.
+- Nothing new in help; everything else turns up once they've found their feet."""
+created_at = "2026-11-12T14:00:46.560301Z"
+updated_at = "2026-11-12T14:06:43.746027Z"
+tags = [
+    "onboarding",
+    "hints",
+]
+priority = "medium"

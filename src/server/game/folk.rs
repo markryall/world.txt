@@ -1172,7 +1172,9 @@ impl Game {
                 .party
                 .as_ref()
                 .is_some_and(|p| p.at > now && !self.folk[i].invited.contains(&user));
+            let settling = self.players.get(&pid).is_some_and(|p| p.settling());
             if !party_news
+                && !settling
                 && self.rng.chance(0.35)
                 && let Some(text) = self.errand_offer(&name, island, leaves, &user, now)
             {
@@ -1251,7 +1253,8 @@ impl Game {
                 (*self.rng.pick(WET)).to_string()
             } else if self.rng.chance(0.3) {
                 (*self.rng.pick(season_says(self.season))).to_string()
-            } else if self.rng.chance(0.3)
+            } else if !settling
+                && self.rng.chance(0.3)
                 && let Some(g) = gossip(&mut self.rng, f.island, &found)
             {
                 g

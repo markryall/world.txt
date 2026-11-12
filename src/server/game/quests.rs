@@ -429,7 +429,11 @@ impl Game {
                 def.name, island.name
             ),
         );
-        for p in self.players.values().filter(|p| !p.bot && p.about()) {
+        for p in self
+            .players
+            .values()
+            .filter(|p| !p.bot && p.about() && !p.settling())
+        {
             let _ = p.tx.send(crate::protocol::ToClient::Lines {
                 lines: vec![line.clone()],
             });
