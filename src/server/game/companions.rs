@@ -705,6 +705,11 @@ pub const ANIMALS: &[Animal] = &[
     },
 ];
 
+/// How meeting one is kept in the journal, beside the finds.
+pub fn met_id(a: &Animal) -> String {
+    format!("met:{}", a.id)
+}
+
 pub fn animal(id: &str) -> Option<&'static Animal> {
     ANIMALS.iter().find(|a| a.id == id)
 }
@@ -823,6 +828,7 @@ impl Game {
                 )
             };
             self.say1(id, Line::col(Col::Green, line).eerie());
+            self.meet(id, a);
         }
 
         self.wild_wander(now);
@@ -924,7 +930,42 @@ impl Game {
                 way(-dx, -dy)
             );
             self.tell_watchers(nx, ny, Line::col(Col::Green, arrives));
+            let here: Vec<u64> = self
+                .players
+                .iter()
+                .filter(|(_, p)| (p.x, p.y) == (nx, ny) && p.about())
+                .map(|(&id, _)| id)
+                .collect();
+            for id in here {
+                self.meet(id, a);
+            }
         }
+    }
+
+    /// The first time someone meets a kind of creature, it goes in their journal.
+    pub(super) fn meet(&mut self, id: u64, a: &'static Animal) {
+        let Some(p) = self.players.get(&id).filter(|p| !p.bot) else {
+            return;
+        };
+        if !self
+            .world
+            .db
+            .journal_add(&p.user, &met_id(a))
+            .unwrap_or(false)
+        {
+            return;
+        }
+        let only = a.island.map_or(String::new(), |i| {
+            let isle = crate::server::islands::ISLANDS[i as usize % crate::server::islands::ISLANDS.len()].name;
+            format!(" (only ever on {isle})")
+        });
+        self.say1(
+            id,
+            Line::new()
+                .b(Col::Yellow, "📖 New in your journal: ")
+                .b(Col::White, format!("{} {}", a.icon, capitalise(a.name)))
+                .c(Col::Yellow, only),
+        );
     }
 
     /// With someone watching, a wild animal gets on with its day: its own

@@ -1,0 +1,11 @@
+name = "Creatures you've met"
+status = "done"
+description = "There are twenty wild creatures now, many on only one island, but nothing remembers which you've met. Give the journal a page of creatures: one gets written in the first time it turns up beside you (or you see one wander in), with the island it lives on, and the rest are still to meet. Like finds, name the islands that still have someone you haven't met, not the creatures."
+created_at = "2026-11-12T13:42:13.967551Z"
+updated_at = "2026-11-12T13:46:21.605823Z"
+tags = [
+    "animals",
+    "journal",
+    "islands",
+]
+priority = "medium"

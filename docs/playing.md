@@ -435,7 +435,7 @@ islands. There are about 60 species, some rare.
 - `gather` (or `pick` / `catch`) takes what's here. Butterflies sometimes flutter
   off to the next spot.
 - `fish` next to water, then wait for a bite. Ponds and the sea have different fish.
-- `satchel` holds 30 things. `journal` shows every species you've ever found.
+- `satchel` holds 30 things. `journal` shows every species you've ever found, and every kind of creature you've met.
 - `give daisy to Poppy` (when you're together; a resident sets your gift down
   there for everyone), `place daisy` to decorate,
   `release butterfly` to let it go.

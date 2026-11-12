@@ -487,11 +487,12 @@ impl Game {
     pub(super) fn cmd_journal(&mut self, id: u64) -> anyhow::Result<()> {
         let user = self.user(id);
         let found = self.world.db.journal(&user)?;
+        let finds = found.iter().filter(|f| nature::by_id(f).is_some()).count();
         let mut lines = vec![Line::new().b(
             Col::Magenta,
             format!(
                 "📖 Your journal: {} of {} discovered",
-                found.len(),
+                finds,
                 nature::SPECIES.iter().filter(|s| s.kind != Kind::Craft).count()
             ),
         )];
@@ -522,6 +523,29 @@ impl Game {
             }
             lines.push(l);
         }
+        // Creatures met, wherever they live.
+        let animals = super::companions::ANIMALS;
+        let met: Vec<&super::companions::Animal> = animals
+            .iter()
+            .filter(|a| found.contains(&super::companions::met_id(a)))
+            .collect();
+        lines.push(Line::new().b(
+            Col::Yellow,
+            format!("🐾 Creatures met  {}/{}", met.len(), animals.len()),
+        ));
+        let mut l = Line::new().t("   ");
+        for a in &met {
+            l = l.t(format!("{} {} ", a.icon, a.name)).c(Col::Dim, "· ");
+        }
+        if met.len() < animals.len() {
+            l = l.c(
+                Col::Dim,
+                format!("{} still to meet", animals.len() - met.len()),
+            );
+        } else {
+            l = l.b(Col::Green, "all met! 🎉");
+        }
+        lines.push(l);
         lines.push(Line::col(
             Col::Dim,
             "Some only appear at night, in the rain, or in certain places.",
@@ -545,7 +569,7 @@ impl Game {
             };
             lines.push(Line::col(
                 Col::Dim,
-                format!("🏝 Some things grow on one island and nowhere else: {list} still {has} some you haven't found."),
+                format!("🏝 Some things live on one island and nowhere else: {list} still {has} something you haven't found."),
             ));
         }
         self.send(id, lines);

@@ -53,6 +53,11 @@ something growing does it a good turn, and it grows on a little. And there's
 a bug hotel to make from pinecones and leaves, which beetles and dragonflies
 like to visit.
 
+### Creatures you've met
+Your journal has a page of creatures now: the first time a kangaroo bounds
+up beside you, or a koala wanders over, it's written in. The journal says
+which islands still have someone you haven't met.
+
 ## 0.11.0 (2026-11-09)
 
 ### Errands for the folk
