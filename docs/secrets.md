@@ -141,6 +141,13 @@ outside: a fox curls up in the warmest corner, a rabbit flops over on its
 side, a turtle finds the warm patch by the window. Put a cushion, rug or
 anything soft in there and they'll settle on it now and then.
 
+## Bugs that help
+
+Let a bug go beside something growing and it does the garden a good turn: a
+ladybird eats the greenfly, a stag beetle turns the soil, a sun lizard snaps
+up the slugs, and the flowers or tree grow on a little (an hour for flowers,
+half a day for a tree). Anyone's garden, not just your own.
+
 ## Island folk
 
 Each island has one or two folk on it at a time: scripted characters (not

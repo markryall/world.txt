@@ -47,6 +47,12 @@ night). And there's new cooking: elderflower cordial, cloudberry jam, a
 samphire fish supper, herby mushrooms with wild oregano, hazelnut honey
 cake, and a herb tea that takes any herbs at all.
 
+### Bugs that help
+Bugs were the only finds with nothing to do. Now a bug let go beside
+something growing does it a good turn, and it grows on a little. And there's
+a bug hotel to make from pinecones and leaves, which beetles and dragonflies
+like to visit.
+
 ## 0.11.0 (2026-11-09)
 
 ### Errands for the folk

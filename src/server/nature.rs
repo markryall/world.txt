@@ -1112,6 +1112,15 @@ pub const SPECIES: &[Species] = &[
         ground: &[],
         here: "stirs in the draught, blue and grey and speckled brown",
     },
+    Species {
+        id: "bug_hotel",
+        name: "bug hotel",
+        kind: Craft,
+        rarity: Common,
+        when: Any,
+        ground: &[],
+        here: "hums quietly with beetles coming and going",
+    },
     // cooked: `here` is how it looks (and smells) once placed
     Species {
         id: "mint_tea",
@@ -1348,12 +1357,13 @@ pub fn choose(
     season: Season,
     festival: bool,
     island: u8,
-    fishing: bool,
+    // Only this kind (fish, when fishing), or anything but fish.
+    only: Option<Kind>,
 ) -> Option<&'static Species> {
     let options: Vec<&Species> = SPECIES
         .iter()
         .filter(|s| {
-            (s.kind == Fish) == fishing
+            only.map_or(s.kind != Fish, |k| s.kind == k)
                 && s.ground.contains(&ground)
                 && s.when.ok(sky, phase, season, festival, island)
         })
@@ -1440,7 +1450,7 @@ mod tests {
                         season,
                         false,
                         0,
-                        false
+                        None,
                     )
                     .is_some(),
                     "{ground:?}"
@@ -1456,7 +1466,7 @@ mod tests {
                 Season::Spring,
                 false,
                 0,
-                true
+                Some(Fish),
             )
             .is_some()
         );
@@ -1469,7 +1479,7 @@ mod tests {
                 Season::Winter,
                 false,
                 0,
-                true
+                Some(Fish),
             )
             .is_some()
         );
@@ -1488,7 +1498,7 @@ mod tests {
                 Season::Autumn,
                 true,
                 0,
-                false,
+                None,
             ) {
                 found.insert(s.id);
             }
@@ -1515,7 +1525,7 @@ mod tests {
                 Season::Spring,
                 false,
                 2,
-                false,
+                None,
             ) {
                 holm.insert(s.id);
             }

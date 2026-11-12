@@ -1,0 +1,16 @@
+name = "Bugs that help"
+status = "done"
+description = """
+Bugs are the only finds with nothing to do: the ladybird, stag beetle, jewel beetle, dragonfly and sun lizard can only be caught, logged and let go.
+
+- Let a bug go in a garden and it helps: the garden grows on a little, kindly, without anyone squashing anything.
+- A bug hotel to build (pinecones and leaves, no bugs needed) that beetles and dragonflies like to visit.
+- Hints, not help."""
+created_at = "2026-11-12T13:42:13.962912Z"
+updated_at = "2026-11-12T13:45:26.689549Z"
+tags = [
+    "nature",
+    "gardens",
+    "bugs",
+]
+priority = "medium"

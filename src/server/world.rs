@@ -303,6 +303,15 @@ impl World {
         Ok(())
     }
 
+    /// Something growing gets on a little, as if planted `secs` earlier.
+    pub fn hurry_planting(&mut self, x: i64, y: i64, secs: i64) -> anyhow::Result<()> {
+        if let Some(p) = self.plantings.get_mut(&(x, y)) {
+            p.at -= secs;
+            self.db.set_planting(p)?;
+        }
+        Ok(())
+    }
+
     /// Its planter has heard it's grown this far.
     pub fn told_planter(&mut self, x: i64, y: i64, stage: i64) -> anyhow::Result<()> {
         if let Some(p) = self.plantings.get_mut(&(x, y)) {
@@ -1172,6 +1181,24 @@ fn load_homes(db: &Db) -> anyhow::Result<Vec<Home>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_hurried_planting_grows_on() {
+        let mut world =
+            World::load_or_create(super::super::db::Db::open(":memory:").unwrap(), Some(7))
+                .unwrap();
+        let t = now();
+        world.plant(10, 10, "bluebells", "sam", t).unwrap();
+        let stage = |w: &World| {
+            super::super::gardens::stage_of(&w.plantings[&(10, 10)], t)
+                .unwrap()
+                .1
+        };
+        assert_eq!(stage(&world), 0);
+        world.hurry_planting(10, 10, 3 * 3600).unwrap();
+        assert_eq!(stage(&world), 1, "in bud now");
+        world.hurry_planting(11, 11, 3600).unwrap(); // nothing there: nothing happens
+    }
 
     #[test]
     fn rooms_stay_on_their_islands_side() {

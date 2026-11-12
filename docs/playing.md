@@ -336,7 +336,8 @@ your guests made too. `paint the bench plain` scrubs it off.
 Homes can be furnished from finds, too: `recipes` lists things for a home
 (a feather cushion, a toadstool stool, a leaf rug, a door wreath, a vase of
 flowers, a shell mirror, a pinecone lamp, a driftwood table, a pebble doorstop,
-a butterfly bush, and a four-feather wreath with a feather from every island). `craft feather cushion`, then `place feather cushion` where
+a butterfly bush, a bug hotel that beetles and dragonflies like to visit,
+and a four-feather wreath with a feather from every island). `craft feather cushion`, then `place feather cushion` where
 you want it, and paint it if you like.
 
 Every finished building has a room inside: `go in` (or `enter the cottage`)

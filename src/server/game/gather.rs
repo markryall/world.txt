@@ -133,6 +133,15 @@ impl Game {
             let sky = self.world.weather.sky_at(x, y);
             let (season, festival) = (Clock::season(), Clock::festival().is_some());
             let island = crate::server::islands::island_at(x, y).id;
+            // Beetles and dragonflies like to visit a bug hotel.
+            let hotel = (-3..=3).any(|hx| {
+                (-3..=3).any(|hy| {
+                    self.world
+                        .things_at(x + hx, y + hy)
+                        .any(|t| t.name.contains("bug hotel"))
+                })
+            });
+            let bugs = (hotel && self.rng.chance(0.5)).then_some(Kind::Bug);
             let Some(species) = nature::choose(
                 &mut self.rng,
                 ground,
@@ -141,8 +150,22 @@ impl Game {
                 season,
                 festival,
                 island,
-                false,
-            ) else {
+                bugs,
+            )
+            .or_else(|| {
+                bugs.and_then(|_| {
+                    nature::choose(
+                        &mut self.rng,
+                        ground,
+                        sky,
+                        phase,
+                        season,
+                        festival,
+                        island,
+                        None,
+                    )
+                })
+            }) else {
                 continue;
             };
             let until = nature::lifetime(&mut self.rng);
@@ -239,7 +262,7 @@ impl Game {
                 Clock::season(),
                 false,
                 crate::server::islands::island_at(x, y).id,
-                true,
+                Some(Kind::Fish),
             )
         };
         match fish {
@@ -824,6 +847,59 @@ impl Game {
             Line::col(
                 Col::Pink,
                 format!("{} {name} lets a {} go. It {how}.", s.kind.icon(), s.name),
+            ),
+        );
+        if s.kind == Kind::Bug {
+            self.bug_helps_garden(id, x, y, s)?;
+        }
+        Ok(())
+    }
+
+    /// A bug let go beside something growing does it a good turn, and it
+    /// grows on a little.
+    fn bug_helps_garden(&mut self, id: u64, x: i64, y: i64, s: &Species) -> anyhow::Result<()> {
+        use crate::server::gardens;
+        let now = super::boards::now();
+        let spots = std::iter::once((0, 0)).chain(DIRS.iter().map(|d| (d.2, d.3)));
+        let Some((gx, gy, plant)) = spots
+            .map(|(dx, dy)| (x + dx, y + dy))
+            .filter_map(|(gx, gy)| {
+                let row = self.world.plantings.get(&(gx, gy))?;
+                let (plant, stage) = gardens::stage_of(row, now)?;
+                (stage < gardens::grown(plant.kind)).then_some((gx, gy, plant))
+            })
+            .next()
+        else {
+            return Ok(());
+        };
+        let favour = match s.id {
+            "ladybird" => "eats every greenfly it can find",
+            "stag_beetle" => "turns over the soil around the roots",
+            "jewel_beetle" => "carries pollen from flower to flower, glittering",
+            "dragonfly" => "keeps the midges off",
+            "sun_lizard" => "snaps up the slugs",
+            "firefly" => "lights the way for the night moths that help it grow",
+            "glow_worm" => "sees off the snails",
+            _ => "potters about among the leaves",
+        };
+        let hurry = match plant.kind {
+            gardens::Kind::Tree => 12 * 3600,
+            gardens::Kind::Flowers => 3600,
+        };
+        self.world.hurry_planting(gx, gy, hurry)?;
+        let place = if (gx, gy) == (x, y) {
+            "here"
+        } else {
+            "beside you"
+        };
+        self.say1(
+            id,
+            Line::col(
+                Col::Green,
+                format!(
+                    "🌱 It {favour}. You'd swear the {} {place} grew a little, just then.",
+                    plant.name
+                ),
             ),
         );
         Ok(())

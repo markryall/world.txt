@@ -143,6 +143,10 @@ pub const FURNITURE: &[Recipe] = &[
         ],
     },
     Recipe {
+        makes: "bug_hotel",
+        needs: &[(Exactly("pinecone"), 2), (Any(Kind::Leaf), 2)],
+    },
+    Recipe {
         makes: "butterfly_bush",
         needs: &[(Any(Kind::Butterfly), 2), (Any(Kind::Flower), 2)],
     },
