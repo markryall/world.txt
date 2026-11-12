@@ -275,6 +275,20 @@ pub fn looks(p: &Plant, stage: i64, season: Season) -> String {
     }
 }
 
+/// Who planted what's growing here, and when: "You planted the birch here
+/// 2 days ago." Where someone's own words have taken the place of how it
+/// looks, it says how it's coming on too, so it's never a mystery.
+pub fn planted(p: &Plant, stage: i64, who: &str, ago: &str, unseen: bool) -> String {
+    let now = match (p.kind, stage, unseen) {
+        (_, _, false) => String::new(),
+        (Tree, s, _) => format!(", and it's {} now", label(p, s)),
+        (Flowers, 0, _) => ", and they're just shoots so far".into(),
+        (Flowers, 1, _) => ", and they're in bud".into(),
+        (Flowers, _, _) => ", and they're in bloom".into(),
+    };
+    format!("{who} planted the {} here {ago}{now}.", p.name)
+}
+
 /// When it grows a stage: "has grown into a young birch".
 pub fn grew(p: &Plant, stage: i64) -> String {
     match p.kind {
@@ -361,6 +375,23 @@ mod tests {
             assert!(p.kind == Tree && p.id != "willow");
             assert_eq!(choose(Flowers, true, roll).kind, Flowers);
         }
+    }
+
+    #[test]
+    fn says_what_was_planted() {
+        let birch = by_id("birch").unwrap();
+        assert_eq!(
+            planted(birch, 1, "You", "2 days ago", false),
+            "You planted the birch here 2 days ago."
+        );
+        assert_eq!(
+            planted(birch, 1, "You", "2 days ago", true),
+            "You planted the birch here 2 days ago, and it's a young birch now."
+        );
+        assert_eq!(
+            planted(by_id("bluebells").unwrap(), 2, "Poppy", "yesterday", true),
+            "Poppy planted the bluebells here yesterday, and they're in bloom."
+        );
     }
 
     #[test]

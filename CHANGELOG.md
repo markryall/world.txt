@@ -15,6 +15,11 @@ In the browser, drag the side panel's edge to make it wider or narrower. It
 remembers, and a double-click puts it back. A wider panel shows more of the
 map, up to about three times as much of the island around you.
 
+### Gardens say what's growing
+Somewhere with its own description, a planting used to say only "You planted
+it 2 days ago", without saying what. Now it's "You planted the birch here 2
+days ago, and it's a young birch now".
+
 ## 0.12.0 (2026-11-12)
 
 ### Dark mode

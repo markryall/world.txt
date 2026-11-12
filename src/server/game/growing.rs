@@ -66,7 +66,7 @@ impl Game {
             return vec![];
         };
         let now = super::boards::now();
-        let Some((plant, _)) = gardens::stage_of(row, now) else {
+        let Some((plant, stage)) = gardens::stage_of(row, now) else {
             return vec![];
         };
         let who = if row.by == p.user {
@@ -74,13 +74,14 @@ impl Game {
         } else {
             self.world.nick(&row.by)
         };
-        let what = match plant.kind {
-            Kind::Tree => "it",
-            Kind::Flowers => "them",
-        };
+        // Someone's own words for the spot hide how it looks: say what it is.
+        let unseen = self.world.descriptions.contains_key(&(p.x, p.y));
         vec![Line::col(
             Col::Green,
-            format!("🌱 {who} planted {what} {}.", gardens::ago(now - row.at)),
+            format!(
+                "🌱 {}",
+                gardens::planted(plant, stage, &who, &gardens::ago(now - row.at), unseen)
+            ),
         )]
     }
 
