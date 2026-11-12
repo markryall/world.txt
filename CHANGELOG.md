@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Installing without Rust
+`brew install markryall/tap/world-txt` now fetches a ready-made world.txt for
+macOS or Linux instead of building it, so there's no Rust to install and
+nothing to wait for. On Linux it carries its own OpenSSL; build it yourself
+with `make install` to use your system's instead.
+
 ### A quieter first visit
 Someone brand new used to get a wall of things before they'd taken a step:
 quest news, a hilltop hint, a whisper about dark mode, their username and how
