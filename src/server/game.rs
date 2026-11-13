@@ -1034,7 +1034,8 @@ impl Game {
             "who" => self.cmd_who(id),
             "time" | "clock" => self.cmd_time(id, rest),
             "sail" | "row" | "boat" => return self.cmd_sail(id, rest.trim_start_matches("to ")),
-            "befriend" | "feed" | "tame" => return self.cmd_befriend(id, rest),
+            "befriend" | "tame" => return self.cmd_befriend(id, rest),
+            "feed" => return self.cmd_feed(id, rest),
             "petname" => return self.cmd_nickname(id, rest),
             "nickname" | "nick" => return self.cmd_rename(id, rest),
             "pet" | "pat" | "cuddle" | "stroke" => return self.cmd_pet(id, rest),
@@ -4119,6 +4120,7 @@ const HELP: &[HelpTopic] = &[
                 "befriend fox",
                 "offer a wild animal a berry (it may take a few)",
             ),
+            ("feed", "give your friend a berry"),
             (
                 "petname Rusty / pet / let go",
                 "your friend follows you everywhere",

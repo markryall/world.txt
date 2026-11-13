@@ -1180,6 +1180,91 @@ impl Game {
         Ok(())
     }
 
+    /// `feed`: your own companion gets a berry, unless you mean a wild one
+    /// here, which is befriending it.
+    pub(super) fn cmd_feed(&mut self, id: u64, what: &str) -> anyhow::Result<()> {
+        let Some((x, y, name)) = self.here(id) else {
+            return Ok(());
+        };
+        let wanted = crate::server::world::strip_article(what.trim()).to_lowercase();
+        let Some((a, n)) = self
+            .players
+            .get(&id)
+            .and_then(|p| p.companion.as_ref())
+            .and_then(|(a, n)| animal(a).map(|an| (an, n.clone())))
+        else {
+            return self.cmd_befriend(id, what);
+        };
+        let who = label(a, &n);
+        let means_mine = wanted.is_empty() || who.to_lowercase().contains(&wanted);
+        let wild_here = self.wild.iter().any(|w| {
+            (w.x, w.y) == (x, y) && (wanted.is_empty() || w.animal.name.contains(&wanted))
+        });
+        if !means_mine && wild_here {
+            return self.cmd_befriend(id, what);
+        }
+        if !means_mine {
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "There's no {wanted} here to feed, but {who} is looking at you hopefully. (feed)"
+                )),
+            );
+            return Ok(());
+        }
+        let user = self.user(id);
+        let berry = self
+            .world
+            .db
+            .satchel(&user)?
+            .into_iter()
+            .filter_map(|(sid, n)| nature::by_id(&sid).map(|s| (s, n)))
+            .filter(|(s, _)| s.kind == Kind::Berry)
+            .max_by_key(|(_, n)| *n)
+            .map(|(s, _)| s);
+        let Some(berry) = berry else {
+            self.say1(
+                id,
+                Line::plain(format!(
+                    "{} {} sniffs your empty hand and looks up at you. Berries are their favourite: gather some! 🫐",
+                    a.icon,
+                    capitalise(&who)
+                )),
+            );
+            return Ok(());
+        };
+        self.world.db.satchel_add(&user, berry.id, -1)?;
+        let how = *self.rng.pick(&[
+            "gobbles it up and looks at you adoringly",
+            "eats it very slowly, savouring every bit",
+            "snaffles it and checks your hand for more",
+            "takes it ever so gently, then wolfs it down",
+            "eats it with great ceremony, and is plainly delighted",
+        ]);
+        self.say1(
+            id,
+            Line::col(
+                Col::Green,
+                format!(
+                    "{} You give {who} {}. {} {how}.",
+                    a.icon,
+                    nature::a(berry.name),
+                    capitalise(&who)
+                ),
+            ),
+        );
+        self.tell_here(
+            x,
+            y,
+            id,
+            Line::col(
+                Col::Green,
+                format!("{} {name} feeds {who} {}.", a.icon, nature::a(berry.name)),
+            ),
+        );
+        Ok(())
+    }
+
     pub(super) fn cmd_nickname(&mut self, id: u64, new: &str) -> anyhow::Result<()> {
         let Some((_, _, _name)) = self.here(id) else {
             return Ok(());

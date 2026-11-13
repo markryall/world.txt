@@ -12,6 +12,10 @@ Recipes and buildings that want a leaf now say "leaf or seed", since an acorn,
 a hazelnut, a pinecone or a curled fern frond will do just as well. Nobody
 would have guessed a hazelnut counted as a leaf.
 
+### Feeding your friend
+`feed` gives your own companion a berry. It used to only work on wild animals,
+so your fox just watched you snack.
+
 ## 0.12.1 - 2026-11-13
 
 ### Installing without Rust

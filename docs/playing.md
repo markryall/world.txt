@@ -470,7 +470,7 @@ turtle on the shore, and stranger things on the other islands. Berries
 (blackberries, wild strawberries, bilberries) are
 gathered like anything else, and `befriend fox` offers one; it may take a couple.
 A companion follows you everywhere, indoors too, gets up to little things, and
-shows up in `look` and in your comings and goings. `petname Rusty`, `pet`, and `let go`.
+shows up in `look` and in your comings and goings. `feed` gives them a berry, and there's `petname Rusty`, `pet`, and `let go`.
 One each, remembered between visits.
 
 ## Crafting
