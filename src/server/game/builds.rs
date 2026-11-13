@@ -45,7 +45,7 @@ pub const PLANS: &[Plan] = &[
         secs: 300,
         extension: false,
         looks: "A round little house with a spotty red roof, and a door just about big enough for you if you duck.",
-        hint: "Your satchel has a good few mushrooms in it. Enough, with a leaf, to build a little mushroom house.",
+        hint: "Your satchel has a good few mushrooms in it. Enough, with a leaf or a seed, to build a little mushroom house.",
     },
     Plan {
         id: "shell_cottage",
@@ -85,7 +85,7 @@ pub const PLANS: &[Plan] = &[
         secs: 240,
         extension: false,
         looks: "A tall, airy aviary woven from leaves and trimmed with feathers. Birds keep popping in to see who built it.",
-        hint: "A couple of feathers and some leaves. You could build a little feather aviary with those.",
+        hint: "A couple of feathers and some leaves or seeds. You could build a little feather aviary with those.",
     },
     Plan {
         id: "berry_bakery",
@@ -105,7 +105,7 @@ pub const PLANS: &[Plan] = &[
         secs: 240,
         extension: false,
         looks: "A leaning shack thatched with leaves, with a hand-painted fish over the door. It's fine. It's mostly fine.",
-        hint: "You've caught enough fish to build a fish shack. Leaves for the roof, fish for the sign.",
+        hint: "You've caught enough fish to build a fish shack. Leaves or seeds for the roof, fish for the sign.",
     },
     // Next door to a building only.
     Plan {
@@ -126,7 +126,7 @@ pub const PLANS: &[Plan] = &[
         secs: 120,
         extension: true,
         looks: "A shady porch roofed with leaves, with room for two to sit and watch the weather.",
-        hint: "A porch would suit the building next door. Three leaves would roof one.",
+        hint: "A porch would suit the building next door. Three leaves or seeds would roof one.",
     },
     Plan {
         id: "toadstool_chimney",

@@ -165,7 +165,7 @@ pub(super) fn need_label(need: Need, n: i64) -> String {
             Kind::Feather => ("feather", "feathers"),
             Kind::Mushroom => ("mushroom", "mushrooms"),
             Kind::Stone => ("stone", "stones"),
-            Kind::Leaf => ("leaf", "leaves"),
+            Kind::Leaf => ("leaf or seed", "leaves or seeds"),
             Kind::Berry => ("berry", "berries"),
             Kind::Fish => ("fish", "fish"),
             Kind::Herb => ("herb", "herbs"),
