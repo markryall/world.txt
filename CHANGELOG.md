@@ -10,7 +10,11 @@ Everyone nearby sees how it turned out.
 ### Leaves or seeds
 Recipes and buildings that want a leaf now say "leaf or seed", since an acorn,
 a hazelnut, a pinecone or a curled fern frond will do just as well. Nobody
-would have guessed a hazelnut counted as a leaf.
+would have guessed a hazelnut counted as a leaf. The same goes for the others
+that stretched a word: a "shell or seashore find" can be sea glass, a starfish,
+driftwood, a sand dollar, a pearl or a cuttlebone, honeycomb and elderflower
+are "herb or honey", a little crab is "fish or crab", and moths are
+"butterfly or moth".
 
 ### Feeding your friend
 `feed` gives your own companion a berry. It used to only work on wild animals,

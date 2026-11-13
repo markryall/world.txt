@@ -95,7 +95,7 @@ pub const PLANS: &[Plan] = &[
         secs: 300,
         extension: false,
         looks: "A tiny bakery with berry-stained shutters. Nobody's baking, but it smells as if somebody just was.",
-        hint: "Berries and a herb in your satchel. That's a berry bakery, if ever there was one.",
+        hint: "Berries and a herb (or a bit of honey) in your satchel. That's a berry bakery, if ever there was one.",
     },
     Plan {
         id: "fish_shack",
@@ -146,7 +146,7 @@ pub const PLANS: &[Plan] = &[
         secs: 180,
         extension: true,
         looks: "A slim bell tower with a big shell for a bell. The wind rings it, very quietly.",
-        hint: "Next door could use a bell tower. A shell or two and a feather would do.",
+        hint: "Next door could use a bell tower. A shell or two (or anything from the seashore) and a feather would do.",
     },
     Plan {
         id: "flower_arch",
